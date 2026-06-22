@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HelloBug · 线框图索引</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+:root {
+  --index-bg: #0d0d0f;
+  --card-bg: #1c1c1e;
+  --card-hover: #2c2c2e;
+  --border: rgba(255,255,255,.08);
+}
+[data-theme="light"] {
+  --index-bg: #f2f2f7;
+  --card-bg: #fff;
+  --card-hover: #f5f5f7;
+  --border: rgba(0,0,0,.06);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 0;
+  background: var(--index-bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  min-height: 100vh;
+}
+.page-header {
+  padding: 48px 40px 32px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 20px; flex-wrap: wrap;
+}
+.header-logo {
+  width: 56px; height: 56px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #0a84ff, #5e5ce6);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 30px; flex-shrink: 0;
+  box-shadow: 0 6px 20px rgba(10,132,255,.3);
+}
+.header-titles { flex: 1; min-width: 220px; }
+.header-title { font-size: 30px; font-weight: 700; letter-spacing: -.5px; line-height: 1.1; }
+.header-sub { font-size: 14px; color: var(--fg2); margin-top: 5px; line-height: 1.5; }
+.header-meta { text-align: right; font-size: 12px; color: var(--fg3); line-height: 1.7; flex-shrink: 0; }
+
+.container { max-width: 1280px; margin: 0 auto; padding: 40px 40px 80px; }
+
+.group-section { margin-bottom: 48px; }
+.group-header {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 18px; flex-wrap: wrap;
+}
+.group-icon {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+.group-name { font-size: 20px; font-weight: 700; }
+.group-desc { font-size: 13px; color: var(--fg2); margin-left: auto; }
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+  gap: 12px;
+}
+.screen-card {
+  background: var(--card-bg);
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  transition: transform .15s, box-shadow .15s;
+  cursor: pointer;
+  display: block;
+}
+.screen-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 32px rgba(0,0,0,.3);
+}
+[data-theme="light"] .screen-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+.card-preview {
+  height: 110px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 36px;
+  position: relative;
+}
+.card-info { padding: 11px 14px 14px; border-top: 1px solid var(--border); }
+.card-num { font-size: 11px; color: var(--fg3); font-family: var(--font-mono); margin-bottom: 2px; }
+.card-name { font-size: 14px; font-weight: 600; line-height: 1.3; }
+.card-desc { font-size: 12px; color: var(--fg2); margin-top: 3px; line-height: 1.4; }
+
+.badge {
+  display: inline-block;
+  font-size: 10px; font-weight: 700;
+  padding: 2px 7px; border-radius: 999px;
+  margin-top: 7px; letter-spacing: .03em;
+  text-transform: uppercase;
+}
+.m1 { background: rgba(10,132,255,.15); color: #0a84ff; }
+.m2 { background: rgba(52,199,89,.15); color: #34c759; }
+.m3 { background: rgba(255,149,0,.15); color: #ff9500; }
+.m4 { background: rgba(191,90,242,.15); color: #bf5af2; }
+.ux { background: rgba(94,92,230,.15); color: #5e5ce6; }
+
+.legend {
+  display: flex; gap: 14px; flex-wrap: wrap;
+  margin-bottom: 36px; padding: 14px 18px;
+  background: var(--card-bg); border-radius: 12px;
+  border: 1px solid var(--border);
+}
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fg2); }
+
+.milestone-strip { display: flex; gap: 8px; margin-bottom: 36px; flex-wrap: wrap; }
+.ms-block {
+  flex: 1; min-width: 140px;
+  padding: 13px 15px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--card-bg);
+}
+.ms-lbl { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 3px; }
+.ms-name { font-size: 13px; font-weight: 600; }
+.ms-days { font-size: 11px; color: var(--fg3); margin-top: 2px; }
+
+.divider { height: 1px; background: var(--border); margin: 44px 0; }
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+
+<div class="page-header">
+  <div style="display:flex;align-items:center;gap:14px;flex:1;min-width:260px">
+    <div class="header-logo">🐛</div>
+    <div class="header-titles">
+      <div class="header-title">HelloBug · 线框图索引</div>
+      <div class="header-sub">手机远程操控本地 Claude Code / Codex · 24 个界面 · Cupertino 深色设计语言</div>
+    </div>
+  </div>
+  <div class="header-meta">24 个界面<br>4 个 Milestone<br>2026-06-21</div>
+</div>
+
+<div class="container">
+
+  <div class="milestone-strip">
+    <div class="ms-block" style="border-color:#0a84ff44;background:rgba(10,132,255,.05)">
+      <div class="ms-lbl" style="color:#0a84ff">M1</div>
+      <div class="ms-name">安全骨架</div>
+      <div class="ms-days">~5-7 天</div>
+    </div>
+    <div class="ms-block" style="border-color:#34c75944;background:rgba(52,199,89,.05)">
+      <div class="ms-lbl" style="color:#34c759">M2</div>
+      <div class="ms-name">聊天闭环</div>
+      <div class="ms-days">~5-7 天</div>
+    </div>
+    <div class="ms-block" style="border-color:#ff950044;background:rgba(255,149,0,.05)">
+      <div class="ms-lbl" style="color:#ff9500">M3</div>
+      <div class="ms-name">Diff + 文件树</div>
+      <div class="ms-days">~5-7 天</div>
+    </div>
+    <div class="ms-block" style="border-color:#bf5af244;background:rgba(191,90,242,.05)">
+      <div class="ms-lbl" style="color:#bf5af2">M4</div>
+      <div class="ms-name">多并发 + 推送</div>
+      <div class="ms-days">~7-10 天</div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><span class="badge m1">M1</span> 骨架 &amp; 安全</div>
+    <div class="legend-item"><span class="badge m2">M2</span> 聊天闭环</div>
+    <div class="legend-item"><span class="badge m3">M3</span> Diff &amp; 文件</div>
+    <div class="legend-item"><span class="badge m4">M4</span> 多并发 &amp; 推送</div>
+    <div class="legend-item"><span class="badge ux">UX</span> 纯 UI / 通用</div>
+  </div>
+
+  <!-- GROUP 1 -->
+  <div class="group-section">
+    <div class="group-header">
+      <div class="group-icon" style="background:rgba(10,132,255,.15)">🔐</div>
+      <div class="group-name">引导与配对</div>
+      <div class="group-desc">首次使用 · 建立 E2EE 信任链</div>
+    </div>
+    <div class="card-grid">
+      <a class="screen-card" href="10-onboarding.html">
+        <div class="card-preview" style="background:linear-gradient(135deg,#0a84ff18,#5e5ce618)">🚀</div>
+        <div class="card-info"><div class="card-num">10</div><div class="card-name">引导页</div>
+          <div class="card-desc">三屏特性介绍：流式对话 / E2EE / 危险守护</div><span class="badge ux">UX</span></div>
+      </a>
+      <a class="screen-card" href="01-pairing.html">
+        <div class="card-preview" style="background:linear-gradient(135deg,#1c3a5e22,#0a84ff11)">📷</div>
+        <div class="card-info"><div class="card-num">01</div><div class="card-name">配对入口</div>
+          <div class="card-desc">扫码或输入配对码 + 服务器地址</div><span class="badge m1">M1</span></div>
+      </a>
+      <a class="screen-card" href="02-sas.html">
+        <div class="card-preview" style="background:linear-gradient(135deg,#ff9f0a22,#ff453a11)">🐢</div>
+        <div class="card-info"><div class="card-num">02</div><div class="card-name">SAS 安全核对</div>
+          <div class="card-desc">5 emoji 双端确认，防中间人</div><span class="badge m1">M1</span></div>
+      </a>
+      <a class="screen-card" href="11-unlock.html">
+        <div class="card-preview" style="background:linear-gradient(135deg,#1c1c1e,#2c2c2e)">🔒</div>
+        <div class="card-info"><div class="card-num">11</div><div class="card-name">锁屏解锁</div>
+          <div class="card-desc">后台超时 Face ID / 指纹验证</div><span class="badge m1">M1</span></div>
+      </a>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- GROUP 2 -->
+  <div class="group-section">
+    <div class="group-header">
+      <div class="group-icon" style="background:rgba(52,199,89,.15)">🖥</div>
+      <div class="group-name">设备与工作区</div>
+      <div class="group-desc">Tab 1 · 选机器、选项目</div>
+    </div>
+    <div class="card-grid">
+      <a class="screen-card" href="03-devices.html">
+        <div class="card-preview" style="background:linear-gradient(135deg,#34c75922,#30d15811)">💻</div>
+        <div class="card-info"><div class="card-num">03</div><div class="card-name">设备列表</div>
+          <div class="card-desc">在线/离线状态、活跃会话数</div><span class="badge m1">M1</span></div>
+      </a>
+      <a class="screen-card" href="03-devices.html">
+        <div class="card-preview" style="background:linear-gradient(135deg,#34c75911,#0a84ff11)">📂</div>
+        <div class="card-info"><div class="card-num">04*</div><div class="card-name">工作区列表</div>
+          <div class="card-desc">项目卡片、git 分支、最近活动（待独立绘制）</div><span class="badge m1">M1</span></div>
+      </a>
+      <a class="screen-card" href="23-device-detail.html">
+        <div class="card-preview" style="background:linear-gradient(135deg,#1c3a5e33,#0a84ff22)">🔑</div>
+        <div class="card-info"><div class="card-num">23</div><div class="card-name">设备详情</div>
+          <div class="card-desc">系统信息、密钥管理、解绑吊销</div><span class="badge m1">M1</span></div>
+      </a>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- GROUP 3 -->
+  <div class="group-section">
+    <div class="group-header">
+      <div class="group-icon" style="background:rgba(10,132,255,.15)">💬</div>
+      <div class="group-name">会话流</div>
+      <div class="group-desc">Tab 2 · 核心聊天体验</div>
+    </div>
+    <div class="card-grid">
+      <a class="screen-card" href="08-session-list.html">
+        <div class="card-preview" style="background:linear-gradient(135deg,#0a84ff18,#5e5ce618)">📋</div>
+        <div class="card-info"><div class="card-num">05</div><div class="card-name">会话列表</div>
+          <div class="card-desc">进行中 + 历史，多项目并发</div><span class="badge m2">M2</span></div>
+      </a>
+      <a class="screen-card" href="12-new-session.html">
+        <div class="card-preview" style="background:linear-gradient(135deg,#5e5ce618,#0a84ff11)">⚡</div>
+        <div class="card-info"><div class="card-num">12</div><div class="card-name">新建会话向导</div>
+          <div class="card-desc">3 步：设备 → 工作区 → Agent</div><span class="badge m2">M2</span></div>
+      </a>
+      <a class="screen-card" href="04-chat.html">
+        <div class="card-preview" style="background:linear-gradient(135deg,#0a84ff28,#1c1c1e)">🤖</div>
+        <div class="card-info"><div class="card-num">06</div><div class="card-name">会话主页</div>
+          <div class="card-desc">流式输出、tool_use 卡片、diff 内联</div><span class="badge m2">M2</span></div>
+      </a>
+      <a class="screen-card" href="13-workspace-switch.html">
+        <div class="card-preview" style="background:linear-gradient(135deg,#5e5ce628,#2c2c2e)">🔀</div>
+        <div class="card-info"><div class="card-num">13</div><div class="card-name">工作区切换</div>
+          <div class="card-desc">Bottom sheet 快速切换</div><span class="badge m2">M2</span></div>
+      </a>
+      <a class="screen-card" href="09-danger-confirm.html">
+        <div class="card-preview" style="background:linear-gradient(135deg,#ff453a28,#ff9f0a18)">⚠️</div>
+        <div class="card-info"><div class="card-num">09</div><div class="card-name">危险操作确认</div>
+          <div class="card-desc">命中黑名单 → Face ID 放行</div><span class="badge m2">M2</span></div>
+      </a>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- GROUP 4 -->
+  <div class="group-section">
+    <div class="group-header">
+      <div class="group-icon" style="background:rgba(255,149,0,.15)">📝</div>
+      <div class="group-name">代码查看</div>
+      <div class="group-desc">M3 · Diff 全屏 + 文件树 + 只读预览 + 终端</div>
+    </div>
+    <div class="card-grid">
+      <a class="screen-card" href="05-diff.html">
+        <div class="card-preview" style="background:linear-gradient(135deg,#34c75918,#ff453a18)">📊</div>
+        <div class="card-info"><div class="card-num">07</div><div class="card-name">Diff 全屏</div>
+          <div class="card-desc">统一/分栏切换、语法高亮、行号</div><span class="badge m3">M3</span></div>
+      </a>
+      <a class="screen-card" href="06-filetree.html">
+        <div class="card-preview" style="background:linear-gradient(135deg,#ff9f0a18,#ff9f0a0a)">🌳</div>
+        <div class="card-info"><div class="card-num">08</div><div class="card-name">文件树 + 预览</div>
+          <div class="card-desc">目录树 + 单文件只读，懒加载</div><span class="badge m3">M3</span></div>
+      </a>
+      <a class="screen-card" href="07-terminal.html">
+        <div class="card-preview" style="background:linear-gradient(135deg,#1c1c1e,#2a1a2e)">⌨️</div>
+        <div class="card-info"><div class="card-num">07*</div><div class="card-name">终端兜底</div>
+          <div class="card-desc">PTY 全屏 + 移动键盘工具栏</div><span class="badge m4">M4</span></div>
+      </a>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- GROUP 5 -->
+  <div class="group-section">
+    <div class="group-header">
+      <div class="group-icon" style="background:rgba(191,90,242,.15)">🎤</div>
+      <div class="group-name">输入增强</div>
+      <div class="group-desc">M4 · 图片 / 语音 / 斜杠命令</div>
+    </div>
+    <div class="card-grid">
+      <a class="screen-card" href="15-image-input.html">
+        <div class="card-preview" style="background:linear-gradient(135deg,#1a2a3a,#0d1a2a)">📸</div>
+        <div class="card-info"><div class="card-num">15</div><div class="card-name">图片输入</div>
+          <div class="card-desc">预览 + 裁剪压缩 + E2EE 发送</div><span class="badge m4">M4</span></div>
+      </a>
+      <a class="screen-card" href="16-voice-input.html">
+        <div class="card-preview" style="background:linear-gradient(135deg,#0a84ff18,#5e5ce610)">🎤</div>
+        <div class="card-info"><div class="card-num">16</div><div class="card-name">语音输入</div>
+          <div class="card-desc">本地 STT 波形 + 实时转写</div><span class="badge m4">M4</span></div>
+      </a>
+      <a class="screen-card" href="14-slash-palette.html">
+        <div class="card-preview" style="background:linear-gradient(135deg,#5e5ce628,#0a84ff18)">⌨️</div>
+        <div class="card-info"><div class="card-num">14</div><div class="card-name">斜杠命令面板</div>
+          <div class="card-desc">/compact /model /clear 动态列表</div><span class="badge m4">M4</span></div>
+      </a>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- GROUP 6 -->
+  <div class="group-section">
+    <div class="group-header">
+      <div class="group-icon" style="background:rgba(94,92,230,.15)">⚙️</div>
+      <div class="group-name">设置</div>
+      <div class="group-desc">Tab 3 · 账号 / 安全 / 外观 / 通知 / 规则 / 关于</div>
+    </div>
+    <div class="card-grid">
+      <a class="screen-card" href="17-settings.html">
+        <div class="card-preview" style="background:linear-gradient(135deg,#5e5ce618,#0a84ff0d)">⚙️</div>
+        <div class="card-info"><div class="card-num">17</div><div class="card-name">设置主页</div>
+          <div class="card-desc">账号卡片 + 所有子页入口</div><span class="badge ux">UX</span></div>
+      </a>
+      <a class="screen-card" href="18-settings-security.html">
+        <div class="card-preview" style="background:linear-gradient(135deg,#ff453a18,#5e5ce610)">🔐</div>
+        <div class="card-info"><div class="card-num">18</div><div class="card-name">安全与隐私</div>
+          <div class="card-desc">Face ID、Ed25519、SAS、Noise IK</div><span class="badge m1">M1</span></div>
+      </a>
+      <a class="screen-card" href="19-settings-appearance.html">
+        <div class="card-preview" style="background:linear-gradient(135deg,#5e5ce618,#bf5af210)">🎨</div>
+        <div class="card-info"><div class="card-num">19</div><div class="card-name">外观</div>
+          <div class="card-desc">主题、强调色、字号、diff 视图</div><span class="badge ux">UX</span></div>
+      </a>
+      <a class="screen-card" href="20-settings-notifications.html">
+        <div class="card-preview" style="background:linear-gradient(135deg,#34c75918,#0a84ff0d)">🔔</div>
+        <div class="card-info"><div class="card-num">20</div><div class="card-name">通知与推送</div>
+          <div class="card-desc">APNS 状态、事件开关、免打扰</div><span class="badge m4">M4</span></div>
+      </a>
+      <a class="screen-card" href="21-settings-danger-rules.html">
+        <div class="card-preview" style="background:linear-gradient(135deg,#ff453a28,#ff9f0a18)">🚫</div>
+        <div class="card-info"><div class="card-num">21</div><div class="card-name">危险操作规则</div>
+          <div class="card-desc">黑名单增删、白名单工具、围栏</div><span class="badge m2">M2</span></div>
+      </a>
+      <a class="screen-card" href="22-settings-templates.html">
+        <div class="card-preview" style="background:linear-gradient(135deg,#0a84ff18,#5e5ce610)">⚡</div>
+        <div class="card-info"><div class="card-num">22</div><div class="card-name">快捷模板</div>
+          <div class="card-desc">模板 CRUD + 变量占位符 + 排序</div><span class="badge m4">M4</span></div>
+      </a>
+      <a class="screen-card" href="24-about.html">
+        <div class="card-preview" style="background:linear-gradient(135deg,#0a84ff18,#5e5ce618)">ℹ️</div>
+        <div class="card-info"><div class="card-num">24</div><div class="card-name">关于 HelloBug</div>
+          <div class="card-desc">版本、协议参数、开源许可、调试</div><span class="badge ux">UX</span></div>
+      </a>
+    </div>
+  </div>
+
+</div>
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn = document.querySelector('.theme-toggle');
+  if (html.dataset.theme === 'dark') { html.dataset.theme = 'light'; btn.textContent = '🌙 深色'; }
+  else { html.dataset.theme = 'dark'; btn.textContent = '☀ 浅色'; }
+}
+</script>
+</body>
+</html>

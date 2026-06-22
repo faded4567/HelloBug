@@ -1,0 +1,21 @@
+{
+  "name": "@hellobug/daemon",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "eslint src test",
+    "dev": "tsx watch src/index.ts"
+  },
+  "dependencies": {
+    "@hellobug/protocol": "workspace:*",
+    "libsodium-wrappers": "^0.7.15",
+    "ws": "^8.18.3",
+    "zod": "^3.25.76"
+  }
+}
+

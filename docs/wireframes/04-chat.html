@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>04 · 会话主页</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+.thinking-card {
+  background: var(--bg3);
+  border-radius: var(--r-sm);
+  padding: 9px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--fg3);
+  cursor: pointer;
+}
+.typing-dots {
+  display: flex; gap: 4px;
+}
+.typing-dots span {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--tint);
+  animation: bounce .9s ease-in-out infinite;
+}
+.typing-dots span:nth-child(2) { animation-delay: .15s; }
+.typing-dots span:nth-child(3) { animation-delay: .3s; }
+@keyframes bounce {
+  0%,80%,100% { transform: scale(1); opacity:.4; }
+  40% { transform: scale(1.3); opacity:1; }
+}
+.usage-bar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 0;
+}
+.usage-pill {
+  font-size: 11px;
+  color: var(--fg3);
+  background: var(--bg3);
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+}
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+  <div class="phone-label">04 · 会话主页</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+
+    <div class="nav" style="height:52px;flex-direction:column;align-items:flex-start;justify-content:center;gap:1px">
+      <div style="display:flex;align-items:center;width:100%;gap:8px">
+        <div class="nav-back"><svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8,1 2,9 8,17"/></svg> 返回</div>
+        <div style="flex:1;text-align:center;font-size:15px;font-weight:600">HelloBug · Claude Code</div>
+        <div style="color:var(--fg2);font-size:20px">⋯</div>
+      </div>
+      <div style="font-size:11px;color:var(--fg3);padding-left:54px">main · 3 处修改未提交</div>
+    </div>
+
+    <div class="screen-body">
+      <div class="chat-area">
+        <!-- user msg -->
+        <div class="msg me">
+          <div class="bubble">帮我看看 login 接口有没有问题</div>
+          <div style="font-size:11px;color:var(--fg3)">9:38 ✓✓</div>
+        </div>
+
+        <!-- ai text -->
+        <div class="msg ai">
+          <div class="bubble">我先看看相关文件。</div>
+        </div>
+
+        <!-- tool: read -->
+        <div class="msg ai" style="max-width:90%">
+          <div class="tool-card">
+            <span class="tool-icon">📂</span>
+            <span class="tool-label">Read  src/auth/login.ts</span>
+            <span class="chevron">▸</span>
+          </div>
+        </div>
+
+        <!-- thinking -->
+        <div class="msg ai" style="max-width:90%">
+          <div class="thinking-card">
+            <span>💭</span>
+            <span style="flex:1">思考中…</span>
+            <span style="color:var(--tint)">展开</span>
+          </div>
+        </div>
+
+        <!-- ai analysis -->
+        <div class="msg ai">
+          <div class="bubble">
+            发现两处潜在问题：<br><br>
+            1. <code style="background:var(--bg3);padding:1px 5px;border-radius:4px;font-family:var(--font-mono);font-size:13px">fetch</code> 缺重试与超时，弱网下容易挂死<br><br>
+            2. 错误信息把内部堆栈暴露给了前端
+          </div>
+        </div>
+
+        <!-- tool: edit -->
+        <div class="msg ai" style="max-width:90%">
+          <div class="tool-card">
+            <span class="tool-icon">✏️</span>
+            <span class="tool-label">Edit  src/auth/login.ts</span>
+            <span class="chevron">▸</span>
+          </div>
+        </div>
+
+        <!-- diff card -->
+        <div class="msg ai" style="max-width:92%">
+          <div class="diff-card">
+            <div class="diff-card-header">
+              <span>📝</span>
+              <span style="font-family:var(--font-mono);font-size:13px;flex:1">login.ts</span>
+              <span class="diff-stat"><span class="add">+12</span> <span class="del">−4</span></span>
+            </div>
+            <div class="diff-card-body">
+              <pre><span class="diff-line-del">- const res = await fetch(url, opts)</span><span class="diff-line-add">+ const res = await withRetry(</span><span class="diff-line-add">+   () => fetch(url, opts), 3)</span><span class="diff-line-ctx">  if (!res.ok) {</span><span class="diff-line-del">-   throw new Error(res.body)</span><span class="diff-line-add">+   throw new AuthError('login failed')</span></pre>
+            </div>
+            <button class="diff-open-btn">查看完整 diff →</button>
+          </div>
+        </div>
+
+        <!-- usage -->
+        <div class="usage-bar">
+          <span class="usage-pill">~2.4k tokens · ¥0.02</span>
+        </div>
+
+        <!-- typing indicator -->
+        <div class="msg ai">
+          <div class="bubble" style="padding:12px 16px">
+            <div class="typing-dots">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- input area -->
+    <div class="input-bar">
+      <div class="template-strip">
+        <div class="tpl-chip accent">⚡ git status</div>
+        <div class="tpl-chip">⚡ 跑测试</div>
+        <div class="tpl-chip">⚡ 看 diff</div>
+        <div class="tpl-chip">⚡ 看最近 5 commit</div>
+      </div>
+      <div class="input-row">
+        <div class="input-field" contenteditable="true" data-placeholder="输入消息…" style="padding:10px 14px;color:var(--fg3)">输入消息…</div>
+        <button class="input-btn">📷</button>
+        <button class="input-btn">🎤</button>
+        <button class="input-btn" style="font-size:16px;color:var(--tint);font-weight:700">/</button>
+        <button class="input-send">➤</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn = document.querySelector('.theme-toggle');
+  if (html.dataset.theme === 'dark') { html.dataset.theme = 'light'; btn.textContent = '🌙 深色'; }
+  else { html.dataset.theme = 'dark'; btn.textContent = '☀ 浅色'; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>22 · 快捷模板</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+.tpl-card {
+  background: var(--bg2);
+  border-radius: var(--r);
+  margin-bottom: 2px;
+  overflow: hidden;
+}
+.tpl-row {
+  display: flex; align-items: flex-start;
+  padding: 13px 16px; gap: 12px;
+  cursor: pointer;
+}
+.tpl-drag {
+  color: var(--fg3);
+  font-size: 18px;
+  padding-top: 2px;
+  cursor: grab;
+}
+.tpl-body { flex: 1; min-width: 0; }
+.tpl-name {
+  font-size: 15px; font-weight: 600;
+  margin-bottom: 3px;
+}
+.tpl-preview {
+  font-size: 12px;
+  color: var(--fg2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tpl-vars {
+  display: flex; gap: 5px; flex-wrap: wrap;
+  margin-top: 5px;
+}
+.tpl-var {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--tint-bg);
+  color: var(--tint);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.tpl-arrow { color: var(--fg3); font-size: 12px; padding-top: 2px; }
+
+.add-tpl-btn {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px;
+  cursor: pointer;
+  color: var(--tint);
+  font-size: 15px;
+}
+
+/* edit sheet mock */
+.tpl-edit-sheet {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: var(--bg2);
+  border-radius: 20px 20px 0 0;
+  padding: 20px 16px 40px;
+  z-index: 20;
+  transform: translateY(0);
+  transition: transform .3s;
+  display: none;
+}
+.tpl-edit-sheet.open { display: block; }
+.sheet-dim {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,.45);
+  z-index: 19;
+  display: none;
+}
+.sheet-dim.open { display: block; }
+.tpl-edit-field {
+  margin-bottom: 14px;
+}
+.tpl-edit-label {
+  font-size: 13px; color: var(--fg2);
+  margin-bottom: 5px;
+}
+.tpl-edit-input {
+  width: 100%;
+  background: var(--bg3);
+  border: none;
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--fg);
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.tpl-edit-textarea {
+  resize: none;
+  height: 80px;
+  line-height: 1.5;
+}
+.hint-vars {
+  font-size: 12px; color: var(--fg3);
+  margin-top: 5px;
+  line-height: 1.5;
+}
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+  <div class="phone-label">22 · 快捷模板</div>
+  <div class="phone" style="position:relative">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nav-back" onclick="location.href='17-settings.html'" style="cursor:pointer;color:var(--tint)">
+        <svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8,1 2,9 8,17"/></svg>
+        设置
+      </div>
+      <div class="nav-title">快捷模板</div>
+      <div class="nav-right" style="color:var(--tint);cursor:pointer" onclick="alert('编辑排序')">排序</div>
+    </div>
+
+    <div class="screen-body" style="padding-bottom:32px">
+
+      <div style="font-size:13px;color:var(--fg2);padding:8px 4px 12px;line-height:1.5">
+        模板在输入栏横划芯片区显示，支持变量占位符 <span style="font-family:var(--font-mono);color:var(--tint)">{变量名}</span>。
+      </div>
+
+      <div class="list-group" style="padding:4px 0">
+
+        <div class="tpl-card">
+          <div class="tpl-row" onclick="openEdit('git-status','git status 概览','请帮我运行 git status 并总结当前工作区状态','')">
+            <div class="tpl-drag">⠿</div>
+            <div class="tpl-body">
+              <div class="tpl-name">git status 概览</div>
+              <div class="tpl-preview">请帮我运行 git status 并总结当前工作区状态</div>
+            </div>
+            <div class="tpl-arrow">›</div>
+          </div>
+        </div>
+
+        <div class="tpl-card">
+          <div class="tpl-row" onclick="openEdit('run-tests','跑测试','请运行 {test_cmd} 并汇报结果','test_cmd')">
+            <div class="tpl-drag">⠿</div>
+            <div class="tpl-body">
+              <div class="tpl-name">跑测试</div>
+              <div class="tpl-preview">请运行 {test_cmd} 并汇报结果</div>
+              <div class="tpl-vars"><div class="tpl-var">{test_cmd}</div></div>
+            </div>
+            <div class="tpl-arrow">›</div>
+          </div>
+        </div>
+
+        <div class="tpl-card">
+          <div class="tpl-row" onclick="openEdit('commit','生成 commit message','帮我根据当前 diff 写一条简洁的 commit message，约定式提交格式','')">
+            <div class="tpl-drag">⠿</div>
+            <div class="tpl-body">
+              <div class="tpl-name">生成 commit message</div>
+              <div class="tpl-preview">帮我根据当前 diff 写一条简洁的 commit message…</div>
+            </div>
+            <div class="tpl-arrow">›</div>
+          </div>
+        </div>
+
+        <div class="tpl-card">
+          <div class="tpl-row" onclick="openEdit('review','Code Review','请帮我 review {file_path}，重点关注安全性与性能','file_path')">
+            <div class="tpl-drag">⠿</div>
+            <div class="tpl-body">
+              <div class="tpl-name">Code Review</div>
+              <div class="tpl-preview">请帮我 review {file_path}，重点关注安全性与性能</div>
+              <div class="tpl-vars"><div class="tpl-var">{file_path}</div></div>
+            </div>
+            <div class="tpl-arrow">›</div>
+          </div>
+        </div>
+
+        <div class="tpl-card">
+          <div class="tpl-row" onclick="openEdit('explain','解释代码','请解释 {file_path} 里 {func_name} 函数的逻辑','file_path,func_name')">
+            <div class="tpl-drag">⠿</div>
+            <div class="tpl-body">
+              <div class="tpl-name">解释代码</div>
+              <div class="tpl-preview">请解释 {file_path} 里 {func_name} 函数的逻辑</div>
+              <div class="tpl-vars">
+                <div class="tpl-var">{file_path}</div>
+                <div class="tpl-var">{func_name}</div>
+              </div>
+            </div>
+            <div class="tpl-arrow">›</div>
+          </div>
+        </div>
+
+        <div class="tpl-card">
+          <div class="tpl-row" onclick="openEdit('recent-commits','最近 5 个 commit','帮我用一句话总结最近 5 个 commit 做了什么','')">
+            <div class="tpl-drag">⠿</div>
+            <div class="tpl-body">
+              <div class="tpl-name">最近 5 个 commit</div>
+              <div class="tpl-preview">帮我用一句话总结最近 5 个 commit 做了什么</div>
+            </div>
+            <div class="tpl-arrow">›</div>
+          </div>
+        </div>
+
+        <div class="add-tpl-btn" onclick="openEdit('','','','')">
+          <div style="width:28px;height:28px;border-radius:50%;background:var(--tint-bg);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--tint)">＋</div>
+          新建模板
+        </div>
+      </div>
+
+    </div>
+
+    <!-- edit sheet -->
+    <div class="sheet-dim" id="sheet-dim" onclick="closeEdit()"></div>
+    <div class="tpl-edit-sheet" id="tpl-edit">
+      <div class="sheet-handle" style="margin-bottom:18px"></div>
+      <div style="font-size:17px;font-weight:700;margin-bottom:16px" id="edit-title">编辑模板</div>
+
+      <div class="tpl-edit-field">
+        <div class="tpl-edit-label">名称</div>
+        <input class="tpl-edit-input" id="edit-name" placeholder="模板名称">
+      </div>
+      <div class="tpl-edit-field">
+        <div class="tpl-edit-label">文本内容</div>
+        <textarea class="tpl-edit-input tpl-edit-textarea" id="edit-body" placeholder="输入模板内容，用 {变量名} 作占位符"></textarea>
+        <div class="hint-vars">变量占位符自动识别，发送前会弹窗填值。<br>示例：帮我 review {file_path}</div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:4px">
+        <button class="btn btn-secondary" style="flex:1;padding:12px" onclick="closeEdit()">取消</button>
+        <button class="btn btn-primary" style="flex:1;padding:12px" onclick="saveEdit()">保存</button>
+      </div>
+      <div style="margin-top:12px;text-align:center">
+        <span style="color:var(--red);font-size:14px;cursor:pointer" id="edit-delete-btn" onclick="deleteTemplate()">删除模板</span>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn = document.querySelector('.theme-toggle');
+  if (html.dataset.theme === 'dark') { html.dataset.theme = 'light'; btn.textContent = '🌙 深色'; }
+  else { html.dataset.theme = 'dark'; btn.textContent = '☀ 浅色'; }
+}
+function openEdit(id, name, body, vars) {
+  document.getElementById('edit-name').value = name;
+  document.getElementById('edit-body').value = body;
+  document.getElementById('edit-title').textContent = name ? '编辑模板' : '新建模板';
+  document.getElementById('edit-delete-btn').style.display = name ? 'inline' : 'none';
+  document.getElementById('tpl-edit').classList.add('open');
+  document.getElementById('sheet-dim').classList.add('open');
+}
+function closeEdit() {
+  document.getElementById('tpl-edit').classList.remove('open');
+  document.getElementById('sheet-dim').classList.remove('open');
+}
+function saveEdit() {
+  closeEdit();
+}
+function deleteTemplate() {
+  if (confirm('确认删除这个模板？')) closeEdit();
+}
+</script>
+</body>
+</html>

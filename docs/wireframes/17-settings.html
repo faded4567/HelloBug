@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>17 · 设置主页</title>
+<link rel="stylesheet" href="_common.css">
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+  <div class="phone-label">17 · 设置主页</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+
+    <div class="nav">
+      <div class="nav-title">设置</div>
+    </div>
+
+    <div class="screen-body" style="padding-bottom:32px">
+
+      <!-- account card -->
+      <div style="background:var(--bg2);border-radius:var(--r);padding:16px;margin:16px 0 8px;display:flex;align-items:center;gap:14px">
+        <div style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#0a84ff,#5e5ce6);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0">🐛</div>
+        <div style="flex:1">
+          <div style="font-size:17px;font-weight:600">shuai</div>
+          <div style="font-size:13px;color:var(--fg2)">shuai@example.com</div>
+        </div>
+        <div class="list-arrow"></div>
+      </div>
+
+      <!-- 设备 & 配对 -->
+      <div class="section-header">设备与配对</div>
+      <div class="list-group">
+        <div class="list-item" onclick="location.href='23-device-detail.html'">
+          <div class="list-icon" style="background:var(--tint-bg)">💻</div>
+          <div class="list-label">已配对设备</div>
+          <div class="list-value">2 台</div>
+          <div class="list-arrow"></div>
+        </div>
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(52,199,89,.12)">📱</div>
+          <div class="list-label">绑定新设备</div>
+          <div class="list-arrow"></div>
+        </div>
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(255,149,0,.12)">🔗</div>
+          <div class="list-label">服务器连接</div>
+          <div class="list-value" style="color:var(--green)">已连接</div>
+          <div class="list-arrow"></div>
+        </div>
+      </div>
+
+      <!-- 安全 -->
+      <div class="section-header">安全与隐私</div>
+      <div class="list-group">
+        <div class="list-item" onclick="location.href='18-settings-security.html'">
+          <div class="list-icon" style="background:rgba(255,59,48,.12)">🔐</div>
+          <div class="list-label">安全与隐私</div>
+          <div class="list-arrow"></div>
+        </div>
+        <div class="list-item" onclick="location.href='21-settings-danger-rules.html'">
+          <div class="list-icon" style="background:rgba(255,149,0,.12)">⚠️</div>
+          <div class="list-label">危险操作规则</div>
+          <div class="list-value">黑名单 8 条</div>
+          <div class="list-arrow"></div>
+        </div>
+      </div>
+
+      <!-- 外观 -->
+      <div class="section-header">个性化</div>
+      <div class="list-group">
+        <div class="list-item" onclick="location.href='19-settings-appearance.html'">
+          <div class="list-icon" style="background:rgba(94,92,230,.2)">🎨</div>
+          <div class="list-label">外观</div>
+          <div class="list-value">深色</div>
+          <div class="list-arrow"></div>
+        </div>
+        <div class="list-item" onclick="location.href='22-settings-templates.html'">
+          <div class="list-icon" style="background:rgba(10,132,255,.12)">⚡</div>
+          <div class="list-label">快捷模板</div>
+          <div class="list-value">6 个</div>
+          <div class="list-arrow"></div>
+        </div>
+      </div>
+
+      <!-- 通知 -->
+      <div class="section-header">通知</div>
+      <div class="list-group">
+        <div class="list-item" onclick="location.href='20-settings-notifications.html'">
+          <div class="list-icon" style="background:rgba(52,199,89,.12)">🔔</div>
+          <div class="list-label">通知与推送</div>
+          <div class="list-value" style="color:var(--green)">APNS 已配置</div>
+          <div class="list-arrow"></div>
+        </div>
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(10,132,255,.12)">🌙</div>
+          <div class="list-label">免打扰时段</div>
+          <div class="list-value">22:00 – 8:00</div>
+          <div class="list-arrow"></div>
+        </div>
+      </div>
+
+      <!-- 数据 -->
+      <div class="section-header">数据</div>
+      <div class="list-group">
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(255,149,0,.12)">📤</div>
+          <div class="list-label">导出会话历史</div>
+          <div class="list-arrow"></div>
+        </div>
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(255,59,48,.12)">🗑</div>
+          <div class="list-label" style="color:var(--red)">清除本地缓存</div>
+          <div class="list-arrow"></div>
+        </div>
+      </div>
+
+      <!-- 关于 -->
+      <div class="section-header">关于</div>
+      <div class="list-group">
+        <div class="list-item" onclick="location.href='24-about.html'">
+          <div class="list-icon" style="background:var(--bg3)">ℹ️</div>
+          <div class="list-label">关于 HelloBug</div>
+          <div class="list-value">v0.1.0</div>
+          <div class="list-arrow"></div>
+        </div>
+      </div>
+
+      <!-- sign out -->
+      <div class="list-group" style="margin-top:24px">
+        <div class="list-item" style="justify-content:center">
+          <span style="color:var(--red);font-size:16px;font-weight:500">退出登录</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-bar">
+      <div class="tab-item"><span class="tab-icon">💻</span>设备</div>
+      <div class="tab-item"><span class="tab-icon">💬</span>会话</div>
+      <div class="tab-item active"><span class="tab-icon">⚙</span>设置</div>
+    </div>
+  </div>
+</div>
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn = document.querySelector('.theme-toggle');
+  if (html.dataset.theme === 'dark') { html.dataset.theme = 'light'; btn.textContent = '🌙 深色'; }
+  else { html.dataset.theme = 'dark'; btn.textContent = '☀ 浅色'; }
+}
+</script>
+</body>
+</html>

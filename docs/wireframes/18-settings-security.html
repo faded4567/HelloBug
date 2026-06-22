@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>18 · 安全与隐私</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+.key-fingerprint {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--fg2);
+  background: var(--bg3);
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  word-break: break-all;
+  line-height: 1.6;
+}
+.sas-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+}
+.sas-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg3);
+  border-radius: var(--r-pill);
+  padding: 5px 10px;
+  font-size: 14px;
+}
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+  <div class="phone-label">18 · 安全与隐私</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nav-back" onclick="location.href='17-settings.html'" style="cursor:pointer;color:var(--tint)">
+        <svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8,1 2,9 8,17"/></svg>
+        设置
+      </div>
+      <div class="nav-title">安全与隐私</div>
+    </div>
+
+    <div class="screen-body" style="padding-bottom:32px">
+
+      <div class="section-header">生物识别锁</div>
+      <div class="list-group">
+        <div class="list-item">
+          <div class="list-icon" style="background:var(--tint-bg)">👆</div>
+          <div style="flex:1">
+            <div class="list-label">启动时 Face ID / 指纹验证</div>
+            <div class="list-desc">冷启动 App 时验证一次，运行中不再打扰</div>
+          </div>
+          <div class="switch on" onclick="this.classList.toggle('on')"></div>
+        </div>
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(255,59,48,.12)">🔒</div>
+          <div class="list-label">截屏保护</div>
+          <div class="list-value">仅敏感页</div>
+          <div class="list-arrow"></div>
+        </div>
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(94,92,230,.15)">📋</div>
+          <div class="list-label">剪贴板读取保护</div>
+          <div class="switch on" onclick="this.classList.toggle('on')"></div>
+        </div>
+      </div>
+
+      <div class="section-header">设备密钥</div>
+      <div class="list-group">
+        <div class="list-item" style="flex-direction:column;align-items:flex-start;gap:8px">
+          <div style="display:flex;align-items:center;gap:12px;width:100%">
+            <div class="list-icon" style="background:rgba(52,199,89,.12)">🔑</div>
+            <div class="list-label">Ed25519 公钥指纹</div>
+            <div class="pill-label green">活跃</div>
+          </div>
+          <div class="key-fingerprint" style="width:100%">
+            SHA256:xK9mP3vQ7nR2wZ8bH4cY1tE6aJ0dL5fN<br>
+            创建于 2026-06-01 · 存储在 iOS Keychain
+          </div>
+        </div>
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(255,149,0,.12)">🔄</div>
+          <div class="list-label">轮换设备密钥</div>
+          <div class="list-arrow"></div>
+        </div>
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(94,92,230,.15)">📤</div>
+          <div class="list-label">导出公钥</div>
+          <div class="list-arrow"></div>
+        </div>
+      </div>
+
+      <div class="section-header">最近配对的 SAS</div>
+      <div class="list-group">
+        <div style="padding:12px 0">
+          <div style="padding:0 16px 8px;font-size:13px;color:var(--fg2)">MacBook Pro M3 · 2026-06-01 配对</div>
+          <div class="sas-row">
+            <div class="sas-chip">🐢 海龟</div>
+            <div class="sas-chip">🪐 土星</div>
+            <div class="sas-chip">🍵 绿茶</div>
+            <div class="sas-chip">🎷 萨克斯</div>
+            <div class="sas-chip">🌙 月亮</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-header">会话加密</div>
+      <div class="list-group">
+        <div class="list-item">
+          <div class="list-icon" style="background:var(--tint-bg)">🔐</div>
+          <div class="list-label">E2EE 协议</div>
+          <div class="list-value">Noise IK</div>
+        </div>
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(52,199,89,.12)">🔄</div>
+          <div class="list-label">密钥轮换间隔</div>
+          <div class="list-value">100 条消息</div>
+          <div class="list-arrow"></div>
+        </div>
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(255,149,0,.12)">⏳</div>
+          <div class="list-label">云端缓冲 TTL</div>
+          <div class="list-value">24 小时</div>
+          <div class="list-arrow"></div>
+        </div>
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(255,59,48,.12)">🗑</div>
+          <div class="list-label" style="color:var(--red)">清除所有会话密文缓存</div>
+          <div class="list-arrow"></div>
+        </div>
+      </div>
+
+      <div class="section-header">越狱/Root 检测</div>
+      <div class="list-group">
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(52,199,89,.12)">✅</div>
+          <div class="list-label">设备状态</div>
+          <div class="list-value" style="color:var(--green)">正常</div>
+        </div>
+        <div class="list-item">
+          <div class="list-icon" style="background:var(--bg3)">⚠️</div>
+          <div class="list-label">检测到越狱时</div>
+          <div class="list-value">仅警告</div>
+          <div class="list-arrow"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn = document.querySelector('.theme-toggle');
+  if (html.dataset.theme === 'dark') { html.dataset.theme = 'light'; btn.textContent = '🌙 深色'; }
+  else { html.dataset.theme = 'dark'; btn.textContent = '☀ 浅色'; }
+}
+</script>
+</body>
+</html>

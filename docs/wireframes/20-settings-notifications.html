@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>20 · 通知与推送</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+.push-status-card {
+  background: var(--bg2);
+  border-radius: var(--r);
+  padding: 14px 16px;
+  margin: 16px 0 8px;
+  display: flex; align-items: center; gap: 14px;
+}
+.push-icon-wrap {
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  background: rgba(52,199,89,.15);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; flex-shrink: 0;
+}
+.push-status-label {
+  font-size: 15px; font-weight: 600;
+}
+.push-status-sub {
+  font-size: 12px; color: var(--fg2); margin-top: 2px;
+}
+.pill-status {
+  margin-left: auto;
+  background: rgba(52,199,89,.15);
+  color: var(--green);
+  font-size: 12px; font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+}
+.pill-status.warn {
+  background: rgba(255,159,10,.15);
+  color: #ff9f0a;
+}
+
+.dnd-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px;
+}
+.time-chip {
+  background: var(--bg3);
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 16px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+}
+.time-sep {
+  font-size: 18px;
+  color: var(--fg2);
+}
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+  <div class="phone-label">20 · 通知与推送</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nav-back" onclick="location.href='17-settings.html'" style="cursor:pointer;color:var(--tint)">
+        <svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8,1 2,9 8,17"/></svg>
+        设置
+      </div>
+      <div class="nav-title">通知与推送</div>
+    </div>
+
+    <div class="screen-body" style="padding-bottom:32px">
+
+      <!-- push channel status -->
+      <div class="push-status-card">
+        <div class="push-icon-wrap">🔔</div>
+        <div>
+          <div class="push-status-label">APNS（iOS 推送）</div>
+          <div class="push-status-sub">设备 token 已注册 · 2026-06-01</div>
+        </div>
+        <div class="pill-status">已就绪</div>
+      </div>
+
+      <div class="push-status-card" style="margin-top:0">
+        <div class="push-icon-wrap" style="background:rgba(255,159,10,.15);font-size:22px">📦</div>
+        <div>
+          <div class="push-status-label">厂商推送（Android）</div>
+          <div class="push-status-sub">当前设备为 iOS，无需配置</div>
+        </div>
+        <div class="pill-status warn">N/A</div>
+      </div>
+
+      <!-- notification toggles -->
+      <div class="section-header">推送事件</div>
+      <div class="list-group">
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(48,209,88,.12)">✅</div>
+          <div style="flex:1">
+            <div class="list-label">Agent 任务完成</div>
+            <div class="list-desc">任务正常结束时推送</div>
+          </div>
+          <div class="switch on" onclick="this.classList.toggle('on')"></div>
+        </div>
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(255,159,10,.15)">⚠️</div>
+          <div style="flex:1">
+            <div class="list-label">等待危险操作确认</div>
+            <div class="list-desc">命中黑名单规则，需手动放行</div>
+          </div>
+          <div class="switch on" onclick="this.classList.toggle('on')"></div>
+        </div>
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(255,59,48,.12)">❌</div>
+          <div style="flex:1">
+            <div class="list-label">Agent 执行出错</div>
+            <div class="list-desc">命令非零退出或 API 错误</div>
+          </div>
+          <div class="switch on" onclick="this.classList.toggle('on')"></div>
+        </div>
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(10,132,255,.12)">💬</div>
+          <div style="flex:1">
+            <div class="list-label">Agent 需要输入</div>
+            <div class="list-desc">询问模式下等待用户回复</div>
+          </div>
+          <div class="switch on" onclick="this.classList.toggle('on')"></div>
+        </div>
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(94,92,230,.15)">🔌</div>
+          <div style="flex:1">
+            <div class="list-label">设备上下线</div>
+            <div class="list-desc">Daemon 连接或断开</div>
+          </div>
+          <div class="switch" onclick="this.classList.toggle('on')"></div>
+        </div>
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(255,149,0,.12)">💰</div>
+          <div style="flex:1">
+            <div class="list-label">Token 用量告警</div>
+            <div class="list-desc">单次会话超过 50 k tokens</div>
+          </div>
+          <div class="switch" onclick="this.classList.toggle('on')"></div>
+        </div>
+      </div>
+
+      <!-- notification content -->
+      <div class="section-header">推送内容隐私</div>
+      <div class="list-group">
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(255,59,48,.12)">🔒</div>
+          <div style="flex:1">
+            <div class="list-label">隐藏推送详情</div>
+            <div class="list-desc">通知仅显示"HelloBug 需要操作"，不含代码或路径</div>
+          </div>
+          <div class="switch on" onclick="this.classList.toggle('on')"></div>
+        </div>
+      </div>
+
+      <!-- DND -->
+      <div class="section-header">免打扰时段</div>
+      <div class="list-group">
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(10,132,255,.12)">🌙</div>
+          <div class="list-label">开启免打扰</div>
+          <div class="switch on" id="dnd-sw" onclick="toggleDnd()"></div>
+        </div>
+        <div id="dnd-detail">
+          <div class="dnd-row">
+            <div class="list-icon" style="background:var(--bg3)">🕙</div>
+            <div style="flex:1;font-size:14px">开始时间</div>
+            <div class="time-chip" onclick="alert('时间选择器')">22:00</div>
+          </div>
+          <div class="dnd-row">
+            <div class="list-icon" style="background:var(--bg3)">🌅</div>
+            <div style="flex:1;font-size:14px">结束时间</div>
+            <div class="time-chip" onclick="alert('时间选择器')">08:00</div>
+          </div>
+          <div class="list-item">
+            <div class="list-icon" style="background:rgba(255,159,10,.15)">⚡</div>
+            <div style="flex:1">
+              <div class="list-label">危险操作不受免打扰限制</div>
+              <div class="list-desc">命中黑名单规则始终推送</div>
+            </div>
+            <div class="switch on" onclick="this.classList.toggle('on')"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- sound & badge -->
+      <div class="section-header">提示方式</div>
+      <div class="list-group">
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(10,132,255,.12)">🔈</div>
+          <div class="list-label">声音</div>
+          <div class="list-value">Ping</div>
+          <div class="list-arrow"></div>
+        </div>
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(94,92,230,.15)">🔢</div>
+          <div class="list-label">角标</div>
+          <div class="switch on" onclick="this.classList.toggle('on')"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn = document.querySelector('.theme-toggle');
+  if (html.dataset.theme === 'dark') { html.dataset.theme = 'light'; btn.textContent = '🌙 深色'; }
+  else { html.dataset.theme = 'dark'; btn.textContent = '☀ 浅色'; }
+}
+function toggleDnd() {
+  const sw = document.getElementById('dnd-sw');
+  const det = document.getElementById('dnd-detail');
+  sw.classList.toggle('on');
+  det.style.opacity = sw.classList.contains('on') ? '1' : '0.35';
+}
+</script>
+</body>
+</html>

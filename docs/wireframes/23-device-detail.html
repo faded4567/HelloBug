@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>23 · 设备详情</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+.device-hero {
+  background: var(--bg2);
+  border-radius: var(--r);
+  padding: 20px 16px;
+  margin: 16px 0 8px;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+}
+.device-icon-wrap {
+  width: 64px; height: 64px;
+  border-radius: 18px;
+  background: linear-gradient(135deg,#1c3a5e,#0a84ff22);
+  border: 1px solid var(--separator);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 34px;
+}
+.device-name { font-size: 18px; font-weight: 700; }
+.device-meta { font-size: 13px; color: var(--fg2); text-align: center; line-height: 1.5; }
+.online-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 2px rgba(52,199,89,.25);
+  margin-right: 5px;
+}
+.offline-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--fg3);
+  margin-right: 5px;
+}
+.ws-row {
+  background: var(--bg2);
+  border-radius: var(--r);
+  padding: 12px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  margin: 4px 0 8px;
+}
+.ws-card {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 0;
+}
+.ws-branch-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: rgba(94,92,230,.15);
+  color: #bf5af2;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+.ws-modified {
+  font-size: 12px;
+  color: var(--fg3);
+}
+.session-pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+}
+.session-pill.active {
+  background: rgba(48,209,88,.15);
+  color: var(--green);
+}
+.session-pill.idle {
+  background: var(--bg3);
+  color: var(--fg2);
+}
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+  <div class="phone-label">23 · 设备详情</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nav-back" onclick="location.href='17-settings.html'" style="cursor:pointer;color:var(--tint)">
+        <svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8,1 2,9 8,17"/></svg>
+        已配对设备
+      </div>
+      <div class="nav-title">设备详情</div>
+    </div>
+
+    <div class="screen-body" style="padding-bottom:48px">
+
+      <!-- hero card -->
+      <div class="device-hero">
+        <div class="device-icon-wrap">💻</div>
+        <div class="device-name">MacBook Pro M3</div>
+        <div class="device-meta">
+          <span class="online-dot"></span>在线
+          &nbsp;·&nbsp; macOS 15.5
+        </div>
+        <div class="device-meta">
+          daemon v0.1.0 · Node.js 22.11.0<br>
+          配对于 2026-06-01 · 上次在线 刚刚
+        </div>
+      </div>
+
+      <!-- stats row -->
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <div style="flex:1;background:var(--bg2);border-radius:var(--r);padding:12px;text-align:center">
+          <div style="font-size:22px;font-weight:700;color:var(--tint)">3</div>
+          <div style="font-size:12px;color:var(--fg2);margin-top:2px">工作区</div>
+        </div>
+        <div style="flex:1;background:var(--bg2);border-radius:var(--r);padding:12px;text-align:center">
+          <div style="font-size:22px;font-weight:700;color:var(--green)">2</div>
+          <div style="font-size:12px;color:var(--fg2);margin-top:2px">活跃会话</div>
+        </div>
+        <div style="flex:1;background:var(--bg2);border-radius:var(--r);padding:12px;text-align:center">
+          <div style="font-size:22px;font-weight:700">14</div>
+          <div style="font-size:12px;color:var(--fg2);margin-top:2px">历史会话</div>
+        </div>
+      </div>
+
+      <!-- system info -->
+      <div class="section-header">系统信息</div>
+      <div class="list-group">
+        <div class="list-item">
+          <div class="list-icon" style="background:var(--bg3)">🖥</div>
+          <div class="list-label">处理器</div>
+          <div class="list-value">Apple M3 Max</div>
+        </div>
+        <div class="list-item">
+          <div class="list-icon" style="background:var(--bg3)">🧠</div>
+          <div class="list-label">内存</div>
+          <div class="list-value">36 GB</div>
+        </div>
+        <div class="list-item">
+          <div class="list-icon" style="background:var(--bg3)">💾</div>
+          <div class="list-label">磁盘可用</div>
+          <div class="list-value">428 GB</div>
+        </div>
+        <div class="list-item">
+          <div class="list-icon" style="background:var(--bg3)">🌐</div>
+          <div class="list-label">连接延迟</div>
+          <div class="list-value" style="color:var(--green)">18 ms</div>
+        </div>
+      </div>
+
+      <!-- workspaces -->
+      <div class="section-header">工作区</div>
+      <div class="list-group">
+        <div class="list-item" style="flex-direction:column;align-items:flex-start;gap:0">
+          <div class="ws-card" style="width:100%">
+            <div class="list-icon" style="background:var(--tint-bg)">📂</div>
+            <div style="flex:1">
+              <div style="font-size:14px;font-weight:600">HelloBug</div>
+              <div style="display:flex;gap:6px;align-items:center;margin-top:3px">
+                <div class="ws-branch-badge">main</div>
+                <div class="ws-modified">3 文件已修改</div>
+              </div>
+            </div>
+            <div class="session-pill active">运行中</div>
+          </div>
+        </div>
+        <div class="list-item" style="flex-direction:column;align-items:flex-start;gap:0">
+          <div class="ws-card" style="width:100%">
+            <div class="list-icon" style="background:rgba(94,92,230,.1)">📂</div>
+            <div style="flex:1">
+              <div style="font-size:14px;font-weight:600">analytics-svc</div>
+              <div style="display:flex;gap:6px;align-items:center;margin-top:3px">
+                <div class="ws-branch-badge">feat/metrics</div>
+                <div class="ws-modified">清洁</div>
+              </div>
+            </div>
+            <div class="session-pill active">运行中</div>
+          </div>
+        </div>
+        <div class="list-item" style="flex-direction:column;align-items:flex-start;gap:0">
+          <div class="ws-card" style="width:100%">
+            <div class="list-icon" style="background:var(--bg3)">📂</div>
+            <div style="flex:1">
+              <div style="font-size:14px;font-weight:600">dotfiles</div>
+              <div style="display:flex;gap:6px;align-items:center;margin-top:3px">
+                <div class="ws-branch-badge">main</div>
+              </div>
+            </div>
+            <div class="session-pill idle">空闲</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- key management -->
+      <div class="section-header">设备密钥</div>
+      <div class="list-group">
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(52,199,89,.12)">🔑</div>
+          <div style="flex:1">
+            <div class="list-label">Ed25519 指纹</div>
+            <div class="list-desc" style="font-family:var(--font-mono);font-size:11px">SHA256:xK9mP3vQ…J0dL5fN</div>
+          </div>
+          <div style="font-size:13px;color:var(--tint);cursor:pointer" onclick="alert('复制指纹')">复制</div>
+        </div>
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(255,149,0,.12)">🔄</div>
+          <div class="list-label">轮换设备密钥</div>
+          <div class="list-arrow"></div>
+        </div>
+      </div>
+
+      <!-- danger -->
+      <div class="section-header">危险操作</div>
+      <div class="list-group">
+        <div class="list-item" onclick="alert('确认解绑此设备？')">
+          <div class="list-icon" style="background:rgba(255,59,48,.12)">🔓</div>
+          <div class="list-label" style="color:var(--red)">解绑此设备</div>
+          <div class="list-arrow"></div>
+        </div>
+        <div class="list-item" onclick="alert('吊销后该设备立即断连')">
+          <div class="list-icon" style="background:rgba(255,59,48,.12)">🚫</div>
+          <div class="list-label" style="color:var(--red)">吊销设备密钥</div>
+          <div class="list-arrow"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn = document.querySelector('.theme-toggle');
+  if (html.dataset.theme === 'dark') { html.dataset.theme = 'light'; btn.textContent = '🌙 深色'; }
+  else { html.dataset.theme = 'dark'; btn.textContent = '☀ 浅色'; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>08 · 会话列表</title>
+<link rel="stylesheet" href="_common.css">
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+  <div class="phone-label">08 · 会话列表</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+
+    <div class="nav">
+      <div class="nav-title">会话</div>
+      <div class="nav-right">
+        <span style="font-size:20px;margin-right:12px">🔍</span>
+        <span style="font-size:20px;color:var(--tint)">＋</span>
+      </div>
+    </div>
+
+    <div class="screen-body" style="padding-bottom:32px">
+      <div class="section-header">进行中</div>
+
+      <div class="session-item">
+        <div class="session-dot active"></div>
+        <div class="session-info">
+          <div class="session-name">HelloBug · Claude Code</div>
+          <div class="session-preview">📝 已修改 login.ts (+12 −4)</div>
+          <div class="session-meta">
+            <span class="session-time">3 分钟前</span>
+            <span class="session-badge active">进行中</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-header">最近</div>
+
+      <div class="session-item">
+        <div class="session-dot done" style="background:var(--green);box-shadow:0 0 5px var(--green)"></div>
+        <div class="session-info">
+          <div class="session-name">analytics-svc · Codex</div>
+          <div class="session-preview">✅ 测试全部通过</div>
+          <div class="session-meta">
+            <span class="session-time">1 小时前</span>
+            <span class="session-badge" style="background:rgba(52,199,89,.12);color:var(--green)">已完成</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="session-item">
+        <div class="session-dot done"></div>
+        <div class="session-info">
+          <div class="session-name">HelloBug · Terminal</div>
+          <div class="session-preview">$ git status</div>
+          <div class="session-meta">
+            <span class="session-time">昨天</span>
+            <span class="session-badge" style="background:var(--bg3);color:var(--fg3)">已关闭</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="session-item">
+        <div class="session-dot done"></div>
+        <div class="session-info">
+          <div class="session-name">api-gateway · Claude Code</div>
+          <div class="session-preview">帮我重构 router 模块</div>
+          <div class="session-meta">
+            <span class="session-time">2 天前</span>
+            <span class="session-badge" style="background:var(--bg3);color:var(--fg3)">已关闭</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-bar">
+      <div class="tab-item">
+        <span class="tab-icon">💻</span>
+        设备
+      </div>
+      <div class="tab-item active">
+        <span class="tab-icon">💬</span>
+        会话
+      </div>
+      <div class="tab-item">
+        <span class="tab-icon">⚙</span>
+        设置
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn = document.querySelector('.theme-toggle');
+  if (html.dataset.theme === 'dark') { html.dataset.theme = 'light'; btn.textContent = '🌙 深色'; }
+  else { html.dataset.theme = 'dark'; btn.textContent = '☀ 浅色'; }
+}
+</script>
+</body>
+</html>

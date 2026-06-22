@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>14 · Slash 命令面板</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+.chat-bg {
+  flex: 1;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+}
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+  <div class="phone-label">14 · Slash 命令面板</div>
+  <div class="phone" style="position:relative">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+
+    <div class="nav">
+      <div class="nav-back" style="cursor:pointer">
+        <svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8,1 2,9 8,17"/></svg>
+      </div>
+      <div class="nav-title" style="font-size:15px">HelloBug · Claude Code</div>
+      <div class="nav-right">⋯</div>
+    </div>
+
+    <!-- chat bg (dimmed) -->
+    <div class="chat-bg" style="opacity:.35;pointer-events:none">
+      <div class="msg me"><div class="bubble">帮我重构一下 auth 模块</div></div>
+      <div class="msg ai"><div class="bubble">好的，我来分析现有代码结构…</div></div>
+      <div class="tool-card" style="max-width:85%">
+        <span class="tool-icon">🔧</span>
+        <span class="tool-label">Read  src/auth/index.ts</span>
+        <span class="chevron">▸</span>
+      </div>
+    </div>
+
+    <!-- slash palette -->
+    <div class="palette" style="position:absolute;left:12px;right:12px;bottom:68px">
+      <div class="palette-search">
+        <span class="palette-search-icon">⁄</span>
+        <input class="palette-input" type="text" placeholder="搜索命令…" value="/com">
+      </div>
+
+      <div style="overflow-y:auto;max-height:260px">
+        <div class="palette-section">会话管理</div>
+        <div class="palette-row active">
+          <span class="palette-cmd">/compact</span>
+          <span class="palette-desc">压缩上下文，节省 token</span>
+          <span class="palette-shortcut">⌘K</span>
+        </div>
+        <div class="palette-row">
+          <span class="palette-cmd">/clear</span>
+          <span class="palette-desc">清空当前对话历史</span>
+        </div>
+
+        <div class="palette-section">配置</div>
+        <div class="palette-row">
+          <span class="palette-cmd">/model</span>
+          <span class="palette-desc">切换 AI 模型</span>
+        </div>
+        <div class="palette-row">
+          <span class="palette-cmd">/permission</span>
+          <span class="palette-desc">修改工具调用权限模式</span>
+        </div>
+
+        <div class="palette-section">工具</div>
+        <div class="palette-row">
+          <span class="palette-cmd">/init</span>
+          <span class="palette-desc">初始化 CLAUDE.md 项目记忆</span>
+        </div>
+        <div class="palette-row">
+          <span class="palette-cmd">/review</span>
+          <span class="palette-desc">Code review 最近 diff</span>
+        </div>
+        <div class="palette-row">
+          <span class="palette-cmd">/commit</span>
+          <span class="palette-desc">生成 commit message 并提交</span>
+        </div>
+
+        <div class="palette-section">导出</div>
+        <div class="palette-row">
+          <span class="palette-cmd">/export</span>
+          <span class="palette-desc">导出当前会话为 Markdown</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- input bar -->
+    <div class="input-bar" style="padding:8px 12px 28px">
+      <div class="input-row">
+        <div class="input-field" style="color:var(--tint);font-family:var(--font-mono)">/com<span style="background:var(--tint);width:2px;height:16px;display:inline-block;vertical-align:middle;margin-left:1px;animation:blink 1s step-end infinite"></span></div>
+        <button class="input-btn">📷</button>
+        <button class="input-btn">🎤</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn = document.querySelector('.theme-toggle');
+  if (html.dataset.theme === 'dark') { html.dataset.theme = 'light'; btn.textContent = '🌙 深色'; }
+  else { html.dataset.theme = 'dark'; btn.textContent = '☀ 浅色'; }
+}
+document.querySelectorAll('.palette-row').forEach(row => {
+  row.addEventListener('click', () => {
+    document.querySelectorAll('.palette-row').forEach(r => r.classList.remove('active'));
+    row.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>

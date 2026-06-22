@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>05 · Diff 全屏页</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+.diff-toolbar {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--separator);
+  gap: 8px;
+  flex-shrink: 0;
+}
+.seg-ctrl {
+  display: flex;
+  background: var(--bg3);
+  border-radius: 8px;
+  padding: 2px;
+}
+.seg-btn {
+  padding: 5px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg2);
+  cursor: pointer;
+}
+.seg-btn.active {
+  background: var(--bg2);
+  color: var(--fg);
+  box-shadow: 0 1px 4px rgba(0,0,0,.2);
+}
+.diff-stats { margin-left: auto; font-size: 13px; }
+
+.diff-full {
+  flex: 1;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  background: var(--diff-bg);
+  padding: 8px 0;
+}
+.diff-hunk-header {
+  padding: 4px 16px;
+  color: var(--fg3);
+  background: var(--bg3);
+  font-size: 12px;
+  margin: 4px 0;
+}
+.diff-row {
+  display: flex;
+  align-items: baseline;
+  padding: 0 16px;
+  min-width: 0;
+}
+.diff-row.add { background: var(--add-bg); }
+.diff-row.del { background: var(--del-bg); }
+.diff-ln {
+  width: 36px;
+  color: var(--fg3);
+  font-size: 11px;
+  flex-shrink: 0;
+  user-select: none;
+  text-align: right;
+  margin-right: 10px;
+}
+.diff-ln2 {
+  width: 36px;
+  color: var(--fg3);
+  font-size: 11px;
+  flex-shrink: 0;
+  user-select: none;
+  text-align: right;
+  margin-right: 12px;
+}
+.diff-sign { width: 12px; flex-shrink: 0; color: var(--fg3); margin-right: 4px; }
+.diff-row.add .diff-sign { color: var(--add-fg); }
+.diff-row.del .diff-sign { color: var(--del-fg); }
+.diff-code {
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.diff-row.add .diff-code { color: var(--add-fg); }
+.diff-row.del .diff-code { color: var(--del-fg); }
+.diff-row.ctx .diff-code { color: var(--fg); }
+
+.diff-nav {
+  border-top: 1px solid var(--separator);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  font-size: 14px;
+}
+.diff-nav-btn {
+  color: var(--tint);
+  padding: 6px 14px;
+  border-radius: var(--r-sm);
+  background: var(--tint-bg);
+  font-size: 14px;
+  cursor: pointer;
+}
+.diff-nav-btn.disabled { opacity: .3; cursor: default; }
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+  <div class="phone-label">05 · Diff 全屏</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+
+    <div class="nav">
+      <div class="nav-back"><svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8,1 2,9 8,17"/></svg></div>
+      <div class="nav-title" style="font-size:14px;font-family:var(--font-mono)">src/auth/login.ts</div>
+    </div>
+
+    <div class="diff-toolbar">
+      <div class="seg-ctrl">
+        <div class="seg-btn active">统一</div>
+        <div class="seg-btn">分栏</div>
+      </div>
+      <div class="diff-stats">
+        <span class="add" style="color:var(--add-fg);font-weight:600">+12</span>
+        &nbsp;
+        <span class="del" style="color:var(--del-fg);font-weight:600">−4</span>
+      </div>
+    </div>
+
+    <div class="diff-full">
+      <div class="diff-hunk-header">@@ -12,8 +12,16 @@</div>
+
+      <div class="diff-row ctx"><div class="diff-ln">12</div><div class="diff-ln2">12</div><div class="diff-sign"> </div><div class="diff-code"><span class="kw">async function</span> <span class="fn">login</span>(u, p) {</div></div>
+      <div class="diff-row ctx"><div class="diff-ln">13</div><div class="diff-ln2">13</div><div class="diff-sign"> </div><div class="diff-code">  <span class="kw">const</span> url = <span class="str">'/api/login'</span></div></div>
+      <div class="diff-row del"><div class="diff-ln">14</div><div class="diff-ln2"></div><div class="diff-sign">−</div><div class="diff-code">  <span class="kw">const</span> res = <span class="kw">await</span> fetch(url, opts)</div></div>
+      <div class="diff-row add"><div class="diff-ln"></div><div class="diff-ln2">14</div><div class="diff-sign">+</div><div class="diff-code">  <span class="kw">const</span> res = <span class="kw">await</span> <span class="fn">withRetry</span>(</div></div>
+      <div class="diff-row add"><div class="diff-ln"></div><div class="diff-ln2">15</div><div class="diff-sign">+</div><div class="diff-code">    () => <span class="fn">fetch</span>(url, {</div></div>
+      <div class="diff-row add"><div class="diff-ln"></div><div class="diff-ln2">16</div><div class="diff-sign">+</div><div class="diff-code">      body: { u, p },</div></div>
+      <div class="diff-row add"><div class="diff-ln"></div><div class="diff-ln2">17</div><div class="diff-sign">+</div><div class="diff-code">      signal: ctl.signal,</div></div>
+      <div class="diff-row add"><div class="diff-ln"></div><div class="diff-ln2">18</div><div class="diff-sign">+</div><div class="diff-code">    }), <span class="tp">3</span>)</div></div>
+      <div class="diff-row ctx"><div class="diff-ln">15</div><div class="diff-ln2">19</div><div class="diff-sign"> </div><div class="diff-code">  <span class="kw">if</span> (!res.ok) {</div></div>
+      <div class="diff-row del"><div class="diff-ln">16</div><div class="diff-ln2"></div><div class="diff-sign">−</div><div class="diff-code">    <span class="kw">throw new</span> <span class="fn">Error</span>(res.body)</div></div>
+      <div class="diff-row add"><div class="diff-ln"></div><div class="diff-ln2">20</div><div class="diff-sign">+</div><div class="diff-code">    <span class="kw">throw new</span> <span class="fn">AuthError</span>(</div></div>
+      <div class="diff-row add"><div class="diff-ln"></div><div class="diff-ln2">21</div><div class="diff-sign">+</div><div class="diff-code">      <span class="str">'login failed'</span>)</div></div>
+      <div class="diff-row ctx"><div class="diff-ln">17</div><div class="diff-ln2">22</div><div class="diff-sign"> </div><div class="diff-code">  }</div></div>
+      <div class="diff-row ctx"><div class="diff-ln">18</div><div class="diff-ln2">23</div><div class="diff-sign"> </div><div class="diff-code">}</div></div>
+
+      <div class="diff-hunk-header">@@ -30,5 +35,6 @@</div>
+      <div class="diff-row del"><div class="diff-ln">30</div><div class="diff-ln2"></div><div class="diff-sign">−</div><div class="diff-code">  <span class="cm">// TODO: remove debug</span></div></div>
+      <div class="diff-row del"><div class="diff-ln">31</div><div class="diff-ln2"></div><div class="diff-sign">−</div><div class="diff-code">  console.log(<span class="str">'pwd='</span>, p)</div></div>
+      <div class="diff-row ctx"><div class="diff-ln">32</div><div class="diff-ln2">35</div><div class="diff-sign"> </div><div class="diff-code">  <span class="kw">return</span> res</div></div>
+    </div>
+
+    <div class="diff-nav">
+      <div class="diff-nav-btn disabled">◀ 上一处</div>
+      <span style="color:var(--fg2);font-size:13px">1 / 2 处变更</span>
+      <div class="diff-nav-btn">下一处 ▶</div>
+    </div>
+  </div>
+</div>
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn = document.querySelector('.theme-toggle');
+  if (html.dataset.theme === 'dark') { html.dataset.theme = 'light'; btn.textContent = '🌙 深色'; }
+  else { html.dataset.theme = 'dark'; btn.textContent = '☀ 浅色'; }
+}
+document.querySelectorAll('.seg-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>

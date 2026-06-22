@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>01 · 配对入口页</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+.qr-area {
+  background: var(--bg3);
+  border-radius: var(--r);
+  height: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 24px 0 8px;
+  border: 2px dashed var(--separator);
+  cursor: pointer;
+  transition: border-color .2s;
+}
+.qr-area:hover { border-color: var(--tint); }
+.qr-icon { font-size: 48px; }
+.qr-hint { font-size: 14px; color: var(--fg2); }
+
+.input-group { margin: 12px 0; }
+.input-label { font-size: 13px; color: var(--fg2); margin-bottom: 6px; }
+.input-ctrl {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--separator);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+  font-size: 15px;
+  color: var(--fg);
+  font-family: inherit;
+  outline: none;
+}
+.input-ctrl:focus { border-color: var(--tint); }
+.pin-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin: 6px 0;
+}
+.pin-box {
+  width: 44px; height: 52px;
+  background: var(--bg3);
+  border: 1px solid var(--separator);
+  border-radius: var(--r-sm);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--tint);
+}
+.pin-sep { display: flex; align-items: center; color: var(--fg3); font-size: 20px; }
+.connect-btn {
+  width: 100%;
+  padding: 16px;
+  border-radius: var(--r);
+  background: var(--tint);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 600;
+  margin-top: 24px;
+  cursor: pointer;
+  border: none;
+}
+.footnote { font-size: 12px; color: var(--fg3); text-align: center; margin-top: 12px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+
+<div class="phone-wrap">
+  <div class="phone-label">01 · 配对入口页</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 16 12" fill="currentColor"><path d="M8 2.4C5.6 2.4 3.4 3.4 1.8 5L0 3.2C2.2 1.2 5 0 8 0s5.8 1.2 8 3.2L14.2 5C12.6 3.4 10.4 2.4 8 2.4z"/><path d="M8 6.4c-1.5 0-2.8.6-3.8 1.6L2.4 6.2C3.8 4.8 5.8 4 8 4s4.2.8 5.6 2.2L11.8 8C10.8 7 9.5 6.4 8 6.4z"/><circle cx="8" cy="10.5" r="1.5"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+
+    <div class="nav">
+      <div class="nav-title">配对设备</div>
+    </div>
+
+    <div class="screen-body" style="padding-bottom:32px">
+
+      <!-- context banner -->
+      <div style="background:rgba(52,199,89,.1);border-radius:var(--r-sm);padding:11px 14px;margin:16px 0 4px;display:flex;gap:10px;align-items:flex-start">
+        <span style="font-size:16px;flex-shrink:0">💡</span>
+        <div style="font-size:13px;color:var(--green);line-height:1.55">
+          <strong>只需配对一次</strong>，在家里电脑旁完成。<br>
+          之后在外面通过云中继发指令，Daemon 在你桌面机上执行，结果流回手机——看到的是 Claude Code 的文字输出，不是屏幕画面。
+        </div>
+      </div>
+
+      <p style="font-size:14px;color:var(--fg2);line-height:1.6;margin-top:16px;text-align:center">
+        在电脑上运行 HelloBug daemon<br>后扫码或输入控制台显示的配对码
+      </p>
+
+      <!-- QR zone -->
+      <div class="qr-area">
+        <div class="qr-icon">⬛</div>
+        <div style="font-size:15px;font-weight:600">点击扫描二维码</div>
+        <div class="qr-hint">需要相机权限</div>
+      </div>
+
+      <div class="divider-text">或手动输入</div>
+
+      <!-- pin input -->
+      <div class="input-group">
+        <div class="input-label">配对码（daemon 控制台显示，30 秒有效）</div>
+        <div class="pin-row">
+          <div class="pin-box">4</div>
+          <div class="pin-box">2</div>
+          <div class="pin-box">8</div>
+          <div class="pin-sep">-</div>
+          <div class="pin-box">7</div>
+          <div class="pin-box">9</div>
+          <div class="pin-box">1</div>
+        </div>
+      </div>
+
+      <!-- server -->
+      <div class="input-group">
+        <div class="input-label">中继服务器地址</div>
+        <input class="input-ctrl" type="text" value="wss://relay.example.com" readonly>
+      </div>
+
+      <button class="connect-btn">连接</button>
+
+      <p class="footnote">配对完成后需在双端核对安全短串<br>以防止中间人攻击</p>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn = document.querySelector('.theme-toggle');
+  if (html.dataset.theme === 'dark') {
+    html.dataset.theme = 'light';
+    btn.textContent = '🌙 深色';
+  } else {
+    html.dataset.theme = 'dark';
+    btn.textContent = '☀ 浅色';
+  }
+}
+</script>
+</body>
+</html>

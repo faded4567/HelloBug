@@ -1,0 +1,20 @@
+.claude/
+
+# Backend workspace
+packages/node_modules/
+packages/*/node_modules/
+packages/*/dist/
+packages/coverage/
+packages/.turbo/
+packages/.pnpm-store/
+
+# Flutter / local IDE
+app/.dart_tool/
+app/.idea/
+app/build/
+
+# Generic
+node_modules
+dist
+coverage
+.DS_Store

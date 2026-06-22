@@ -1,0 +1,24 @@
+{
+  "name": "@hellobug/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "eslint src test",
+    "dev": "tsx watch src/index.ts"
+  },
+  "dependencies": {
+    "@fastify/websocket": "^11.2.0",
+    "@hellobug/protocol": "workspace:*",
+    "fastify": "^5.4.0",
+    "jose": "^6.0.12",
+    "node-forge": "^1.3.1",
+    "ws": "^8.18.3",
+    "zod": "^3.25.76"
+  }
+}
+

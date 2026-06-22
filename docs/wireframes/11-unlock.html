@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>11 · 生物解锁</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+.lock-bg {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(160deg, #0d0d0f 0%, #1a1a2e 60%, #0d0d0f 100%);
+  overflow: hidden;
+}
+[data-theme="light"] .lock-bg {
+  background: linear-gradient(160deg, #dde6f0 0%, #c9d8ec 60%, #dde6f0 100%);
+}
+.lock-blur-card {
+  position: absolute;
+  border-radius: 20px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+/* decorative blurred cards behind */
+.blur-c1 {
+  width: 200px; height: 80px;
+  background: rgba(10,132,255,.15);
+  top: 140px; left: 20px;
+}
+.blur-c2 {
+  width: 180px; height: 60px;
+  background: rgba(52,199,89,.1);
+  top: 240px; left: 60px;
+}
+.blur-c3 {
+  width: 220px; height: 70px;
+  background: rgba(255,159,10,.08);
+  top: 320px; right: 10px;
+}
+
+.lock-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 0 32px;
+  z-index: 10;
+}
+[data-theme="light"] .lock-overlay {
+  background: rgba(200,210,225,.5);
+}
+
+.lock-app-icon {
+  width: 72px; height: 72px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #0a84ff, #5e5ce6);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 38px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 20px rgba(10,132,255,.4);
+}
+.lock-title {
+  font-size: 22px; font-weight: 700;
+  margin-bottom: 6px;
+}
+.lock-sub {
+  font-size: 14px; color: var(--fg2);
+  margin-bottom: 48px;
+  text-align: center;
+}
+
+.faceid-ring {
+  width: 88px; height: 88px;
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,.2);
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  margin-bottom: 20px;
+  cursor: pointer;
+}
+.faceid-ring::before {
+  content: '';
+  position: absolute; inset: -6px;
+  border-radius: 50%;
+  border: 2px solid var(--tint);
+  opacity: .5;
+  animation: pulse-ring 2s ease infinite;
+}
+@keyframes pulse-ring {
+  0%,100% { transform: scale(1); opacity:.5; }
+  50% { transform: scale(1.08); opacity:.15; }
+}
+.faceid-icon {
+  font-size: 44px; line-height: 1;
+}
+.lock-hint {
+  font-size: 14px; color: var(--fg2);
+  margin-bottom: 48px;
+  text-align: center;
+}
+.lock-fallback {
+  font-size: 15px; color: var(--tint);
+  cursor: pointer;
+  padding: 8px 20px;
+}
+.lock-time {
+  position: absolute;
+  top: 90px;
+  font-size: 52px; font-weight: 200;
+  letter-spacing: -.02em;
+  color: rgba(255,255,255,.9);
+}
+[data-theme="light"] .lock-time { color: rgba(0,0,0,.8); }
+.lock-date {
+  position: absolute;
+  top: 154px;
+  font-size: 16px; color: rgba(255,255,255,.6);
+}
+[data-theme="light"] .lock-date { color: rgba(0,0,0,.5); }
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+  <div class="phone-label">11 · 生物识别解锁</div>
+  <div class="phone" style="position:relative;overflow:hidden">
+    <div class="dynamic-island"></div>
+    <div class="status-bar" style="position:relative;z-index:20">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+
+    <!-- blurred chat bg (decorative) -->
+    <div class="lock-bg">
+      <div class="lock-blur-card blur-c1"></div>
+      <div class="lock-blur-card blur-c2"></div>
+      <div class="lock-blur-card blur-c3"></div>
+    </div>
+
+    <!-- time display through blur -->
+    <div class="lock-time" style="position:absolute;z-index:5">9:41</div>
+    <div class="lock-date" style="position:absolute;z-index:5">2026年6月21日 周日</div>
+
+    <!-- lock overlay -->
+    <div class="lock-overlay">
+      <div class="lock-app-icon">🐛</div>
+      <div class="lock-title">HelloBug 已锁定</div>
+      <div class="lock-sub">后台超过 5 分钟，请验证身份<br>以继续使用</div>
+      <div class="faceid-ring" onclick="alert('Face ID 验证成功 → 解锁')">
+        <div class="faceid-icon">🔐</div>
+      </div>
+      <div class="lock-hint">Face ID 解锁</div>
+      <div class="lock-fallback" onclick="alert('→ 密码解锁')">使用密码解锁</div>
+    </div>
+  </div>
+</div>
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn = document.querySelector('.theme-toggle');
+  if (html.dataset.theme === 'dark') { html.dataset.theme = 'light'; btn.textContent = '🌙 深色'; }
+  else { html.dataset.theme = 'dark'; btn.textContent = '☀ 浅色'; }
+}
+</script>
+</body>
+</html>

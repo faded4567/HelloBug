@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>12 · 新建会话</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+.step-indicator {
+  display: flex; align-items: center;
+  padding: 12px 16px;
+  gap: 0;
+  flex-shrink: 0;
+}
+.step-node {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700;
+  flex-shrink: 0;
+}
+.step-node.done   { background: var(--tint); color: #fff; }
+.step-node.active { background: var(--tint); color: #fff; box-shadow: 0 0 0 4px var(--tint-bg); }
+.step-node.idle   { background: var(--bg3); color: var(--fg3); }
+.step-line { flex: 1; height: 2px; background: var(--separator); }
+.step-line.done { background: var(--tint); }
+
+.step-labels {
+  display: flex;
+  padding: 0 8px;
+  margin-top: -4px; margin-bottom: 8px;
+}
+.step-label {
+  flex: 1; text-align: center;
+  font-size: 11px; color: var(--fg3);
+}
+.step-label.active { color: var(--tint); font-weight: 600; }
+
+/* agent card */
+.agent-card {
+  background: var(--bg2);
+  border-radius: var(--r);
+  padding: 16px;
+  margin: 6px 0;
+  display: flex; align-items: center; gap: 14px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color .15s;
+}
+.agent-card.selected { border-color: var(--tint); background: var(--tint-bg); }
+.agent-logo {
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; flex-shrink: 0;
+}
+.agent-info { flex: 1; }
+.agent-name { font-size: 16px; font-weight: 600; }
+.agent-desc { font-size: 13px; color: var(--fg2); margin-top: 2px; }
+.agent-check {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: var(--tint);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 13px; font-weight: 700;
+  opacity: 0; transition: opacity .15s;
+}
+.agent-card.selected .agent-check { opacity: 1; }
+
+.model-row {
+  background: var(--bg2);
+  border-radius: var(--r);
+  padding: 14px 16px;
+  display: flex; align-items: center; gap: 10px;
+  margin: 6px 0;
+  cursor: pointer;
+}
+.model-tag {
+  background: var(--bg3);
+  border-radius: var(--r-sm);
+  padding: 4px 10px;
+  font-size: 13px;
+  color: var(--fg2);
+}
+.perm-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 10px; border-radius: var(--r-sm);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.perm-badge.ask    { background: var(--tint-bg); color: var(--tint); }
+.perm-badge.auto   { background: rgba(52,199,89,.12); color: #30d158; }
+.perm-badge.bypass { background: rgba(255,59,48,.12); color: #ff453a; }
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+  <div class="phone-label">12 · 新建会话</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+
+    <div class="nav">
+      <div class="nav-back" onclick="history.back()" style="cursor:pointer">
+        <svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8,1 2,9 8,17"/></svg>
+        取消
+      </div>
+      <div class="nav-title">新建会话</div>
+      <div class="nav-right" style="color:var(--fg3)">步骤 3/3</div>
+    </div>
+
+    <!-- step indicator -->
+    <div class="step-indicator">
+      <div class="step-node done">✓</div>
+      <div class="step-line done"></div>
+      <div class="step-node done">✓</div>
+      <div class="step-line done"></div>
+      <div class="step-node active">3</div>
+    </div>
+    <div class="step-labels">
+      <div class="step-label">选设备</div>
+      <div class="step-label">选工作区</div>
+      <div class="step-label active">选 Agent</div>
+    </div>
+
+    <div class="screen-body" style="padding-bottom:20px">
+      <!-- selected context -->
+      <div style="background:var(--bg2);border-radius:var(--r);padding:12px 16px;margin-bottom:16px;display:flex;gap:12px;font-size:13px;color:var(--fg2)">
+        <span>💻 MacBook Pro M3</span>
+        <span>›</span>
+        <span style="color:var(--fg)">📂 HelloBug</span>
+        <span style="color:var(--fg2);margin-left:auto;font-family:var(--font-mono)">main</span>
+      </div>
+
+      <div class="section-header">选择 Agent 类型</div>
+
+      <div class="agent-card selected" id="card-cc" onclick="selectAgent('cc')">
+        <div class="agent-logo" style="background:rgba(255,149,0,.12)">🤖</div>
+        <div class="agent-info">
+          <div class="agent-name">Claude Code</div>
+          <div class="agent-desc">代码编写、重构、调试、解释</div>
+        </div>
+        <div class="agent-check">✓</div>
+      </div>
+
+      <div class="agent-card" id="card-cx" onclick="selectAgent('cx')">
+        <div class="agent-logo" style="background:rgba(10,132,255,.12)">⚡</div>
+        <div class="agent-info">
+          <div class="agent-name">Codex</div>
+          <div class="agent-desc">任务执行、自动化、多步操作</div>
+        </div>
+        <div class="agent-check">✓</div>
+      </div>
+
+      <div class="agent-card" id="card-sh" onclick="selectAgent('sh')">
+        <div class="agent-logo" style="background:rgba(52,199,89,.12)">⌨️</div>
+        <div class="agent-info">
+          <div class="agent-name">Shell 终端</div>
+          <div class="agent-desc">PTY 直连，完整命令行访问</div>
+        </div>
+        <div class="agent-check">✓</div>
+      </div>
+
+      <div class="section-header" style="margin-top:8px">模型</div>
+      <div class="model-row">
+        <span style="flex:1;font-size:15px">Claude 模型</span>
+        <span class="model-tag">claude-sonnet-4-6</span>
+        <span class="list-arrow"></span>
+      </div>
+
+      <div class="section-header">权限模式</div>
+      <div style="background:var(--bg2);border-radius:var(--r);padding:14px 16px;display:flex;gap:8px;flex-wrap:wrap">
+        <div class="perm-badge ask" id="perm-ask" onclick="selectPerm('ask')">👁 询问</div>
+        <div class="perm-badge" id="perm-auto" onclick="selectPerm('auto')" style="background:var(--bg3);color:var(--fg2)">⚡ 自动接受</div>
+        <div class="perm-badge" id="perm-bypass" onclick="selectPerm('bypass')" style="background:var(--bg3);color:var(--fg2)">🔓 绕过安全</div>
+      </div>
+      <div style="font-size:12px;color:var(--fg3);padding:6px 4px">询问模式：危险操作需二次确认（推荐）</div>
+
+      <div class="section-header">起始提示词（可选）</div>
+      <textarea class="input-field" style="border-radius:var(--r);min-height:80px;padding:12px 14px;width:100%" placeholder="输入任务描述，或留空后在聊天页再发起…"></textarea>
+    </div>
+
+    <div style="padding:12px 16px 32px;flex-shrink:0;border-top:1px solid var(--separator)">
+      <button class="btn btn-primary" style="width:100%">启动会话</button>
+    </div>
+  </div>
+</div>
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn = document.querySelector('.theme-toggle');
+  if (html.dataset.theme === 'dark') { html.dataset.theme = 'light'; btn.textContent = '🌙 深色'; }
+  else { html.dataset.theme = 'dark'; btn.textContent = '☀ 浅色'; }
+}
+function selectAgent(id) {
+  ['cc','cx','sh'].forEach(k => document.getElementById('card-'+k).classList.remove('selected'));
+  document.getElementById('card-'+id).classList.add('selected');
+}
+function selectPerm(id) {
+  const colors = { ask: ['var(--tint-bg)','var(--tint)'], auto: ['rgba(52,199,89,.12)','#30d158'], bypass: ['rgba(255,59,48,.12)','#ff453a'] };
+  ['ask','auto','bypass'].forEach(k => {
+    const el = document.getElementById('perm-'+k);
+    el.style.background = 'var(--bg3)'; el.style.color = 'var(--fg2)';
+  });
+  const el = document.getElementById('perm-'+id);
+  el.style.background = colors[id][0]; el.style.color = colors[id][1];
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>02 · SAS 安全核对页</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+.sas-box {
+  background: var(--bg2);
+  border-radius: var(--r-lg);
+  padding: 24px 20px;
+  margin: 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.sas-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  background: var(--bg3);
+  border-radius: var(--r);
+}
+.sas-emoji { font-size: 28px; }
+.sas-word  { font-size: 18px; font-weight: 600; }
+
+.warning-box {
+  background: rgba(255,59,48,.10);
+  border: 1px solid rgba(255,59,48,.25);
+  border-radius: var(--r);
+  padding: 12px 16px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+.warning-icon { font-size: 18px; flex-shrink: 0; }
+.warning-text { font-size: 13px; color: var(--red); line-height: 1.55; }
+
+.btn-row { display: flex; gap: 12px; }
+.btn-row .btn { flex: 1; }
+
+.progress-hint {
+  font-size: 13px;
+  color: var(--fg2);
+  text-align: center;
+  margin-top: 8px;
+}
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+  <div class="phone-label">02 · SAS 安全核对</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+
+    <div class="nav">
+      <div class="nav-title">安全核对</div>
+    </div>
+
+    <div class="screen-body" style="padding-bottom:32px">
+      <p style="font-size:14px;color:var(--fg2);line-height:1.6;margin-top:20px;text-align:center">
+        请确认电脑终端显示的安全短串<br>与下方<strong style="color:var(--fg)">完全一致</strong>后再点确认
+      </p>
+
+      <div class="sas-box">
+        <div class="sas-item"><span class="sas-emoji">🐢</span><span class="sas-word">海龟</span></div>
+        <div class="sas-item"><span class="sas-emoji">🪐</span><span class="sas-word">土星</span></div>
+        <div class="sas-item"><span class="sas-emoji">🍵</span><span class="sas-word">绿茶</span></div>
+        <div class="sas-item"><span class="sas-emoji">🎷</span><span class="sas-word">萨克斯</span></div>
+        <div class="sas-item"><span class="sas-emoji">🌙</span><span class="sas-word">月亮</span></div>
+      </div>
+
+      <div class="warning-box">
+        <span class="warning-icon">⚠️</span>
+        <span class="warning-text">若与电脑端显示不一致，请立即取消。可能存在中间人攻击，连接不安全。</span>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-ghost" style="background:var(--bg3);color:var(--red);border-radius:var(--r);font-size:17px;font-weight:600;padding:14px">取消</button>
+        <button class="btn btn-primary">一致，确认</button>
+      </div>
+      <div class="progress-hint">完成后双端建立加密通道</div>
+    </div>
+  </div>
+</div>
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn = document.querySelector('.theme-toggle');
+  if (html.dataset.theme === 'dark') { html.dataset.theme = 'light'; btn.textContent = '🌙 深色'; }
+  else { html.dataset.theme = 'dark'; btn.textContent = '☀ 浅色'; }
+}
+</script>
+</body>
+</html>

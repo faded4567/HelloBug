@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>06 · 文件树 + 预览</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+.filetree-pane {
+  border-bottom: 1px solid var(--separator);
+  flex-shrink: 0;
+  overflow-y: auto;
+  max-height: 240px;
+}
+.code-pane {
+  flex: 1;
+  overflow: auto;
+  background: var(--diff-bg);
+}
+.pane-header {
+  padding: 6px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg3);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  background: var(--bg3);
+  border-bottom: 1px solid var(--separator);
+}
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+  <div class="phone-label">06 · 文件树 + 只读预览</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+
+    <div class="nav">
+      <div class="nav-back"><svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8,1 2,9 8,17"/></svg></div>
+      <div class="nav-title">HelloBug</div>
+      <div class="nav-right" style="font-size:20px">⋯</div>
+    </div>
+
+    <div class="filetree-pane">
+      <div class="filetree" style="padding:4px 8px">
+        <div class="tree-row"><span>📂</span><span>src/</span></div>
+        <div class="tree-row tree-indent-1"><span>📂</span><span>auth/</span></div>
+        <div class="tree-row tree-indent-2 active"><span>📄</span><span>login.ts</span><span class="tree-badge">✎ 已修改</span></div>
+        <div class="tree-row tree-indent-2"><span>📄</span><span>register.ts</span></div>
+        <div class="tree-row tree-indent-2"><span>📄</span><span>session.ts</span></div>
+        <div class="tree-row tree-indent-1"><span>📂</span><span>api/</span></div>
+        <div class="tree-row tree-indent-2"><span>📄</span><span>client.ts</span></div>
+        <div class="tree-row tree-indent-2"><span>📄</span><span>router.ts</span></div>
+        <div class="tree-row tree-indent-1"><span>📂</span><span>utils/</span></div>
+        <div class="tree-row"><span>📂</span><span>tests/</span></div>
+        <div class="tree-row"><span>📄</span><span>package.json</span></div>
+        <div class="tree-row"><span>📄</span><span>README.md</span></div>
+      </div>
+    </div>
+
+    <div class="pane-header">src/auth/login.ts — 只读</div>
+
+    <div class="code-pane">
+      <div class="code-viewer">
+        <div class="code-line"><span class="code-ln">1</span><span class="code-content"><span class="kw">import</span> { AuthError } <span class="kw">from</span> <span class="str">'../errors'</span></span></div>
+        <div class="code-line"><span class="code-ln">2</span><span class="code-content"><span class="kw">import</span> { withRetry } <span class="kw">from</span> <span class="str">'../utils/retry'</span></span></div>
+        <div class="code-line"><span class="code-ln">3</span><span class="code-content"></span></div>
+        <div class="code-line"><span class="code-ln">4</span><span class="code-content"><span class="kw">export async function</span> <span class="fn">login</span>(</span></div>
+        <div class="code-line"><span class="code-ln">5</span><span class="code-content">  u: <span class="tp">string</span>, p: <span class="tp">string</span>,</span></div>
+        <div class="code-line"><span class="code-ln">6</span><span class="code-content">) {</span></div>
+        <div class="code-line"><span class="code-ln">7</span><span class="code-content">  <span class="kw">const</span> url = <span class="str">'/api/login'</span></span></div>
+        <div class="code-line"><span class="code-ln">8</span><span class="code-content">  <span class="kw">const</span> ctl = <span class="kw">new</span> <span class="fn">AbortController</span>()</span></div>
+        <div class="code-line"><span class="code-ln">9</span><span class="code-content">  <span class="kw">return</span> <span class="fn">withRetry</span>(<span class="kw">async</span> () => {</span></div>
+        <div class="code-line"><span class="code-ln">10</span><span class="code-content">    <span class="kw">const</span> res = <span class="kw">await</span> <span class="fn">fetch</span>(url, {</span></div>
+        <div class="code-line"><span class="code-ln">11</span><span class="code-content">      body: <span class="fn">JSON.stringify</span>({ u, p }),</span></div>
+        <div class="code-line"><span class="code-ln">12</span><span class="code-content">      signal: ctl.signal,</span></div>
+        <div class="code-line"><span class="code-ln">13</span><span class="code-content">    })</span></div>
+        <div class="code-line"><span class="code-ln">14</span><span class="code-content">    <span class="kw">if</span> (!res.ok) {</span></div>
+        <div class="code-line"><span class="code-ln">15</span><span class="code-content">      <span class="kw">throw new</span> <span class="fn">AuthError</span>(<span class="str">'login failed'</span>)</span></div>
+        <div class="code-line"><span class="code-ln">16</span><span class="code-content">    }</span></div>
+        <div class="code-line"><span class="code-ln">17</span><span class="code-content">    <span class="kw">return</span> res.<span class="fn">json</span>()</span></div>
+        <div class="code-line"><span class="code-ln">18</span><span class="code-content">  }, <span class="tp">3</span>)</span></div>
+        <div class="code-line"><span class="code-ln">19</span><span class="code-content">}</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn = document.querySelector('.theme-toggle');
+  if (html.dataset.theme === 'dark') { html.dataset.theme = 'light'; btn.textContent = '🌙 深色'; }
+  else { html.dataset.theme = 'dark'; btn.textContent = '☀ 浅色'; }
+}
+</script>
+</body>
+</html>

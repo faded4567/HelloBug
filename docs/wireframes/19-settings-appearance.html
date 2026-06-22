@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>19 · 外观</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+.theme-picker {
+  display: flex; gap: 12px;
+  padding: 14px 16px;
+}
+.theme-option {
+  flex: 1;
+  border-radius: var(--r);
+  border: 2px solid var(--separator);
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color .15s;
+}
+.theme-option.active { border-color: var(--tint); }
+.theme-preview {
+  height: 64px;
+  display: flex; flex-direction: column;
+  padding: 6px 8px; gap: 4px;
+}
+.tp-bar { height: 8px; border-radius: 4px; }
+.theme-label {
+  font-size: 13px; font-weight: 500;
+  text-align: center; padding: 6px 0;
+  background: var(--bg2);
+  border-top: 1px solid var(--separator);
+}
+.theme-check {
+  text-align: center; font-size: 11px;
+  color: var(--tint); padding: 3px 0;
+  background: var(--bg2);
+}
+
+.font-size-row {
+  display: flex; align-items: center;
+  padding: 12px 16px; gap: 12px;
+}
+.font-minus, .font-plus {
+  width: 32px; height: 32px;
+  background: var(--bg3);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: 700;
+  cursor: pointer; flex-shrink: 0;
+}
+.font-slider {
+  flex: 1; height: 4px;
+  background: var(--bg3);
+  border-radius: 2px;
+  position: relative;
+}
+.font-fill {
+  height: 100%; border-radius: 2px;
+  background: var(--tint);
+  width: 55%;
+}
+.font-thumb {
+  width: 20px; height: 20px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0,0,0,.3);
+  position: absolute;
+  top: -8px; left: calc(55% - 10px);
+}
+.preview-text {
+  font-size: 14px;
+  color: var(--fg);
+  line-height: 1.55;
+}
+.code-preview {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  background: var(--bg3);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  line-height: 1.6;
+  margin-top: 8px;
+}
+
+.segmented-row {
+  display: flex;
+  background: var(--bg3);
+  border-radius: 8px;
+  padding: 2px;
+  margin: 0 16px 4px;
+}
+.seg-opt {
+  flex: 1; text-align: center;
+  padding: 7px; border-radius: 6px;
+  font-size: 14px; cursor: pointer; color: var(--fg2);
+}
+.seg-opt.active {
+  background: var(--bg2);
+  color: var(--fg); font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0,0,0,.2);
+}
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+  <div class="phone-label">19 · 外观设置</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nav-back" onclick="location.href='17-settings.html'" style="cursor:pointer;color:var(--tint)">
+        <svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8,1 2,9 8,17"/></svg>
+        设置
+      </div>
+      <div class="nav-title">外观</div>
+    </div>
+
+    <div class="screen-body" style="padding-bottom:32px">
+
+      <div class="section-header">主题</div>
+      <div class="list-group" style="overflow:visible;background:none;border-radius:0;margin:0">
+        <div class="theme-picker">
+          <div class="theme-option" id="t-sys" onclick="selTheme('sys')">
+            <div class="theme-preview" style="background:linear-gradient(135deg,#1c1c1e 50%,#f2f2f7 50%)">
+              <div class="tp-bar" style="background:rgba(255,255,255,.4);width:70%"></div>
+              <div class="tp-bar" style="background:rgba(0,0,0,.2);width:50%"></div>
+            </div>
+            <div class="theme-label">跟随系统</div>
+            <div class="theme-check" id="chk-sys" style="opacity:1">✓ 当前</div>
+          </div>
+          <div class="theme-option" id="t-dark" onclick="selTheme('dark')">
+            <div class="theme-preview" style="background:#1c1c1e">
+              <div class="tp-bar" style="background:rgba(255,255,255,.3);width:70%"></div>
+              <div class="tp-bar" style="background:rgba(10,132,255,.5);width:45%"></div>
+            </div>
+            <div class="theme-label">深色</div>
+            <div class="theme-check" id="chk-dark" style="opacity:0">✓ 当前</div>
+          </div>
+          <div class="theme-option" id="t-light" onclick="selTheme('light')">
+            <div class="theme-preview" style="background:#f2f2f7">
+              <div class="tp-bar" style="background:rgba(0,0,0,.2);width:70%"></div>
+              <div class="tp-bar" style="background:rgba(0,122,255,.4);width:45%"></div>
+            </div>
+            <div class="theme-label" style="color:#000;background:#fff;border-color:#e5e5ea">浅色</div>
+            <div class="theme-check" id="chk-light" style="opacity:0;background:#fff;color:#007aff">✓ 当前</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-header">强调色</div>
+      <div class="list-group">
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(10,132,255,.12)">🎨</div>
+          <div class="list-label">强调色</div>
+          <div style="display:flex;gap:8px">
+            <div style="width:24px;height:24px;border-radius:50%;background:#0a84ff;box-shadow:0 0 0 3px rgba(10,132,255,.3)"></div>
+            <div style="width:24px;height:24px;border-radius:50%;background:#30d158;cursor:pointer" onclick="alert('切换绿色')"></div>
+            <div style="width:24px;height:24px;border-radius:50%;background:#ff9f0a;cursor:pointer"></div>
+            <div style="width:24px;height:24px;border-radius:50%;background:#ff453a;cursor:pointer"></div>
+            <div style="width:24px;height:24px;border-radius:50%;background:#bf5af2;cursor:pointer"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-header">字号</div>
+      <div class="list-group">
+        <div class="font-size-row">
+          <div class="font-minus" onclick="changeFont(-1)">−</div>
+          <div class="font-slider">
+            <div class="font-fill" id="ffill"></div>
+            <div class="font-thumb" id="fthumb"></div>
+          </div>
+          <div class="font-plus" onclick="changeFont(1)">＋</div>
+          <div style="font-size:13px;color:var(--fg2);width:28px;text-align:center" id="fval">14</div>
+        </div>
+        <div style="padding:0 16px 14px">
+          <div class="preview-text" id="prev-text">这是预览文字效果，登录接口已添加重试逻辑。</div>
+          <div class="code-preview" id="prev-code"><span class="kw">const</span> res = <span class="kw">await</span> <span class="fn">withRetry</span>(fn, <span class="tp">3</span>)</div>
+        </div>
+      </div>
+
+      <div class="section-header">代码字体</div>
+      <div class="list-group">
+        <div class="list-item">
+          <div class="list-icon" style="background:var(--bg3);font-family:var(--font-mono);font-size:14px">Aa</div>
+          <div class="list-label">当前字体</div>
+          <div class="list-value">SF Mono</div>
+          <div class="list-arrow"></div>
+        </div>
+        <div class="list-item">
+          <div class="list-icon" style="background:var(--bg3)">↔️</div>
+          <div class="list-label">代码行间距</div>
+          <div class="list-value">1.55</div>
+          <div class="list-arrow"></div>
+        </div>
+      </div>
+
+      <div class="section-header">Diff 显示</div>
+      <div class="list-group">
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(48,209,88,.12)">📝</div>
+          <div class="list-label">默认视图</div>
+          <div style="display:flex;background:var(--bg3);border-radius:6px;padding:2px">
+            <div style="padding:4px 10px;border-radius:4px;font-size:13px;background:var(--bg2);color:var(--fg);font-weight:500">统一</div>
+            <div style="padding:4px 10px;border-radius:4px;font-size:13px;color:var(--fg2);cursor:pointer">分栏</div>
+          </div>
+        </div>
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(10,132,255,.12)">🔢</div>
+          <div class="list-label">显示行号</div>
+          <div class="switch on" onclick="this.classList.toggle('on')"></div>
+        </div>
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(255,149,0,.12)">↩</div>
+          <div class="list-label">长行自动折行</div>
+          <div class="switch" onclick="this.classList.toggle('on')"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn = document.querySelector('.theme-toggle');
+  if (html.dataset.theme === 'dark') { html.dataset.theme = 'light'; btn.textContent = '🌙 深色'; }
+  else { html.dataset.theme = 'dark'; btn.textContent = '☀ 浅色'; }
+}
+function selTheme(t) {
+  ['sys','dark','light'].forEach(k => {
+    document.getElementById('t-'+k).classList.remove('active');
+    document.getElementById('chk-'+k).style.opacity = '0';
+  });
+  document.getElementById('t-'+t).classList.add('active');
+  document.getElementById('chk-'+t).style.opacity = '1';
+}
+let fsize = 14;
+function changeFont(d) {
+  fsize = Math.max(11, Math.min(18, fsize + d));
+  document.getElementById('fval').textContent = fsize;
+  document.getElementById('prev-text').style.fontSize = fsize+'px';
+  document.getElementById('prev-code').style.fontSize = (fsize-1)+'px';
+  const pct = (fsize - 11) / 7 * 100;
+  document.getElementById('ffill').style.width = pct+'%';
+  document.getElementById('fthumb').style.left = 'calc('+pct+'% - 10px)';
+}
+</script>
+</body>
+</html>

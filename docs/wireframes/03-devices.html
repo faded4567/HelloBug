@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>03 · 设备列表</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+.add-device {
+  background: var(--bg2);
+  border-radius: var(--r);
+  padding: 16px;
+  margin: 8px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  color: var(--tint);
+  font-size: 16px;
+  font-weight: 500;
+}
+.add-icon {
+  width: 40px; height: 40px;
+  background: var(--tint-bg);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+  color: var(--tint);
+}
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+  <div class="phone-label">03 · 设备列表</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+
+    <div class="nav">
+      <div class="nav-title">我的设备</div>
+      <div class="nav-right" style="font-size:24px">⚙</div>
+    </div>
+
+    <div class="screen-body" style="padding-bottom:32px">
+      <div class="section-header">已配对</div>
+
+      <!-- online device -->
+      <div class="device-card">
+        <div class="device-header">
+          <span class="device-icon">💻</span>
+          <span class="device-name">MacBook Pro M3</span>
+          <span class="status-dot online"></span>
+          <span class="status-label online">在线</span>
+        </div>
+        <div class="device-meta">macOS 14.5</div>
+        <div class="device-meta">2 个活跃会话 · 3 个工作区</div>
+      </div>
+
+      <!-- offline device -->
+      <div class="device-card">
+        <div class="device-header">
+          <span class="device-icon">🖥</span>
+          <span class="device-name">办公室主机</span>
+          <span class="status-dot offline"></span>
+          <span class="status-label offline">离线</span>
+        </div>
+        <div class="device-meta">Ubuntu 22.04</div>
+        <div class="device-meta">最后在线 12 分钟前</div>
+      </div>
+
+      <div class="section-header">添加</div>
+      <div class="add-device">
+        <div class="add-icon">＋</div>
+        绑定新设备
+      </div>
+
+      <div style="margin-top:20px;padding:14px 16px;background:var(--bg2);border-radius:var(--r);font-size:13px;color:var(--fg2);line-height:1.6">
+        💡 <strong style="color:var(--fg)">向左滑动</strong>卡片可解绑设备并吊销其访问权限
+      </div>
+    </div>
+
+    <div class="tab-bar">
+      <div class="tab-item active">
+        <span class="tab-icon">💻</span>
+        设备
+      </div>
+      <div class="tab-item">
+        <span class="tab-icon">💬</span>
+        <span class="tab-badge"></span>
+        会话
+      </div>
+      <div class="tab-item">
+        <span class="tab-icon">⚙</span>
+        设置
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn = document.querySelector('.theme-toggle');
+  if (html.dataset.theme === 'dark') { html.dataset.theme = 'light'; btn.textContent = '🌙 深色'; }
+  else { html.dataset.theme = 'dark'; btn.textContent = '☀ 浅色'; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>09 · 危险操作确认</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+.modal-overlay {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 0 32px;
+  /* dim background showing chat beneath */
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+[data-theme="light"] .modal-overlay { background: rgba(0,0,0,.35); }
+
+.modal-sheet {
+  width: 100%;
+  background: var(--bg2);
+  border-radius: 24px 24px 0 0;
+  padding: 8px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.sheet-handle {
+  width: 36px; height: 4px;
+  background: var(--bg4);
+  border-radius: var(--r-pill);
+  margin: 8px auto 4px;
+}
+.sheet-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 700;
+}
+.sheet-title .warn-icon {
+  width: 36px; height: 36px;
+  background: rgba(255,149,0,.2);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+}
+.cmd-box {
+  background: #0d0d0d;
+  border-radius: var(--r);
+  padding: 14px 16px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.6;
+  color: #d4d4d4;
+  overflow-x: auto;
+}
+[data-theme="light"] .cmd-box { background: #1e1e1e; }
+.cmd-box .cmd-dollar { color: #4ec9b0; }
+.cmd-box .cmd-danger { color: #ff453a; font-weight: 700; }
+
+.rule-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,59,48,.12);
+  border: 1px solid rgba(255,59,48,.25);
+  border-radius: var(--r-sm);
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--red);
+}
+.meta-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--fg2);
+}
+.meta-row strong { color: var(--fg); }
+
+.faceid-btn {
+  width: 100%;
+  padding: 16px;
+  border-radius: var(--r);
+  background: var(--orange);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  border: none;
+}
+.deny-btn {
+  width: 100%;
+  padding: 14px;
+  border-radius: var(--r);
+  background: var(--bg3);
+  color: var(--red);
+  font-size: 17px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+}
+
+/* blurred background chat (decorative) */
+.bg-chat {
+  position: absolute;
+  inset: 54px 0 0 0;
+  padding: 16px;
+  pointer-events: none;
+  opacity: .4;
+}
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+  <div class="phone-label">09 · 危险操作确认</div>
+  <div class="phone" style="position:relative">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+
+    <!-- blurred bg: chat screen -->
+    <div class="bg-chat">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="align-self:flex-end;background:var(--bubble-me);color:#fff;padding:10px 14px;border-radius:18px 18px 4px 18px;font-size:14px;max-width:75%">把 feature/login 合并到 main 吧</div>
+        <div style="align-self:flex-start;background:var(--bubble-ai);padding:10px 14px;border-radius:18px 18px 18px 4px;font-size:14px;max-width:80%">好的，我来执行 merge 并 push。</div>
+        <div style="align-self:flex-start;background:var(--tool-bg);border:1px solid var(--separator);padding:9px 14px;border-radius:8px;font-size:12px;color:var(--fg2);font-family:var(--font-mono)">🔧 Bash  git push --force origin main</div>
+      </div>
+    </div>
+
+    <!-- modal overlay -->
+    <div class="modal-overlay">
+      <div class="modal-sheet">
+        <div class="sheet-handle"></div>
+
+        <div class="sheet-title">
+          <div class="warn-icon">⚠️</div>
+          <span>危险操作</span>
+        </div>
+
+        <div class="cmd-box">
+          <span class="cmd-dollar">$ </span><span class="cmd-danger">git push --force</span> origin main
+        </div>
+
+        <div class="rule-badge">
+          <span>🚫</span>
+          命中黑名单：<strong>force push</strong>
+        </div>
+
+        <div class="meta-row">
+          <div>工作区：<strong>HelloBug</strong></div>
+          <div>分支：<strong>main</strong>（受保护）</div>
+          <div style="color:var(--red);font-size:13px">⚠ 此操作不可撤销，将覆盖远程历史</div>
+        </div>
+
+        <button class="faceid-btn">
+          <span style="font-size:22px">🔐</span>
+          Face ID · 确认执行
+        </button>
+        <button class="deny-btn">拒绝，不执行</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn = document.querySelector('.theme-toggle');
+  if (html.dataset.theme === 'dark') { html.dataset.theme = 'light'; btn.textContent = '🌙 深色'; }
+  else { html.dataset.theme = 'dark'; btn.textContent = '☀ 浅色'; }
+}
+</script>
+</body>
+</html>

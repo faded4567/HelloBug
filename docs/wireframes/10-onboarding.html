@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>10 · 首启引导</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+.ob-screen { display: none; flex: 1; flex-direction: column; }
+.ob-screen.active { display: flex; }
+
+.ob-hero {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 32px 24px;
+  gap: 24px;
+}
+.ob-icon {
+  width: 96px; height: 96px;
+  border-radius: 24px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 52px;
+  position: relative;
+}
+.ob-icon::before {
+  content: '';
+  position: absolute; inset: -2px;
+  border-radius: 26px;
+  background: linear-gradient(135deg, var(--tint), #5e5ce6);
+  z-index: -1;
+  opacity: .6;
+}
+.ob-title {
+  font-size: 26px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: -.01em;
+  line-height: 1.25;
+}
+.ob-body {
+  font-size: 15px;
+  color: var(--fg2);
+  text-align: center;
+  line-height: 1.6;
+}
+.ob-feature-list {
+  width: 100%;
+  background: var(--bg2);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.ob-feature {
+  display: flex; align-items: center;
+  padding: 13px 16px; gap: 12px;
+  border-bottom: 1px solid var(--separator);
+  font-size: 14px;
+}
+.ob-feature:last-child { border-bottom: none; }
+.ob-feature-icon {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; flex-shrink: 0;
+}
+
+.ob-footer {
+  padding: 20px 24px 32px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.ob-skip {
+  text-align: center; font-size: 14px; color: var(--fg2); cursor: pointer;
+}
+.ob-progress {
+  display: flex; gap: 6px; justify-content: center; margin-bottom: 8px;
+}
+.ob-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--fg3); transition: all .25s; }
+.ob-dot.active { background: var(--tint); width: 20px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+  <div class="phone-label">10 · 首启引导</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+
+    <!-- Step 1 -->
+    <div class="ob-screen active" id="s1">
+      <div class="ob-hero">
+        <div class="ob-icon" style="background:var(--bg3)">🤖</div>
+        <div class="ob-title">随时随地<br>掌控你的 AI Agent</div>
+        <div class="ob-body">让 Claude Code 和 Codex 在你的本地电脑上持续工作，手机端实时跟踪进度、发指令、看结果。</div>
+        <div class="ob-feature-list">
+          <div class="ob-feature">
+            <div class="ob-feature-icon" style="background:var(--tint-bg)">💬</div>
+            <div>
+              <div style="font-weight:600">流式对话</div>
+              <div style="font-size:13px;color:var(--fg2)">实时看到 agent 的思考与工具调用</div>
+            </div>
+          </div>
+          <div class="ob-feature">
+            <div class="ob-feature-icon" style="background:rgba(48,209,88,.12)">📝</div>
+            <div>
+              <div style="font-weight:600">代码 diff 预览</div>
+              <div style="font-size:13px;color:var(--fg2)">语法高亮、行号、hunk 快速跳转</div>
+            </div>
+          </div>
+          <div class="ob-feature">
+            <div class="ob-feature-icon" style="background:rgba(255,159,10,.12)">⌨️</div>
+            <div>
+              <div style="font-weight:600">嵌入式终端</div>
+              <div style="font-size:13px;color:var(--fg2)">PTY 直连，移动端专属虚拟键盘</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="ob-footer">
+        <div class="ob-progress">
+          <div class="ob-dot active"></div>
+          <div class="ob-dot"></div>
+          <div class="ob-dot"></div>
+        </div>
+        <button class="btn btn-primary" onclick="goStep(2)">下一步</button>
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="ob-screen" id="s2">
+      <div class="ob-hero">
+        <div class="ob-icon" style="background:var(--bg3)">🔐</div>
+        <div class="ob-title">端到端加密<br>服务器看不到你的代码</div>
+        <div class="ob-body">云服务器只作消息中继，数据在你的手机和电脑之间使用 Noise Protocol 全程加密，中途任何人无法窥视。</div>
+        <div class="ob-feature-list">
+          <div class="ob-feature">
+            <div class="ob-feature-icon" style="background:var(--tint-bg)">🛡</div>
+            <div>
+              <div style="font-weight:600">双层加密</div>
+              <div style="font-size:13px;color:var(--fg2)">外层 TLS 1.3 + 内层 E2EE AEAD</div>
+            </div>
+          </div>
+          <div class="ob-feature">
+            <div class="ob-feature-icon" style="background:rgba(48,209,88,.12)">🔑</div>
+            <div>
+              <div style="font-weight:600">密钥存设备</div>
+              <div style="font-size:13px;color:var(--fg2)">iOS Keychain / Android Keystore，绝不上传</div>
+            </div>
+          </div>
+          <div class="ob-feature">
+            <div class="ob-feature-icon" style="background:rgba(255,159,10,.12)">🔄</div>
+            <div>
+              <div style="font-weight:600">前向安全</div>
+              <div style="font-size:13px;color:var(--fg2)">会话密钥定期轮换，历史不可追溯</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="ob-footer">
+        <div class="ob-progress">
+          <div class="ob-dot"></div>
+          <div class="ob-dot active"></div>
+          <div class="ob-dot"></div>
+        </div>
+        <button class="btn btn-primary" onclick="goStep(3)">下一步</button>
+        <div class="ob-skip" onclick="goStep(1)">← 上一步</div>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="ob-screen" id="s3">
+      <div class="ob-hero">
+        <div class="ob-icon" style="background:var(--bg3)">⚠️</div>
+        <div class="ob-title">危险操作<br>双重守护</div>
+        <div class="ob-body">执行 <code style="font-family:var(--font-mono);font-size:13px;background:var(--bg3);padding:1px 5px;border-radius:4px">rm -rf</code>、强制推送等高危命令前，HelloBug 会拦截并要求 Face ID 确认，保护你的代码安全。</div>
+        <div class="ob-feature-list">
+          <div class="ob-feature">
+            <div class="ob-feature-icon" style="background:rgba(255,59,48,.12)">🚫</div>
+            <div>
+              <div style="font-weight:600">黑名单拦截</div>
+              <div style="font-size:13px;color:var(--fg2)">预置危险命令规则，可自定义</div>
+            </div>
+          </div>
+          <div class="ob-feature">
+            <div class="ob-feature-icon" style="background:var(--tint-bg)">👆</div>
+            <div>
+              <div style="font-weight:600">Face ID / 指纹二次确认</div>
+              <div style="font-size:13px;color:var(--fg2)">生物识别后才能放行高危操作</div>
+            </div>
+          </div>
+          <div class="ob-feature">
+            <div class="ob-feature-icon" style="background:rgba(48,209,88,.12)">📋</div>
+            <div>
+              <div style="font-weight:600">本地审计日志</div>
+              <div style="font-size:13px;color:var(--fg2)">所有操作记录在电脑本地，加密存储</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="ob-footer">
+        <div class="ob-progress">
+          <div class="ob-dot"></div>
+          <div class="ob-dot"></div>
+          <div class="ob-dot active"></div>
+        </div>
+        <button class="btn btn-primary" onclick="alert('→ 跳转配对页 01-pairing.html')">开始配对</button>
+        <div class="ob-skip" onclick="goStep(2)">← 上一步</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn = document.querySelector('.theme-toggle');
+  if (html.dataset.theme === 'dark') { html.dataset.theme = 'light'; btn.textContent = '🌙 深色'; }
+  else { html.dataset.theme = 'dark'; btn.textContent = '☀ 浅色'; }
+}
+function goStep(n) {
+  document.querySelectorAll('.ob-screen').forEach(el => el.classList.remove('active'));
+  document.getElementById('s' + n).classList.add('active');
+}
+</script>
+</body>
+</html>

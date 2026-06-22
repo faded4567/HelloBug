@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>21 · 危险操作规则</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+.rule-card {
+  background: var(--bg2);
+  border-radius: var(--r);
+  margin: 0 0 2px;
+  overflow: hidden;
+}
+.rule-header {
+  display: flex; align-items: center;
+  padding: 12px 16px; gap: 12px;
+  cursor: pointer;
+}
+.rule-pattern {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  background: var(--bg3);
+  color: var(--red);
+  padding: 2px 7px;
+  border-radius: 5px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rule-desc {
+  font-size: 12px;
+  color: var(--fg2);
+  padding: 0 16px 10px 56px;
+}
+.rule-delete {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: rgba(255,59,48,.15);
+  color: var(--red);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; cursor: pointer;
+  flex-shrink: 0;
+}
+.add-rule-btn {
+  display: flex; align-items: center; gap: 10px;
+  padding: 13px 16px;
+  cursor: pointer;
+  color: var(--tint);
+  font-size: 15px;
+}
+
+.wl-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px;
+}
+.wl-badge {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: rgba(48,209,88,.1);
+  color: var(--green);
+  padding: 3px 8px;
+  border-radius: 5px;
+}
+.faceid-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px;
+}
+.faceid-desc {
+  font-size: 12px;
+  color: var(--fg2);
+  padding: 0 16px 12px;
+  line-height: 1.5;
+}
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+  <div class="phone-label">21 · 危险操作规则</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nav-back" onclick="location.href='17-settings.html'" style="cursor:pointer;color:var(--tint)">
+        <svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8,1 2,9 8,17"/></svg>
+        设置
+      </div>
+      <div class="nav-title">危险操作规则</div>
+      <div class="nav-right" style="color:var(--tint);font-size:15px;cursor:pointer" onclick="alert('编辑模式')">编辑</div>
+    </div>
+
+    <div class="screen-body" style="padding-bottom:32px">
+
+      <!-- Face ID enforcement -->
+      <div class="section-header">二次验证</div>
+      <div class="list-group">
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(255,59,48,.12)">👆</div>
+          <div style="flex:1">
+            <div class="list-label">命中规则时 Face ID 验证</div>
+            <div class="list-desc">放行危险命令前必须生物识别确认</div>
+          </div>
+          <div class="switch on" onclick="this.classList.toggle('on')"></div>
+        </div>
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(255,149,0,.12)">⏱</div>
+          <div style="flex:1">
+            <div class="list-label">确认超时自动拒绝</div>
+            <div class="list-desc">60 秒内未确认则发送 SIGINT 到 agent</div>
+          </div>
+          <div class="list-value">60 s</div>
+          <div class="list-arrow"></div>
+        </div>
+      </div>
+
+      <!-- blacklist -->
+      <div class="section-header">拦截黑名单（8 条）</div>
+      <div class="list-group" style="padding:4px 0">
+
+        <div class="rule-card">
+          <div class="rule-header">
+            <div class="list-icon" style="background:rgba(255,59,48,.1);flex-shrink:0">🚫</div>
+            <div class="rule-pattern">rm -rf</div>
+            <div class="rule-delete" onclick="deleteRule(this)">−</div>
+          </div>
+          <div class="rule-desc">删除文件/目录，带 -r 的递归删除</div>
+        </div>
+
+        <div class="rule-card">
+          <div class="rule-header">
+            <div class="list-icon" style="background:rgba(255,59,48,.1);flex-shrink:0">🚫</div>
+            <div class="rule-pattern">git push --force</div>
+            <div class="rule-delete" onclick="deleteRule(this)">−</div>
+          </div>
+          <div class="rule-desc">强制推送，可能覆盖远端历史</div>
+        </div>
+
+        <div class="rule-card">
+          <div class="rule-header">
+            <div class="list-icon" style="background:rgba(255,59,48,.1);flex-shrink:0">🚫</div>
+            <div class="rule-pattern">curl * | sh</div>
+            <div class="rule-delete" onclick="deleteRule(this)">−</div>
+          </div>
+          <div class="rule-desc">下载并执行远端脚本</div>
+        </div>
+
+        <div class="rule-card">
+          <div class="rule-header">
+            <div class="list-icon" style="background:rgba(255,59,48,.1);flex-shrink:0">🚫</div>
+            <div class="rule-pattern">sudo *</div>
+            <div class="rule-delete" onclick="deleteRule(this)">−</div>
+          </div>
+          <div class="rule-desc">以 root 权限执行任意命令</div>
+        </div>
+
+        <div class="rule-card">
+          <div class="rule-header">
+            <div class="list-icon" style="background:rgba(255,59,48,.1);flex-shrink:0">🚫</div>
+            <div class="rule-pattern">~/.ssh/*</div>
+            <div class="rule-delete" onclick="deleteRule(this)">−</div>
+          </div>
+          <div class="rule-desc">修改 SSH 配置或密钥文件</div>
+        </div>
+
+        <div class="rule-card">
+          <div class="rule-header">
+            <div class="list-icon" style="background:rgba(255,59,48,.1);flex-shrink:0">🚫</div>
+            <div class="rule-pattern">~/.aws/*</div>
+            <div class="rule-delete" onclick="deleteRule(this)">−</div>
+          </div>
+          <div class="rule-desc">读写 AWS 凭证文件</div>
+        </div>
+
+        <div class="rule-card">
+          <div class="rule-header">
+            <div class="list-icon" style="background:rgba(255,59,48,.1);flex-shrink:0">🚫</div>
+            <div class="rule-pattern">git reset --hard</div>
+            <div class="rule-delete" onclick="deleteRule(this)">−</div>
+          </div>
+          <div class="rule-desc">丢弃所有未提交改动</div>
+        </div>
+
+        <div class="rule-card">
+          <div class="rule-header">
+            <div class="list-icon" style="background:rgba(255,59,48,.1);flex-shrink:0">🚫</div>
+            <div class="rule-pattern">DROP TABLE *</div>
+            <div class="rule-delete" onclick="deleteRule(this)">−</div>
+          </div>
+          <div class="rule-desc">SQL 破坏性 DDL 语句</div>
+        </div>
+
+        <!-- add -->
+        <div class="add-rule-btn" onclick="alert('添加规则')">
+          <div style="width:28px;height:28px;border-radius:50%;background:var(--tint-bg);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--tint)">＋</div>
+          添加黑名单规则
+        </div>
+      </div>
+
+      <!-- whitelist -->
+      <div class="section-header">放行白名单（只读工具）</div>
+      <div class="list-group">
+        <div class="wl-item">
+          <div class="list-icon" style="background:rgba(48,209,88,.1)">✅</div>
+          <div class="wl-badge">Read</div>
+          <div class="wl-badge">Glob</div>
+          <div class="wl-badge">Grep</div>
+          <div class="wl-badge">LS</div>
+        </div>
+        <div class="wl-item">
+          <div class="list-icon" style="background:rgba(48,209,88,.1)">✅</div>
+          <div class="wl-badge">git log</div>
+          <div class="wl-badge">git diff</div>
+          <div class="wl-badge">git status</div>
+        </div>
+        <div class="add-rule-btn" onclick="alert('添加白名单工具')">
+          <div style="width:28px;height:28px;border-radius:50%;background:rgba(48,209,88,.1);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--green)">＋</div>
+          <span style="color:var(--green)">添加白名单工具</span>
+        </div>
+      </div>
+
+      <!-- scope -->
+      <div class="section-header">工作区围栏</div>
+      <div class="list-group">
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(10,132,255,.12)">📂</div>
+          <div style="flex:1">
+            <div class="list-label">限制路径访问</div>
+            <div class="list-desc">仅允许 agent 读写已声明工作区根目录内的文件</div>
+          </div>
+          <div class="switch on" onclick="this.classList.toggle('on')"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn = document.querySelector('.theme-toggle');
+  if (html.dataset.theme === 'dark') { html.dataset.theme = 'light'; btn.textContent = '🌙 深色'; }
+  else { html.dataset.theme = 'dark'; btn.textContent = '☀ 浅色'; }
+}
+function deleteRule(btn) {
+  const card = btn.closest('.rule-card');
+  card.style.transition = 'opacity .2s';
+  card.style.opacity = '0';
+  setTimeout(() => card.remove(), 200);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>24 · 关于 HelloBug</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+.app-hero {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 28px 16px 20px;
+  gap: 10px;
+}
+.app-icon {
+  width: 80px; height: 80px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, #0a84ff, #5e5ce6);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 44px;
+  box-shadow: 0 8px 28px rgba(10,132,255,.35);
+}
+.app-version {
+  font-size: 13px; color: var(--fg2);
+}
+.build-info {
+  font-family: var(--font-mono);
+  font-size: 11px; color: var(--fg3);
+  text-align: center;
+  line-height: 1.6;
+}
+
+.protocol-row {
+  display: flex; justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--separator);
+  font-size: 13px;
+}
+.protocol-row:last-child { border-bottom: none; }
+.protocol-key { color: var(--fg2); }
+.protocol-val { font-family: var(--font-mono); color: var(--fg); font-size: 12px; }
+
+.oss-item {
+  padding: 11px 0;
+  border-bottom: 1px solid var(--separator);
+}
+.oss-item:last-child { border-bottom: none; }
+.oss-name { font-size: 14px; font-weight: 500; margin-bottom: 2px; }
+.oss-meta { font-size: 12px; color: var(--fg2); }
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+  <div class="phone-label">24 · 关于 HelloBug</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nav-back" onclick="location.href='17-settings.html'" style="cursor:pointer;color:var(--tint)">
+        <svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8,1 2,9 8,17"/></svg>
+        设置
+      </div>
+      <div class="nav-title">关于</div>
+    </div>
+
+    <div class="screen-body" style="padding-bottom:40px">
+
+      <!-- hero -->
+      <div class="app-hero">
+        <div class="app-icon">🐛</div>
+        <div style="font-size:22px;font-weight:700">HelloBug</div>
+        <div class="app-version">版本 0.1.0 (build 20260621.1)</div>
+        <div class="build-info">
+          Flutter 3.27.4 · Dart 3.7.0<br>
+          iOS 17.0+ / Android 12+
+        </div>
+      </div>
+
+      <!-- update -->
+      <div class="list-group">
+        <div class="list-item">
+          <div class="list-icon" style="background:rgba(52,199,89,.12)">✅</div>
+          <div style="flex:1">
+            <div class="list-label">已是最新版本</div>
+            <div class="list-desc">上次检查：今天 9:38</div>
+          </div>
+          <div style="font-size:13px;color:var(--tint);cursor:pointer">检查更新</div>
+        </div>
+      </div>
+
+      <!-- protocol versions -->
+      <div class="section-header">协议版本</div>
+      <div class="list-group">
+        <div style="padding: 4px 16px">
+          <div class="protocol-row">
+            <div class="protocol-key">传输协议</div>
+            <div class="protocol-val">HelloBug Wire v1.0</div>
+          </div>
+          <div class="protocol-row">
+            <div class="protocol-key">E2EE</div>
+            <div class="protocol-val">Noise IK / ChaCha20-Poly1305</div>
+          </div>
+          <div class="protocol-row">
+            <div class="protocol-key">设备认证</div>
+            <div class="protocol-val">Ed25519 + mTLS</div>
+          </div>
+          <div class="protocol-row">
+            <div class="protocol-key">密钥协商</div>
+            <div class="protocol-val">Curve25519</div>
+          </div>
+          <div class="protocol-row">
+            <div class="protocol-key">Daemon 最低版本</div>
+            <div class="protocol-val">0.1.0</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- links -->
+      <div class="section-header">文档与资源</div>
+      <div class="list-group">
+        <div class="list-item" onclick="alert('打开浏览器')">
+          <div class="list-icon" style="background:rgba(10,132,255,.12)">📋</div>
+          <div class="list-label">隐私政策</div>
+          <div class="list-arrow"></div>
+        </div>
+        <div class="list-item" onclick="alert('打开浏览器')">
+          <div class="list-icon" style="background:rgba(255,59,48,.12)">🔐</div>
+          <div class="list-label">安全白皮书</div>
+          <div class="list-arrow"></div>
+        </div>
+        <div class="list-item" onclick="alert('打开浏览器')">
+          <div class="list-icon" style="background:rgba(94,92,230,.15)">📖</div>
+          <div class="list-label">使用文档</div>
+          <div class="list-arrow"></div>
+        </div>
+        <div class="list-item" onclick="alert('打开 GitHub')">
+          <div class="list-icon" style="background:var(--bg3)">⭐</div>
+          <div class="list-label">GitHub 仓库</div>
+          <div class="list-arrow"></div>
+        </div>
+        <div class="list-item" onclick="alert('打开 Issues')">
+          <div class="list-icon" style="background:rgba(255,149,0,.12)">🐛</div>
+          <div class="list-label">反馈问题</div>
+          <div class="list-arrow"></div>
+        </div>
+      </div>
+
+      <!-- open source -->
+      <div class="section-header">开源致谢</div>
+      <div class="list-group">
+        <div style="padding: 4px 16px">
+          <div class="oss-item">
+            <div class="oss-name">Flutter</div>
+            <div class="oss-meta">BSD 3-Clause · Google LLC</div>
+          </div>
+          <div class="oss-item">
+            <div class="oss-name">noise_protocol (Dart)</div>
+            <div class="oss-meta">MIT · dint</div>
+          </div>
+          <div class="oss-item">
+            <div class="oss-name">cryptography</div>
+            <div class="oss-meta">Apache 2.0 · Dint</div>
+          </div>
+          <div class="oss-item">
+            <div class="oss-name">flutter_highlight</div>
+            <div class="oss-meta">MIT · git-touch</div>
+          </div>
+          <div class="oss-item">
+            <div class="oss-name">speech_to_text</div>
+            <div class="oss-meta">BSD 3-Clause · csdcorp</div>
+          </div>
+          <div class="oss-item">
+            <div class="oss-name">xterm.dart</div>
+            <div class="oss-meta">MIT · xterminator5</div>
+          </div>
+          <div class="oss-item" onclick="alert('查看完整列表')">
+            <div class="oss-name" style="color:var(--tint)">查看完整开源许可列表 →</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- fingerprint / session id for debugging -->
+      <div class="section-header">调试信息</div>
+      <div class="list-group">
+        <div class="list-item" style="flex-direction:column;align-items:flex-start;gap:5px">
+          <div class="list-label" style="font-size:13px;color:var(--fg2)">本机设备 ID（前缀）</div>
+          <div style="font-family:var(--font-mono);font-size:12px;color:var(--fg)">dev_7f2a9c0e…</div>
+        </div>
+        <div class="list-item">
+          <div class="list-icon" style="background:var(--bg3)">📤</div>
+          <div class="list-label">导出诊断日志</div>
+          <div class="list-arrow"></div>
+        </div>
+      </div>
+
+      <div style="text-align:center;padding:24px 0 8px;font-size:12px;color:var(--fg3);line-height:1.8">
+        HelloBug 是开源项目，按 MIT 协议分发。<br>
+        © 2026 shuai · 所有代码在本地运行，与 Anthropic 无关。
+      </div>
+
+    </div>
+  </div>
+</div>
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn = document.querySelector('.theme-toggle');
+  if (html.dataset.theme === 'dark') { html.dataset.theme = 'light'; btn.textContent = '🌙 深色'; }
+  else { html.dataset.theme = 'dark'; btn.textContent = '☀ 浅色'; }
+}
+</script>
+</body>
+</html>

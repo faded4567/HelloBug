@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>15 · 图片输入</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+.img-preview-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 16px;
+  gap: 16px;
+  overflow-y: auto;
+}
+.img-thumb-wrap {
+  position: relative;
+  border-radius: var(--r);
+  overflow: hidden;
+  background: var(--bg3);
+}
+.img-thumb {
+  width: 100%;
+  height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 80px;
+  background: linear-gradient(135deg, #1a2a3a, #0d1a2a);
+  position: relative;
+}
+/* simulated screenshot content */
+.img-thumb::before {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(180deg, rgba(10,132,255,.05) 0%, transparent 50%),
+    repeating-linear-gradient(0deg, transparent, transparent 18px, rgba(255,255,255,.03) 19px);
+}
+.img-thumb-label {
+  position: absolute;
+  bottom: 10px; left: 12px;
+  font-size: 12px;
+  background: rgba(0,0,0,.6);
+  color: rgba(255,255,255,.8);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+}
+.img-action-row {
+  display: flex; gap: 10px;
+}
+.img-action-btn {
+  flex: 1;
+  background: var(--bg2);
+  border-radius: var(--r-sm);
+  padding: 12px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  cursor: pointer;
+  font-size: 22px;
+}
+.img-action-label { font-size: 12px; color: var(--fg2); }
+
+.caption-area {
+  background: var(--bg2);
+  border-radius: var(--r);
+  padding: 14px 16px;
+}
+.caption-label { font-size: 13px; color: var(--fg2); margin-bottom: 8px; }
+.caption-input {
+  width: 100%;
+  background: none;
+  border: none;
+  font-size: 15px;
+  color: var(--fg);
+  outline: none;
+  font-family: inherit;
+  line-height: 1.5;
+  resize: none;
+}
+.caption-input::placeholder { color: var(--fg3); }
+
+.context-info {
+  background: var(--tint-bg);
+  border-radius: var(--r-sm);
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--tint);
+  display: flex; align-items: center; gap: 8px;
+}
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+  <div class="phone-label">15 · 图片输入预览</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+
+    <div class="nav">
+      <div class="nav-back" style="cursor:pointer;color:var(--tint)">
+        <svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8,1 2,9 8,17"/></svg>
+        取消
+      </div>
+      <div class="nav-title">发送图片</div>
+      <div class="nav-right" style="font-size:15px;color:var(--fg2)">1 张</div>
+    </div>
+
+    <div class="img-preview-area">
+      <!-- image preview -->
+      <div class="img-thumb-wrap">
+        <div class="img-thumb">
+          <span style="position:relative;z-index:1">📸</span>
+          <div class="img-thumb-label">screenshot_2026-06-21.png · 1.4 MB</div>
+        </div>
+      </div>
+
+      <!-- quick actions: crop / rotate / compress -->
+      <div class="img-action-row">
+        <div class="img-action-btn">
+          <span>✂️</span>
+          <span class="img-action-label">裁剪</span>
+        </div>
+        <div class="img-action-btn">
+          <span>🔄</span>
+          <span class="img-action-label">旋转</span>
+        </div>
+        <div class="img-action-btn">
+          <span>🗜</span>
+          <span class="img-action-label">压缩</span>
+        </div>
+        <div class="img-action-btn">
+          <span>🖼</span>
+          <span class="img-action-label">替换</span>
+        </div>
+      </div>
+
+      <!-- context info -->
+      <div class="context-info">
+        <span>ℹ️</span>
+        <span>图片已压缩至 <strong>1.2 MB</strong>，经 E2EE 通道发送给 daemon</span>
+      </div>
+
+      <!-- caption input -->
+      <div class="caption-area">
+        <div class="caption-label">附加说明（可选）</div>
+        <textarea class="caption-input" rows="3" placeholder="例如：这是报错截图，帮我分析原因…">这是登录接口的错误提示，请帮我排查一下是什么原因导致的</textarea>
+      </div>
+
+      <!-- add more -->
+      <div style="display:flex;gap:12px">
+        <button class="btn btn-secondary" style="flex:1;padding:12px;font-size:14px">＋ 再加一张</button>
+      </div>
+    </div>
+
+    <div style="padding:12px 16px 32px;border-top:1px solid var(--separator);flex-shrink:0;display:flex;gap:10px">
+      <button class="btn btn-secondary" style="flex:1;padding:13px">取消</button>
+      <button class="btn btn-primary" style="flex:2;padding:13px">发送图片 ➤</button>
+    </div>
+  </div>
+</div>
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn = document.querySelector('.theme-toggle');
+  if (html.dataset.theme === 'dark') { html.dataset.theme = 'light'; btn.textContent = '🌙 深色'; }
+  else { html.dataset.theme = 'dark'; btn.textContent = '☀ 浅色'; }
+}
+</script>
+</body>
+</html>
