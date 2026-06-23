@@ -1,5 +1,7 @@
 # HelloBug 开发规划总览
 
+> 当前最准确的“剩余工作总表”请优先看 `docs/app-remaining-work.md`。
+
 > 手机远程操控本地 Claude Code / Codex Agent  
 > 更新：2026-06-22
 

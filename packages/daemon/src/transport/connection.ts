@@ -28,6 +28,7 @@ export class DaemonConnection {
       this.socket = socket;
 
       socket.once("open", () => {
+        console.log(`[daemon] relay connected -> ${this.options.serverUrl}`);
         this.sendMessage({
           v: 1,
           type: "daemon.hello",
@@ -47,13 +48,26 @@ export class DaemonConnection {
       socket.on("message", async (raw) => {
         try {
           const parsed = validateMessage(JSON.parse(raw.toString()));
+          console.log(`[daemon] recv <- ${parsed.type}`);
+          if (parsed.type === "error") {
+            console.log(
+              `[daemon] error payload <- ${JSON.stringify(parsed.payload)}`,
+            );
+          }
           await this.handleIncomingMessage(parsed);
         } catch {
           // Keep the daemon connected even if the server sends unsupported scaffolding frames.
         }
       });
 
+      socket.on("close", (code, reason) => {
+        console.log(
+          `[daemon] relay closed code=${code} reason=${reason.toString()}`,
+        );
+      });
+
       socket.once("error", (error: Error) => {
+        console.error("[daemon] relay error", error);
         reject(error);
       });
     });
@@ -79,6 +93,7 @@ export class DaemonConnection {
   }
 
   sendMessage(message: Omit<Message, "id"> & { id?: string }): void {
+    console.log(`[daemon] send -> ${message.type}`);
     this.socket?.send(JSON.stringify(message));
   }
 

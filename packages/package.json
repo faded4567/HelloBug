@@ -3,11 +3,11 @@
   "private": true,
   "packageManager": "pnpm@10.12.1",
   "scripts": {
-    "build": "pnpm --filter @hellobug/protocol build && pnpm --filter @hellobug/server build && pnpm --filter @hellobug/daemon build",
-    "test": "pnpm -r test",
-    "lint": "pnpm -r lint",
-    "dev:server": "pnpm --filter @hellobug/server dev",
-    "dev:daemon": "pnpm --filter @hellobug/daemon dev"
+    "build": "npm --prefix ./protocol run build && npm --prefix ./server run build && npm --prefix ./daemon run build",
+    "test": "npm --prefix ./protocol run test && npm --prefix ./server run test && npm --prefix ./daemon run test",
+    "lint": "npm --prefix ./protocol run lint && npm --prefix ./server run lint && npm --prefix ./daemon run lint",
+    "dev:server": "npm --prefix ./server run dev",
+    "dev:daemon": "npm --prefix ./daemon run dev"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",

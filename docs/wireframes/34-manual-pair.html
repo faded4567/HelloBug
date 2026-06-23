@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>34 · 手动配对</title>
+<link rel="stylesheet" href="_common.css">
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+
+  <!-- 输入状态 -->
+  <div class="phone-label">34-A · 手动配对 — 输入</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nav-back">
+        <svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 1L1 9l7 8"/></svg>
+        配对
+      </div>
+      <div class="nav-title">手动输入配对码</div>
+    </div>
+
+    <div class="screen-body" style="padding-bottom:40px">
+      <!-- 说明 -->
+      <div style="padding:20px 4px 8px;font-size:15px;color:var(--fg2);line-height:1.6">
+        在 Mac 终端运行 <code style="font-family:var(--font-mono);font-size:13px;background:var(--bg3);padding:2px 7px;border-radius:5px">hellobug pair</code>，将显示的配对码输入到下方。
+      </div>
+
+      <!-- 分段码输入框 -->
+      <div class="section-header">配对码</div>
+      <div style="display:flex;gap:8px;justify-content:center;padding:4px 0 8px">
+        <div style="flex:1;background:var(--bg2);border-radius:var(--r);padding:14px 0;text-align:center;font-family:var(--font-mono);font-size:22px;font-weight:700;letter-spacing:4px;border:2px solid var(--tint)">A3K7</div>
+        <div style="display:flex;align-items:center;font-size:20px;color:var(--fg3)">·</div>
+        <div style="flex:1;background:var(--bg2);border-radius:var(--r);padding:14px 0;text-align:center;font-family:var(--font-mono);font-size:22px;font-weight:700;letter-spacing:4px;border:1px solid var(--separator);color:var(--fg3)">____</div>
+      </div>
+      <div style="text-align:center;font-size:12px;color:var(--fg3);margin-bottom:16px">每段 4 位，共 8 位</div>
+
+      <!-- 或：URL 模式 -->
+      <div class="divider-text">或粘贴配对链接</div>
+
+      <div class="list-group">
+        <div class="list-item" style="padding:0 16px">
+          <input style="flex:1;background:none;border:none;outline:none;font-size:14px;color:var(--fg);font-family:var(--font-mono);padding:13px 0" placeholder="hellobug://pair?code=XXXXXXXX">
+        </div>
+      </div>
+      <div style="padding:4px 4px 0;font-size:13px;color:var(--fg3)">链接通常以 <code style="font-family:var(--font-mono)">hellobug://</code> 开头</div>
+
+      <div style="margin-top:24px">
+        <button class="btn btn-primary" style="width:100%;font-size:17px;opacity:.5">连接</button>
+      </div>
+      <div style="margin-top:10px;text-align:center">
+        <button style="color:var(--tint);font-size:15px;background:none;border:none;cursor:pointer;padding:8px">📷 切换到扫码</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 连接中 -->
+  <div class="phone-label">34-B · 手动配对 — 连接中</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nav-back">
+        <svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 1L1 9l7 8"/></svg>
+        配对
+      </div>
+      <div class="nav-title">手动输入配对码</div>
+    </div>
+
+    <div class="screen-body" style="padding-bottom:40px">
+      <div style="padding:20px 4px 8px;font-size:15px;color:var(--fg2);line-height:1.6">
+        在 Mac 终端运行 <code style="font-family:var(--font-mono);font-size:13px;background:var(--bg3);padding:2px 7px;border-radius:5px">hellobug pair</code>，将显示的配对码输入到下方。
+      </div>
+
+      <div class="section-header">配对码</div>
+      <div style="display:flex;gap:8px;justify-content:center;padding:4px 0 8px">
+        <div style="flex:1;background:var(--bg2);border-radius:var(--r);padding:14px 0;text-align:center;font-family:var(--font-mono);font-size:22px;font-weight:700;letter-spacing:4px;border:2px solid var(--tint)">A3K7</div>
+        <div style="display:flex;align-items:center;font-size:20px;color:var(--fg3)">·</div>
+        <div style="flex:1;background:var(--bg2);border-radius:var(--r);padding:14px 0;text-align:center;font-family:var(--font-mono);font-size:22px;font-weight:700;letter-spacing:4px;border:2px solid var(--tint)">9ZMR</div>
+      </div>
+
+      <!-- 连接进度 -->
+      <div style="margin-top:20px;background:var(--bg2);border-radius:var(--r);padding:20px 16px;display:flex;flex-direction:column;align-items:center;gap:14px">
+        <div style="width:40px;height:40px;border-radius:50%;border:3px solid var(--tint);border-top-color:transparent;animation:spin 0.8s linear infinite"></div>
+        <div style="font-size:16px;font-weight:600">正在连接…</div>
+        <div style="font-size:13px;color:var(--fg2)">relay.hellobug.dev</div>
+        <div style="display:flex;flex-direction:column;gap:6px;width:100%">
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px">
+            <span style="color:var(--green)">✓</span>
+            <span style="color:var(--fg2)">验证配对码</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px">
+            <span style="color:var(--green)">✓</span>
+            <span style="color:var(--fg2)">连接中继服务器</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px">
+            <div style="width:12px;height:12px;border-radius:50%;border:2px solid var(--tint);border-top-color:transparent;animation:spin .8s linear infinite"></div>
+            <span style="color:var(--fg)">协商加密密钥</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;opacity:.4">
+            <div style="width:12px;height:12px;border-radius:50%;border:2px solid var(--bg4)"></div>
+            <span style="color:var(--fg2)">SAS 安全核对</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 错误 -->
+  <div class="phone-label">34-C · 手动配对 — 错误</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nav-back">
+        <svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 1L1 9l7 8"/></svg>
+        配对
+      </div>
+      <div class="nav-title">手动输入配对码</div>
+    </div>
+
+    <div class="banner error">配对码无效或已过期</div>
+
+    <div class="screen-body" style="padding-bottom:40px">
+      <div style="padding:20px 4px 8px;font-size:15px;color:var(--fg2);line-height:1.6">
+        在 Mac 终端运行 <code style="font-family:var(--font-mono);font-size:13px;background:var(--bg3);padding:2px 7px;border-radius:5px">hellobug pair</code>，将显示的配对码输入到下方。
+      </div>
+
+      <div class="section-header">配对码</div>
+      <div style="display:flex;gap:8px;justify-content:center;padding:4px 0 8px">
+        <div style="flex:1;background:var(--bg2);border-radius:var(--r);padding:14px 0;text-align:center;font-family:var(--font-mono);font-size:22px;font-weight:700;letter-spacing:4px;border:2px solid var(--red)">A3K7</div>
+        <div style="display:flex;align-items:center;font-size:20px;color:var(--fg3)">·</div>
+        <div style="flex:1;background:var(--bg2);border-radius:var(--r);padding:14px 0;text-align:center;font-family:var(--font-mono);font-size:22px;font-weight:700;letter-spacing:4px;border:2px solid var(--red)">XXXX</div>
+      </div>
+      <div style="text-align:center;font-size:13px;color:var(--red);margin-bottom:4px">配对码已过期，请重新获取</div>
+
+      <div style="margin-top:20px">
+        <button class="btn btn-primary" style="width:100%;font-size:17px">重新输入</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.querySelector('.theme-toggle').textContent = isDark ? '🌙 深色' : '☀ 浅色';
+}
+</script>
+</body>
+</html>

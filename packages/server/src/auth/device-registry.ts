@@ -18,6 +18,11 @@ export interface AppDeviceRecord {
   appEd25519PubKey: string;
   appDeviceName: string;
   createdAt: number;
+  pushPlatform?: "ios" | "android";
+  apnsToken?: string;
+  manufacturer?: "Xiaomi" | "OPPO" | "vivo" | "Other";
+  vendorToken?: string;
+  pushTokenUpdatedAt?: number;
   revokedAt?: number;
 }
 
@@ -25,6 +30,20 @@ export class DeviceRegistry {
   private readonly daemonDevices = new Map<string, DaemonDeviceRecord>();
   private readonly daemonDeviceByPubKey = new Map<string, string>();
   private readonly appDevices = new Map<string, AppDeviceRecord>();
+
+  constructor(state?: {
+    daemonDevices?: DaemonDeviceRecord[];
+    appDevices?: AppDeviceRecord[];
+  }) {
+    for (const record of state?.daemonDevices ?? []) {
+      this.daemonDevices.set(record.deviceId, { ...record });
+      this.daemonDeviceByPubKey.set(record.devicePubKey, record.deviceId);
+    }
+
+    for (const record of state?.appDevices ?? []) {
+      this.appDevices.set(record.deviceId, { ...record });
+    }
+  }
 
   registerDaemonDevice(input: {
     devicePubKey: string;
@@ -97,6 +116,40 @@ export class DeviceRegistry {
     return record;
   }
 
+  updateAppPushToken(
+    deviceId: string,
+    token:
+      | {
+          platform: "ios";
+          apnsToken: string;
+        }
+      | {
+          platform: "android";
+          manufacturer: "Xiaomi" | "OPPO" | "vivo" | "Other";
+          vendorToken: string;
+        },
+  ): AppDeviceRecord | undefined {
+    const record = this.appDevices.get(deviceId);
+    if (!record) {
+      return undefined;
+    }
+
+    record.pushPlatform = token.platform;
+    record.pushTokenUpdatedAt = Date.now();
+
+    if (token.platform === "ios") {
+      record.apnsToken = token.apnsToken;
+      delete record.manufacturer;
+      delete record.vendorToken;
+      return record;
+    }
+
+    delete record.apnsToken;
+    record.manufacturer = token.manufacturer;
+    record.vendorToken = token.vendorToken;
+    return record;
+  }
+
   revokeDevice(deviceId: string): void {
     const daemon = this.daemonDevices.get(deviceId);
     if (daemon) {
@@ -115,5 +168,15 @@ export class DeviceRegistry {
       this.daemonDevices.get(deviceId)?.revokedAt ??
         this.appDevices.get(deviceId)?.revokedAt,
     );
+  }
+
+  exportState(): {
+    daemonDevices: DaemonDeviceRecord[];
+    appDevices: AppDeviceRecord[];
+  } {
+    return {
+      daemonDevices: Array.from(this.daemonDevices.values(), (record) => ({ ...record })),
+      appDevices: Array.from(this.appDevices.values(), (record) => ({ ...record })),
+    };
   }
 }

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>46 · 启动恢复中</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fade-up { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+.splash { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:40px; }
+.app-icon { width:72px; height:72px; border-radius:18px; background:linear-gradient(135deg,#0a84ff,#5e5ce6); display:flex; align-items:center; justify-content:center; font-size:36px; box-shadow:0 8px 24px rgba(10,132,255,.35); animation:fade-up .5s ease both; }
+.spinner { width:28px; height:28px; border-radius:50%; border:2.5px solid var(--bg4); border-top-color:var(--tint); animation:spin .8s linear infinite; }
+.relay-row { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--fg3); font-family:var(--font-mono); }
+.dot-pulse { width:6px; height:6px; border-radius:50%; background:var(--green); animation:spin 1.4s ease-in-out infinite; }
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+
+  <div class="phone-label">46-A · 启动恢复中 — 会话恢复</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg><svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg></div></div>
+
+    <div class="splash">
+      <div class="app-icon">🐛</div>
+      <div style="font-size:22px;font-weight:700;letter-spacing:-.3px">HelloBug</div>
+      <div class="spinner" style="margin-top:8px"></div>
+      <div style="font-size:14px;color:var(--fg2)">正在恢复会话…</div>
+      <div class="relay-row">
+        <div class="dot-pulse"></div>
+        relay.hellobug.dev
+      </div>
+      <div style="margin-top:24px;font-size:12px;color:var(--fg3);text-align:center;line-height:1.8">
+        已配对设备：MacBook Pro<br>
+        上次活跃：3 分钟前
+      </div>
+    </div>
+  </div>
+
+  <div class="phone-label">46-B · 启动恢复中 — 连接中断，跳过</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".15"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".15"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".15"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".15"/></svg><svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg></div></div>
+
+    <div class="splash">
+      <div class="app-icon">🐛</div>
+      <div style="font-size:22px;font-weight:700;letter-spacing:-.3px">HelloBug</div>
+      <div style="font-size:36px;margin:8px 0">⚠️</div>
+      <div style="font-size:16px;font-weight:600;color:var(--orange)">无法连接中继服务器</div>
+      <div style="font-size:13px;color:var(--fg2);text-align:center;line-height:1.6">
+        relay.hellobug.dev 不可达<br>
+        上次同步：15 分钟前
+      </div>
+      <button class="btn btn-primary" style="margin-top:16px;width:200px">重试连接</button>
+      <button style="color:var(--tint);font-size:14px;padding:8px">离线模式进入</button>
+    </div>
+  </div>
+
+</div>
+<script>
+function toggleTheme() {
+  const h = document.documentElement, d = h.getAttribute('data-theme') === 'dark';
+  h.setAttribute('data-theme', d ? 'light' : 'dark');
+  document.querySelector('.theme-toggle').textContent = d ? '🌙 深色' : '☀ 浅色';
+}
+</script>
+</body>
+</html>

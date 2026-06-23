@@ -1,388 +1,386 @@
 <!DOCTYPE html>
-<html lang="zh" data-theme="dark">
+<html lang="zh">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>HelloBug · 线框图索引</title>
-<link rel="stylesheet" href="_common.css">
+<title>HelloBug · 操作流程图</title>
 <style>
-:root {
-  --index-bg: #0d0d0f;
-  --card-bg: #1c1c1e;
-  --card-hover: #2c2c2e;
-  --border: rgba(255,255,255,.08);
-}
-[data-theme="light"] {
-  --index-bg: #f2f2f7;
-  --card-bg: #fff;
-  --card-hover: #f5f5f7;
-  --border: rgba(0,0,0,.06);
-}
-* { box-sizing: border-box; }
-body {
-  margin: 0; padding: 0;
-  background: var(--index-bg);
-  color: var(--fg);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
-  min-height: 100vh;
-}
-.page-header {
-  padding: 48px 40px 32px;
-  border-bottom: 1px solid var(--border);
-  display: flex; align-items: flex-end; justify-content: space-between;
-  gap: 20px; flex-wrap: wrap;
-}
-.header-logo {
-  width: 56px; height: 56px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #0a84ff, #5e5ce6);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 30px; flex-shrink: 0;
-  box-shadow: 0 6px 20px rgba(10,132,255,.3);
-}
-.header-titles { flex: 1; min-width: 220px; }
-.header-title { font-size: 30px; font-weight: 700; letter-spacing: -.5px; line-height: 1.1; }
-.header-sub { font-size: 14px; color: var(--fg2); margin-top: 5px; line-height: 1.5; }
-.header-meta { text-align: right; font-size: 12px; color: var(--fg3); line-height: 1.7; flex-shrink: 0; }
-
-.container { max-width: 1280px; margin: 0 auto; padding: 40px 40px 80px; }
-
-.group-section { margin-bottom: 48px; }
-.group-header {
-  display: flex; align-items: center; gap: 12px;
-  margin-bottom: 18px; flex-wrap: wrap;
-}
-.group-icon {
-  width: 36px; height: 36px;
-  border-radius: 10px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 18px; flex-shrink: 0;
-}
-.group-name { font-size: 20px; font-weight: 700; }
-.group-desc { font-size: 13px; color: var(--fg2); margin-left: auto; }
-
-.card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
-  gap: 12px;
-}
-.screen-card {
-  background: var(--card-bg);
-  border-radius: 14px;
-  border: 1px solid var(--border);
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0d0d0f; overflow: hidden; width: 100vw; height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif; color: #fff; }
+#viewport { position: absolute; inset: 0; overflow: hidden; cursor: grab; }
+#viewport.dragging { cursor: grabbing; }
+#canvas { position: absolute; transform-origin: 0 0; }
+svg#arrowlayer { position: absolute; top: 0; left: 0; overflow: visible; pointer-events: none; }
+.node { position: absolute; width: 120px; cursor: pointer; }
+.node-card {
+  width: 120px; background: #1c1c1e; border-radius: 12px;
+  border: 1.5px solid rgba(255,255,255,.1);
   overflow: hidden;
-  text-decoration: none;
-  color: inherit;
-  transition: transform .15s, box-shadow .15s;
-  cursor: pointer;
-  display: block;
+  transition: border-color .15s, box-shadow .15s;
 }
-.screen-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 10px 32px rgba(0,0,0,.3);
+.node:hover .node-card { border-color: rgba(255,255,255,.3); box-shadow: 0 8px 28px rgba(0,0,0,.5); }
+.thumb { width: 120px; height: 195px; overflow: hidden; background: #111; }
+.thumb iframe {
+  width: 390px; height: 844px;
+  transform: scale(0.3077); transform-origin: 0 0;
+  pointer-events: none; border: none; display: block;
 }
-[data-theme="light"] .screen-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,.12); }
-.card-preview {
-  height: 110px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 36px;
-  position: relative;
+.node-label {
+  padding: 6px 4px 0; font-size: 11px; font-weight: 600;
+  line-height: 1.3; color: #aeaeb2; text-align: center;
 }
-.card-info { padding: 11px 14px 14px; border-top: 1px solid var(--border); }
-.card-num { font-size: 11px; color: var(--fg3); font-family: var(--font-mono); margin-bottom: 2px; }
-.card-name { font-size: 14px; font-weight: 600; line-height: 1.3; }
-.card-desc { font-size: 12px; color: var(--fg2); margin-top: 3px; line-height: 1.4; }
-
-.badge {
-  display: inline-block;
-  font-size: 10px; font-weight: 700;
-  padding: 2px 7px; border-radius: 999px;
-  margin-top: 7px; letter-spacing: .03em;
-  text-transform: uppercase;
+.node-num { font-size: 10px; color: #48484a; font-family: monospace; }
+.edge-label {
+  position: absolute; pointer-events: none;
+  font-size: 10px; white-space: nowrap;
+  padding: 2px 6px; border-radius: 4px;
+  font-weight: 500;
 }
-.m1 { background: rgba(10,132,255,.15); color: #0a84ff; }
-.m2 { background: rgba(52,199,89,.15); color: #34c759; }
-.m3 { background: rgba(255,149,0,.15); color: #ff9500; }
-.m4 { background: rgba(191,90,242,.15); color: #bf5af2; }
-.ux { background: rgba(94,92,230,.15); color: #5e5ce6; }
-
+.hint {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  color: rgba(255,255,255,.3); font-size: 12px; pointer-events: none;
+}
 .legend {
-  display: flex; gap: 14px; flex-wrap: wrap;
-  margin-bottom: 36px; padding: 14px 18px;
-  background: var(--card-bg); border-radius: 12px;
-  border: 1px solid var(--border);
+  position: fixed; top: 16px; left: 16px;
+  background: rgba(28,28,30,.9); border: 1px solid rgba(255,255,255,.1);
+  border-radius: 10px; padding: 10px 14px; font-size: 11px;
+  display: flex; gap: 14px; backdrop-filter: blur(8px);
 }
-.legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fg2); }
-
-.milestone-strip { display: flex; gap: 8px; margin-bottom: 36px; flex-wrap: wrap; }
-.ms-block {
-  flex: 1; min-width: 140px;
-  padding: 13px 15px; border-radius: 10px;
-  border: 1px solid var(--border); background: var(--card-bg);
-}
-.ms-lbl { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 3px; }
-.ms-name { font-size: 13px; font-weight: 600; }
-.ms-days { font-size: 11px; color: var(--fg3); margin-top: 2px; }
-
-.divider { height: 1px; background: var(--border); margin: 44px 0; }
+.leg { display: flex; align-items: center; gap: 5px; color: #aeaeb2; }
+.leg-line { width: 24px; height: 2px; border-radius: 1px; }
 </style>
 </head>
 <body>
-<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
-
-<div class="page-header">
-  <div style="display:flex;align-items:center;gap:14px;flex:1;min-width:260px">
-    <div class="header-logo">🐛</div>
-    <div class="header-titles">
-      <div class="header-title">HelloBug · 线框图索引</div>
-      <div class="header-sub">手机远程操控本地 Claude Code / Codex · 24 个界面 · Cupertino 深色设计语言</div>
-    </div>
+<div id="viewport">
+  <div id="canvas">
+    <svg id="arrowlayer"></svg>
   </div>
-  <div class="header-meta">24 个界面<br>4 个 Milestone<br>2026-06-21</div>
 </div>
-
-<div class="container">
-
-  <div class="milestone-strip">
-    <div class="ms-block" style="border-color:#0a84ff44;background:rgba(10,132,255,.05)">
-      <div class="ms-lbl" style="color:#0a84ff">M1</div>
-      <div class="ms-name">安全骨架</div>
-      <div class="ms-days">~5-7 天</div>
-    </div>
-    <div class="ms-block" style="border-color:#34c75944;background:rgba(52,199,89,.05)">
-      <div class="ms-lbl" style="color:#34c759">M2</div>
-      <div class="ms-name">聊天闭环</div>
-      <div class="ms-days">~5-7 天</div>
-    </div>
-    <div class="ms-block" style="border-color:#ff950044;background:rgba(255,149,0,.05)">
-      <div class="ms-lbl" style="color:#ff9500">M3</div>
-      <div class="ms-name">Diff + 文件树</div>
-      <div class="ms-days">~5-7 天</div>
-    </div>
-    <div class="ms-block" style="border-color:#bf5af244;background:rgba(191,90,242,.05)">
-      <div class="ms-lbl" style="color:#bf5af2">M4</div>
-      <div class="ms-name">多并发 + 推送</div>
-      <div class="ms-days">~7-10 天</div>
-    </div>
-  </div>
-
-  <div class="legend">
-    <div class="legend-item"><span class="badge m1">M1</span> 骨架 &amp; 安全</div>
-    <div class="legend-item"><span class="badge m2">M2</span> 聊天闭环</div>
-    <div class="legend-item"><span class="badge m3">M3</span> Diff &amp; 文件</div>
-    <div class="legend-item"><span class="badge m4">M4</span> 多并发 &amp; 推送</div>
-    <div class="legend-item"><span class="badge ux">UX</span> 纯 UI / 通用</div>
-  </div>
-
-  <!-- GROUP 1 -->
-  <div class="group-section">
-    <div class="group-header">
-      <div class="group-icon" style="background:rgba(10,132,255,.15)">🔐</div>
-      <div class="group-name">引导与配对</div>
-      <div class="group-desc">首次使用 · 建立 E2EE 信任链</div>
-    </div>
-    <div class="card-grid">
-      <a class="screen-card" href="10-onboarding.html">
-        <div class="card-preview" style="background:linear-gradient(135deg,#0a84ff18,#5e5ce618)">🚀</div>
-        <div class="card-info"><div class="card-num">10</div><div class="card-name">引导页</div>
-          <div class="card-desc">三屏特性介绍：流式对话 / E2EE / 危险守护</div><span class="badge ux">UX</span></div>
-      </a>
-      <a class="screen-card" href="01-pairing.html">
-        <div class="card-preview" style="background:linear-gradient(135deg,#1c3a5e22,#0a84ff11)">📷</div>
-        <div class="card-info"><div class="card-num">01</div><div class="card-name">配对入口</div>
-          <div class="card-desc">扫码或输入配对码 + 服务器地址</div><span class="badge m1">M1</span></div>
-      </a>
-      <a class="screen-card" href="02-sas.html">
-        <div class="card-preview" style="background:linear-gradient(135deg,#ff9f0a22,#ff453a11)">🐢</div>
-        <div class="card-info"><div class="card-num">02</div><div class="card-name">SAS 安全核对</div>
-          <div class="card-desc">5 emoji 双端确认，防中间人</div><span class="badge m1">M1</span></div>
-      </a>
-      <a class="screen-card" href="11-unlock.html">
-        <div class="card-preview" style="background:linear-gradient(135deg,#1c1c1e,#2c2c2e)">🔒</div>
-        <div class="card-info"><div class="card-num">11</div><div class="card-name">锁屏解锁</div>
-          <div class="card-desc">后台超时 Face ID / 指纹验证</div><span class="badge m1">M1</span></div>
-      </a>
-    </div>
-  </div>
-
-  <div class="divider"></div>
-
-  <!-- GROUP 2 -->
-  <div class="group-section">
-    <div class="group-header">
-      <div class="group-icon" style="background:rgba(52,199,89,.15)">🖥</div>
-      <div class="group-name">设备与工作区</div>
-      <div class="group-desc">Tab 1 · 选机器、选项目</div>
-    </div>
-    <div class="card-grid">
-      <a class="screen-card" href="03-devices.html">
-        <div class="card-preview" style="background:linear-gradient(135deg,#34c75922,#30d15811)">💻</div>
-        <div class="card-info"><div class="card-num">03</div><div class="card-name">设备列表</div>
-          <div class="card-desc">在线/离线状态、活跃会话数</div><span class="badge m1">M1</span></div>
-      </a>
-      <a class="screen-card" href="03-devices.html">
-        <div class="card-preview" style="background:linear-gradient(135deg,#34c75911,#0a84ff11)">📂</div>
-        <div class="card-info"><div class="card-num">04*</div><div class="card-name">工作区列表</div>
-          <div class="card-desc">项目卡片、git 分支、最近活动（待独立绘制）</div><span class="badge m1">M1</span></div>
-      </a>
-      <a class="screen-card" href="23-device-detail.html">
-        <div class="card-preview" style="background:linear-gradient(135deg,#1c3a5e33,#0a84ff22)">🔑</div>
-        <div class="card-info"><div class="card-num">23</div><div class="card-name">设备详情</div>
-          <div class="card-desc">系统信息、密钥管理、解绑吊销</div><span class="badge m1">M1</span></div>
-      </a>
-    </div>
-  </div>
-
-  <div class="divider"></div>
-
-  <!-- GROUP 3 -->
-  <div class="group-section">
-    <div class="group-header">
-      <div class="group-icon" style="background:rgba(10,132,255,.15)">💬</div>
-      <div class="group-name">会话流</div>
-      <div class="group-desc">Tab 2 · 核心聊天体验</div>
-    </div>
-    <div class="card-grid">
-      <a class="screen-card" href="08-session-list.html">
-        <div class="card-preview" style="background:linear-gradient(135deg,#0a84ff18,#5e5ce618)">📋</div>
-        <div class="card-info"><div class="card-num">05</div><div class="card-name">会话列表</div>
-          <div class="card-desc">进行中 + 历史，多项目并发</div><span class="badge m2">M2</span></div>
-      </a>
-      <a class="screen-card" href="12-new-session.html">
-        <div class="card-preview" style="background:linear-gradient(135deg,#5e5ce618,#0a84ff11)">⚡</div>
-        <div class="card-info"><div class="card-num">12</div><div class="card-name">新建会话向导</div>
-          <div class="card-desc">3 步：设备 → 工作区 → Agent</div><span class="badge m2">M2</span></div>
-      </a>
-      <a class="screen-card" href="04-chat.html">
-        <div class="card-preview" style="background:linear-gradient(135deg,#0a84ff28,#1c1c1e)">🤖</div>
-        <div class="card-info"><div class="card-num">06</div><div class="card-name">会话主页</div>
-          <div class="card-desc">流式输出、tool_use 卡片、diff 内联</div><span class="badge m2">M2</span></div>
-      </a>
-      <a class="screen-card" href="13-workspace-switch.html">
-        <div class="card-preview" style="background:linear-gradient(135deg,#5e5ce628,#2c2c2e)">🔀</div>
-        <div class="card-info"><div class="card-num">13</div><div class="card-name">工作区切换</div>
-          <div class="card-desc">Bottom sheet 快速切换</div><span class="badge m2">M2</span></div>
-      </a>
-      <a class="screen-card" href="09-danger-confirm.html">
-        <div class="card-preview" style="background:linear-gradient(135deg,#ff453a28,#ff9f0a18)">⚠️</div>
-        <div class="card-info"><div class="card-num">09</div><div class="card-name">危险操作确认</div>
-          <div class="card-desc">命中黑名单 → Face ID 放行</div><span class="badge m2">M2</span></div>
-      </a>
-    </div>
-  </div>
-
-  <div class="divider"></div>
-
-  <!-- GROUP 4 -->
-  <div class="group-section">
-    <div class="group-header">
-      <div class="group-icon" style="background:rgba(255,149,0,.15)">📝</div>
-      <div class="group-name">代码查看</div>
-      <div class="group-desc">M3 · Diff 全屏 + 文件树 + 只读预览 + 终端</div>
-    </div>
-    <div class="card-grid">
-      <a class="screen-card" href="05-diff.html">
-        <div class="card-preview" style="background:linear-gradient(135deg,#34c75918,#ff453a18)">📊</div>
-        <div class="card-info"><div class="card-num">07</div><div class="card-name">Diff 全屏</div>
-          <div class="card-desc">统一/分栏切换、语法高亮、行号</div><span class="badge m3">M3</span></div>
-      </a>
-      <a class="screen-card" href="06-filetree.html">
-        <div class="card-preview" style="background:linear-gradient(135deg,#ff9f0a18,#ff9f0a0a)">🌳</div>
-        <div class="card-info"><div class="card-num">08</div><div class="card-name">文件树 + 预览</div>
-          <div class="card-desc">目录树 + 单文件只读，懒加载</div><span class="badge m3">M3</span></div>
-      </a>
-      <a class="screen-card" href="07-terminal.html">
-        <div class="card-preview" style="background:linear-gradient(135deg,#1c1c1e,#2a1a2e)">⌨️</div>
-        <div class="card-info"><div class="card-num">07*</div><div class="card-name">终端兜底</div>
-          <div class="card-desc">PTY 全屏 + 移动键盘工具栏</div><span class="badge m4">M4</span></div>
-      </a>
-    </div>
-  </div>
-
-  <div class="divider"></div>
-
-  <!-- GROUP 5 -->
-  <div class="group-section">
-    <div class="group-header">
-      <div class="group-icon" style="background:rgba(191,90,242,.15)">🎤</div>
-      <div class="group-name">输入增强</div>
-      <div class="group-desc">M4 · 图片 / 语音 / 斜杠命令</div>
-    </div>
-    <div class="card-grid">
-      <a class="screen-card" href="15-image-input.html">
-        <div class="card-preview" style="background:linear-gradient(135deg,#1a2a3a,#0d1a2a)">📸</div>
-        <div class="card-info"><div class="card-num">15</div><div class="card-name">图片输入</div>
-          <div class="card-desc">预览 + 裁剪压缩 + E2EE 发送</div><span class="badge m4">M4</span></div>
-      </a>
-      <a class="screen-card" href="16-voice-input.html">
-        <div class="card-preview" style="background:linear-gradient(135deg,#0a84ff18,#5e5ce610)">🎤</div>
-        <div class="card-info"><div class="card-num">16</div><div class="card-name">语音输入</div>
-          <div class="card-desc">本地 STT 波形 + 实时转写</div><span class="badge m4">M4</span></div>
-      </a>
-      <a class="screen-card" href="14-slash-palette.html">
-        <div class="card-preview" style="background:linear-gradient(135deg,#5e5ce628,#0a84ff18)">⌨️</div>
-        <div class="card-info"><div class="card-num">14</div><div class="card-name">斜杠命令面板</div>
-          <div class="card-desc">/compact /model /clear 动态列表</div><span class="badge m4">M4</span></div>
-      </a>
-    </div>
-  </div>
-
-  <div class="divider"></div>
-
-  <!-- GROUP 6 -->
-  <div class="group-section">
-    <div class="group-header">
-      <div class="group-icon" style="background:rgba(94,92,230,.15)">⚙️</div>
-      <div class="group-name">设置</div>
-      <div class="group-desc">Tab 3 · 账号 / 安全 / 外观 / 通知 / 规则 / 关于</div>
-    </div>
-    <div class="card-grid">
-      <a class="screen-card" href="17-settings.html">
-        <div class="card-preview" style="background:linear-gradient(135deg,#5e5ce618,#0a84ff0d)">⚙️</div>
-        <div class="card-info"><div class="card-num">17</div><div class="card-name">设置主页</div>
-          <div class="card-desc">账号卡片 + 所有子页入口</div><span class="badge ux">UX</span></div>
-      </a>
-      <a class="screen-card" href="18-settings-security.html">
-        <div class="card-preview" style="background:linear-gradient(135deg,#ff453a18,#5e5ce610)">🔐</div>
-        <div class="card-info"><div class="card-num">18</div><div class="card-name">安全与隐私</div>
-          <div class="card-desc">Face ID、Ed25519、SAS、Noise IK</div><span class="badge m1">M1</span></div>
-      </a>
-      <a class="screen-card" href="19-settings-appearance.html">
-        <div class="card-preview" style="background:linear-gradient(135deg,#5e5ce618,#bf5af210)">🎨</div>
-        <div class="card-info"><div class="card-num">19</div><div class="card-name">外观</div>
-          <div class="card-desc">主题、强调色、字号、diff 视图</div><span class="badge ux">UX</span></div>
-      </a>
-      <a class="screen-card" href="20-settings-notifications.html">
-        <div class="card-preview" style="background:linear-gradient(135deg,#34c75918,#0a84ff0d)">🔔</div>
-        <div class="card-info"><div class="card-num">20</div><div class="card-name">通知与推送</div>
-          <div class="card-desc">APNS 状态、事件开关、免打扰</div><span class="badge m4">M4</span></div>
-      </a>
-      <a class="screen-card" href="21-settings-danger-rules.html">
-        <div class="card-preview" style="background:linear-gradient(135deg,#ff453a28,#ff9f0a18)">🚫</div>
-        <div class="card-info"><div class="card-num">21</div><div class="card-name">危险操作规则</div>
-          <div class="card-desc">黑名单增删、白名单工具、围栏</div><span class="badge m2">M2</span></div>
-      </a>
-      <a class="screen-card" href="22-settings-templates.html">
-        <div class="card-preview" style="background:linear-gradient(135deg,#0a84ff18,#5e5ce610)">⚡</div>
-        <div class="card-info"><div class="card-num">22</div><div class="card-name">快捷模板</div>
-          <div class="card-desc">模板 CRUD + 变量占位符 + 排序</div><span class="badge m4">M4</span></div>
-      </a>
-      <a class="screen-card" href="24-about.html">
-        <div class="card-preview" style="background:linear-gradient(135deg,#0a84ff18,#5e5ce618)">ℹ️</div>
-        <div class="card-info"><div class="card-num">24</div><div class="card-name">关于 HelloBug</div>
-          <div class="card-desc">版本、协议参数、开源许可、调试</div><span class="badge ux">UX</span></div>
-      </a>
-    </div>
-  </div>
-
+<div class="legend">
+  <div class="leg"><div class="leg-line" style="background:#34c759"></div>成功 / 下一步</div>
+  <div class="leg"><div class="leg-line" style="background:#ff453a"></div>失败 / 取消</div>
+  <div class="leg"><div class="leg-line" style="background:#0a84ff"></div>操作触发</div>
+  <div class="leg"><div class="leg-line" style="background:#ff9f0a;height:1px;border-top:2px dashed #ff9f0a;background:none;"></div>可选路径</div>
 </div>
+<div class="hint">滚轮缩放 · 拖拽平移 · 双击进入页面</div>
 <script>
-function toggleTheme() {
-  const html = document.documentElement;
-  const btn = document.querySelector('.theme-toggle');
-  if (html.dataset.theme === 'dark') { html.dataset.theme = 'light'; btn.textContent = '🌙 深色'; }
-  else { html.dataset.theme = 'dark'; btn.textContent = '☀ 浅色'; }
+const NW = 120, NH = 237; // node width / height (195 thumb + 42 label)
+
+// x,y = top-left corner of node
+const nodes = [
+  // ── Onboarding ──
+  { id:'onboard', label:'引导页', num:'10', url:'10-onboarding.html', x:40,   y:340 },
+  { id:'unlock',  label:'锁屏解锁', num:'11', url:'11-unlock.html',  x:40,   y:680 },
+
+  // ── Pairing ──
+  { id:'pair',    label:'配对入口', num:'01', url:'01-pairing.html',  x:260,  y:340 },
+  { id:'qr',      label:'扫码配对', num:'33', url:'33-qr-scan.html',  x:480,  y:180 },
+  { id:'manual',  label:'手动配对', num:'34', url:'34-manual-pair.html', x:480, y:500 },
+  { id:'sas',     label:'SAS安全核对', num:'02', url:'02-sas.html',  x:700,  y:340 },
+
+  // ── Device / Workspace ──
+  { id:'devices',    label:'设备列表', num:'03', url:'03-devices.html',       x:960,  y:340 },
+  { id:'dev_detail', label:'设备详情', num:'23', url:'23-device-detail.html', x:960,  y:680 },
+  { id:'ws_home',    label:'工作区主页', num:'43', url:'43-workspace-home.html', x:1180, y:340 },
+
+  // ── Session ──
+  { id:'sess_list',   label:'会话列表',   num:'08', url:'08-session-list.html',           x:1400, y:180 },
+  { id:'search',      label:'会话搜索',   num:'26', url:'26-sessions-search.html',        x:1620, y:60  },
+  { id:'hist_list',   label:'历史列表',   num:'27', url:'27-history-list.html',           x:1400, y:1500 },
+  { id:'hist_detail', label:'历史详情',   num:'28', url:'28-history-detail.html',         x:1620, y:1500 },
+  { id:'new_sess',    label:'新建会话向导', num:'12', url:'12-new-session.html',           x:1400, y:500 },
+  { id:'new_confirm', label:'新建确认',   num:'32', url:'32-new-session-confirm.html',    x:1620, y:500 },
+
+  // ── Chat ──
+  { id:'chat', label:'会话主页', num:'04', url:'04-chat.html', x:1840, y:340 },
+
+  // ── Chat branches col-1 (x=2100) ──
+  { id:'danger',    label:'危险操作确认', num:'09', url:'09-danger-confirm.html',    x:2100, y:60  },
+  { id:'diff',      label:'Diff全屏',    num:'05', url:'05-diff.html',               x:2100, y:340 },
+  { id:'filetree',  label:'文件树+预览', num:'06', url:'06-filetree.html',           x:2100, y:580 },
+  { id:'reconnect',   label:'断线重连',    num:'41', url:'41-reconnect-state.html',    x:2100, y:820 },
+  { id:'terminal_sb', label:'终端+状态栏', num:'31', url:'31-terminal-status-bar.html', x:2100, y:1060 },
+
+  // ── Chat branches col-1 sub ──
+  { id:'fileprev', label:'文件预览页', num:'37', url:'37-file-preview.html', x:2320, y:580 },
+
+  // ── Chat branches col-2 (x=2560) ──
+  { id:'ws_switcher', label:'工作区切换器', num:'44', url:'44-workspace-switcher.html', x:2560, y:60 },
+  { id:'slash',       label:'斜杠命令面板', num:'14', url:'14-slash-palette.html',       x:2560, y:340  },
+  { id:'img_input',   label:'图片输入',     num:'15', url:'15-image-input.html',         x:2560, y:580  },
+  { id:'voice_input', label:'语音输入',     num:'16', url:'16-voice-input.html',         x:2560, y:820  },
+  { id:'msg_actions', label:'消息长按操作', num:'29', url:'29-message-actions-sheet.html', x:2560, y:1060 },
+  { id:'sess_info',   label:'会话信息面板', num:'40', url:'40-session-info.html',        x:2560, y:1300 },
+  { id:'sess_tabs',   label:'多会话Tab',    num:'35', url:'35-session-tabs.html',        x:2560, y:1540 },
+  { id:'landscape',   label:'横屏双栏',     num:'36', url:'36-landscape-split.html',     x:2560, y:1780 },
+
+  // ── Settings row-1 (y=1060) ──
+  { id:'settings',     label:'设置主页',      num:'17', url:'17-settings.html',                 x:700,  y:1060 },
+  { id:'security',     label:'安全与隐私',    num:'18', url:'18-settings-security.html',         x:940,  y:1060 },
+  { id:'danger_rules', label:'危险操作规则',  num:'21', url:'21-settings-danger-rules.html',     x:1180, y:1060 },
+  { id:'rule_form',    label:'危险规则表单',  num:'30', url:'30-danger-rule-form.html',           x:1420, y:1060 },
+  { id:'templates',    label:'快捷模板',      num:'22', url:'22-settings-templates.html',        x:1660, y:1060 },
+  { id:'relay',        label:'中继服务器设置', num:'39', url:'39-relay-settings.html',           x:1900, y:1060 },
+
+  // ── Settings row-2 (y=1300) ──
+  { id:'appearance',     label:'外观',         num:'19', url:'19-settings-appearance.html',      x:700,  y:1300 },
+  { id:'notifications',  label:'通知与推送',   num:'20', url:'20-settings-notifications.html',   x:940,  y:1300 },
+  { id:'about',          label:'关于HelloBug', num:'24', url:'24-about.html',                    x:1180, y:1300 },
+  { id:'tmpl_form',      label:'模板编辑表单', num:'38', url:'38-template-form.html',            x:1660, y:1300 },
+
+  // ── 导航重设计 (y=1800) ──
+  { id:'tab2',       label:'2-Tab导航框架', num:'42', url:'42-tab-scaffold-2tab.html',  x:700,  y:1800 },
+  { id:'ws_settings',label:'工作区设置',    num:'45', url:'45-workspace-settings.html', x:940,  y:1800 },
+
+  // ── Error / State pages ──
+  { id:'startup',     label:'启动恢复中',    num:'46', url:'46-startup-loading.html',          x:40,   y:2100 },
+  { id:'dev_revoked', label:'设备已吊销',    num:'47', url:'47-device-revoked.html',           x:260,  y:2100 },
+  { id:'pair_exp',    label:'配对码过期',    num:'48', url:'48-pairing-expired.html',          x:480,  y:2100 },
+  { id:'ws_invalid',  label:'工作区路径失效', num:'49', url:'49-workspace-path-invalid.html',  x:700,  y:2100 },
+  { id:'ws_empty',    label:'空工作区引导',  num:'50', url:'50-workspace-empty.html',          x:920,  y:2100 },
+  { id:'ws_new',      label:'新建工作区',    num:'51', url:'51-workspace-new.html',            x:1140, y:2100 },
+  { id:'sess_404',    label:'会话不存在',    num:'52', url:'52-session-not-found.html',        x:1360, y:2100 },
+
+  // ── Group Agent pages ──
+  { id:'push_land',  label:'推送落地跳转',   num:'53', url:'53-push-landing.html',            x:40,   y:2440 },
+  { id:'grp_agents', label:'群组Agent列表',  num:'54', url:'54-group-agent-list.html',        x:260,  y:2440 },
+  { id:'grp_add',    label:'新增Agent',      num:'55', url:'55-group-add-agent.html',         x:480,  y:2440 },
+  { id:'mention',    label:'@mention选择',   num:'56', url:'56-mention-agent.html',           x:700,  y:2440 },
+  { id:'routing',    label:'路由方式选择',   num:'57', url:'57-agent-routing.html',           x:920,  y:2440 },
+  { id:'agent_stat', label:'Agent运行状态',  num:'58', url:'58-agent-status-detail.html',     x:1140, y:2440 },
+  { id:'hist_agent',  label:'按Agent筛选历史', num:'59', url:'59-history-by-agent.html',      x:1360, y:2440 },
+  { id:'ws_perm',     label:'工作区权限受限',  num:'60', url:'60-workspace-permission.html',  x:1580, y:2100 },
+];
+
+// type: 'ok'=green, 'fail'=red, 'action'=blue, 'opt'=orange-dashed
+// from/to: node id; fromPort: 'r','b','l','t' (right/bottom/left/top)
+const edges = [
+  // Onboarding
+  { from:'onboard', to:'pair',   label:'首次启动', type:'ok' },
+  { from:'onboard', to:'unlock', label:'已有设备', type:'opt', fromPort:'b', toPort:'t' },
+  { from:'unlock',  to:'devices',label:'验证通过', type:'ok', fromPort:'r' },
+
+  // Pairing
+  { from:'pair',   to:'qr',     label:'扫码',    type:'action' },
+  { from:'pair',   to:'manual', label:'手动输入', type:'action' },
+  { from:'qr',     to:'sas',    label:'', type:'ok' },
+  { from:'manual', to:'sas',    label:'', type:'ok' },
+  { from:'sas', to:'devices', label:'双端确认', type:'ok' },
+  { from:'sas', to:'pair',    label:'拒绝/重试', type:'fail', fromPort:'b', toPort:'b' },
+
+  // Device
+  { from:'devices', to:'ws_home',    label:'进入',   type:'ok' },
+  { from:'devices', to:'dev_detail', label:'查看详情', type:'action', fromPort:'b', toPort:'t' },
+
+  // Workspace → Session
+  { from:'ws_home', to:'sess_list', label:'选工作区', type:'ok' },
+  { from:'ws_home', to:'new_sess',  label:'新建会话', type:'action' },
+  { from:'sess_list', to:'chat',       label:'选择会话', type:'ok' },
+  { from:'sess_list', to:'search',     label:'搜索',     type:'action' },
+  { from:'sess_list', to:'hist_list',  label:'历史记录', type:'opt', fromPort:'b', toPort:'t' },
+  { from:'hist_list', to:'hist_detail',label:'查看详情', type:'action' },
+  { from:'new_sess',    to:'new_confirm', label:'下一步',  type:'ok' },
+  { from:'new_confirm', to:'chat',        label:'确认创建', type:'ok', fromPort:'r', toPort:'b' },
+
+  // Chat → col-1
+  { from:'chat', to:'danger',   label:'危险指令', type:'action', fromPort:'r', toPort:'l' },
+  { from:'chat', to:'diff',     label:'查看Diff', type:'action' },
+  { from:'chat', to:'filetree', label:'文件树',   type:'action', fromPort:'r', toPort:'l' },
+  { from:'chat', to:'reconnect',label:'连接断开', type:'fail',   fromPort:'b', toPort:'l' },
+  { from:'chat', to:'terminal_sb', label:'打开终端', type:'action', fromPort:'r', toPort:'l' },
+  { from:'danger',   to:'chat', label:'Face ID通过', type:'ok',   fromPort:'l', toPort:'t' },
+  { from:'danger',   to:'chat', label:'拒绝',        type:'fail', fromPort:'b', toPort:'t' },
+  { from:'filetree', to:'fileprev', label:'打开文件', type:'action' },
+  { from:'reconnect',to:'chat',    label:'重连成功', type:'ok',   fromPort:'t', toPort:'b' },
+  { from:'reconnect',to:'devices', label:'重连失败', type:'fail', fromPort:'b' },
+
+  // Chat → col-2
+  { from:'chat', to:'ws_switcher', label:'切换工作区', type:'action', fromPort:'r', toPort:'l' },
+  { from:'chat', to:'slash',      label:'斜杠命令',   type:'action', fromPort:'r', toPort:'l' },
+  { from:'chat', to:'img_input',  label:'添加图片',   type:'action', fromPort:'r', toPort:'l' },
+  { from:'chat', to:'voice_input',label:'语音输入',   type:'action', fromPort:'r', toPort:'l' },
+  { from:'chat', to:'msg_actions',label:'长按消息',   type:'action', fromPort:'r', toPort:'l' },
+  { from:'chat', to:'sess_info',  label:'会话信息',   type:'action', fromPort:'r', toPort:'l' },
+  { from:'chat', to:'sess_tabs',  label:'多会话',     type:'action', fromPort:'r', toPort:'l' },
+  { from:'chat', to:'landscape',  label:'横屏',       type:'opt',    fromPort:'r', toPort:'l' },
+
+  // Settings row-1
+  { from:'settings', to:'security',     label:'', type:'action' },
+  { from:'settings', to:'danger_rules', label:'', type:'action' },
+  { from:'settings', to:'templates',    label:'', type:'action' },
+  { from:'settings', to:'relay',        label:'', type:'action' },
+  { from:'danger_rules', to:'rule_form',  label:'新建/编辑', type:'action' },
+  // Settings row-2
+  { from:'settings',  to:'appearance',    label:'', type:'action', fromPort:'b', toPort:'t' },
+  { from:'settings',  to:'notifications', label:'', type:'action', fromPort:'b', toPort:'t' },
+  { from:'settings',  to:'about',         label:'', type:'action', fromPort:'b', toPort:'t' },
+  { from:'templates', to:'tmpl_form',     label:'新建/编辑', type:'action', fromPort:'b', toPort:'t' },
+
+  // 导航重设计
+  { from:'tab2',    to:'ws_home',     label:'进入', type:'ok' },
+  { from:'ws_home', to:'ws_settings', label:'设置', type:'action', fromPort:'b', toPort:'t' },
+  { from:'chat',      to:'push_land',  label:'通知到达',  type:'opt',    fromPort:'b', toPort:'t' },
+  { from:'push_land', to:'chat',       label:'跳转会话',  type:'ok' },
+  { from:'push_land', to:'danger',     label:'待确认',    type:'action' },
+  { from:'ws_home',   to:'ws_perm',    label:'权限不足',  type:'fail',   fromPort:'b', toPort:'t' },
+  { from:'ws_perm',   to:'ws_home',    label:'已修复',    type:'ok' },
+  { from:'search',    to:'chat',       label:'打开结果',  type:'ok' },
+  { from:'hist_detail', to:'chat',     label:'恢复会话',  type:'ok' },
+  { from:'tab2', to:'devices',  label:'设备管理入口', type:'ok' },
+  { from:'tab2', to:'settings', label:'设置', type:'ok' },
+
+  // Error / State
+  { from:'onboard',   to:'startup',    label:'冷启动',  type:'action', fromPort:'b', toPort:'t' },
+  { from:'devices',   to:'dev_revoked',label:'已吊销',  type:'fail',   fromPort:'b', toPort:'t' },
+  { from:'pair',      to:'pair_exp',   label:'码过期',  type:'fail',   fromPort:'b', toPort:'t' },
+  { from:'ws_home',   to:'ws_invalid', label:'路径失效', type:'fail',  fromPort:'b', toPort:'t' },
+  { from:'ws_home',   to:'ws_empty',   label:'首次进入', type:'opt',   fromPort:'b', toPort:'t' },
+  { from:'ws_home',   to:'ws_new',     label:'新建',    type:'action', fromPort:'b', toPort:'t' },
+  { from:'sess_list', to:'sess_404',   label:'会话丢失', type:'fail',  fromPort:'b', toPort:'t' },
+
+  // Group Agent
+  { from:'chat',      to:'grp_agents', label:'Agent列表', type:'action', fromPort:'b', toPort:'t' },
+  { from:'grp_agents',to:'grp_add',    label:'+添加',     type:'action' },
+  { from:'grp_agents',to:'routing',    label:'路由设置',  type:'action' },
+  { from:'grp_agents',to:'agent_stat', label:'查看状态',  type:'action' },
+  { from:'chat',      to:'mention',    label:'@mention',  type:'action', fromPort:'b', toPort:'t' },
+  { from:'hist_list', to:'hist_agent', label:'按Agent筛', type:'action' },
+];
+
+const COLOR = { ok:'#34c759', fail:'#ff453a', action:'#0a84ff', opt:'#ff9f0a' };
+
+// ── Build DOM ──
+const canvas = document.getElementById('canvas');
+const svg = document.getElementById('arrowlayer');
+const ns = 'http://www.w3.org/2000/svg';
+
+// Compute canvas bounding box
+const pad = 40;
+let maxX = 0, maxY = 0;
+for (const n of nodes) { maxX = Math.max(maxX, n.x + NW + pad); maxY = Math.max(maxY, n.y + NH + pad); }
+canvas.style.width = maxX + 'px'; canvas.style.height = maxY + 'px';
+svg.setAttribute('width', maxX); svg.setAttribute('height', maxY);
+
+// Arrowhead markers
+const defs = document.createElementNS(ns, 'defs');
+for (const [type, color] of Object.entries(COLOR)) {
+  const marker = document.createElementNS(ns, 'marker');
+  marker.setAttribute('id', 'arr-' + type);
+  marker.setAttribute('markerWidth', '8'); marker.setAttribute('markerHeight', '8');
+  marker.setAttribute('refX', '6'); marker.setAttribute('refY', '3');
+  marker.setAttribute('orient', 'auto');
+  const poly = document.createElementNS(ns, 'polygon');
+  poly.setAttribute('points', '0 0, 8 3, 0 6'); poly.setAttribute('fill', color);
+  marker.appendChild(poly); defs.appendChild(marker);
 }
+svg.appendChild(defs);
+
+// Node map for position lookup
+const nmap = {};
+for (const n of nodes) nmap[n.id] = n;
+
+function port(n, side) {
+  const cx = n.x + NW / 2, cy = n.y + NH / 2;
+  if (side === 'r') return [n.x + NW, cy];
+  if (side === 'l') return [n.x, cy];
+  if (side === 't') return [cx, n.y];
+  if (side === 'b') return [cx, n.y + NH];
+  return [n.x + NW, cy]; // default right
+}
+
+function autoPort(sn, tn) {
+  const sc = [sn.x + NW/2, sn.y + NH/2];
+  const tc = [tn.x + NW/2, tn.y + NH/2];
+  const dx = tc[0] - sc[0], dy = tc[1] - sc[1];
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return dx >= 0 ? ['r','l'] : ['l','r'];
+  } else {
+    return dy >= 0 ? ['b','t'] : ['t','b'];
+  }
+}
+
+function mkPath(x1,y1,x2,y2,sp,tp) {
+  // cubic bezier
+  let c1x,c1y,c2x,c2y;
+  if (sp==='r'||sp==='l') { const m=(x1+x2)/2; c1x=m;c1y=y1;c2x=m;c2y=y2; }
+  else if (sp==='b'||sp==='t') { const m=(y1+y2)/2; c1x=x1;c1y=m;c2x=x2;c2y=m; }
+  else { c1x=(x1+x2)/2;c1y=y1;c2x=(x1+x2)/2;c2y=y2; }
+  return `M${x1},${y1} C${c1x},${c1y} ${c2x},${c2y} ${x2},${y2}`;
+}
+
+for (const e of edges) {
+  const sn = nmap[e.from], tn = nmap[e.to];
+  if (!sn || !tn) continue;
+  const [sp, tp] = e.fromPort && e.toPort ? [e.fromPort, e.toPort]
+    : e.fromPort ? [e.fromPort, autoPort(sn,tn)[1]]
+    : e.toPort   ? [autoPort(sn,tn)[0], e.toPort]
+    : autoPort(sn,tn);
+  const [x1,y1] = port(sn,sp), [x2,y2] = port(tn,tp);
+  // arrow offset from endpoint (don't overlap node border)
+  const off = 4;
+  const tx2 = tp==='l' ? x2-off : tp==='r' ? x2+off : x2;
+  const ty2 = tp==='t' ? y2-off : tp==='b' ? y2+off : y2;
+
+  const path = document.createElementNS(ns,'path');
+  path.setAttribute('d', mkPath(x1,y1,tx2,ty2,sp,tp));
+  path.setAttribute('fill','none');
+  path.setAttribute('stroke', COLOR[e.type]||'#888');
+  path.setAttribute('stroke-width', e.type==='opt'?1.5:2);
+  if (e.type==='opt') path.setAttribute('stroke-dasharray','5,4');
+  path.setAttribute('marker-end', `url(#arr-${e.type})`);
+  path.setAttribute('opacity','0.75');
+  svg.appendChild(path);
+
+  if (e.label) {
+    const mx=(x1+tx2)/2, my=(y1+ty2)/2;
+    const fo = document.createElementNS(ns,'foreignObject');
+    fo.setAttribute('x', mx-50); fo.setAttribute('y', my-11);
+    fo.setAttribute('width',100); fo.setAttribute('height',22);
+    fo.setAttribute('overflow','visible');
+    const div = document.createElement('div');
+    div.className = 'edge-label';
+    div.style.cssText = `color:${COLOR[e.type]};background:rgba(13,13,15,.8);border:1px solid ${COLOR[e.type]}44;left:50%;transform:translateX(-50%)`;
+    div.textContent = e.label;
+    fo.appendChild(div); svg.appendChild(fo);
+  }
+}
+
+// Nodes
+for (const n of nodes) {
+  const div = document.createElement('div');
+  div.className = 'node';
+  div.style.left = n.x + 'px'; div.style.top = n.y + 'px';
+  div.title = n.label;
+  div.innerHTML = `
+    <div class="node-card"><div class="thumb"><iframe src="${n.url}" loading="lazy" tabindex="-1"></iframe></div></div>
+    <div class="node-label"><div class="node-num">${n.num}</div>${n.label}</div>`;
+  div.addEventListener('dblclick', () => location.href = n.url);
+  canvas.appendChild(div);
+}
+
+// ── Pan + Zoom ──
+let tx = 60, ty = 60, sc = 0.55;
+const vp = document.getElementById('viewport');
+const apply = () => canvas.style.transform = `translate(${tx}px,${ty}px) scale(${sc})`;
+apply();
+
+vp.addEventListener('wheel', e => {
+  e.preventDefault();
+  const f = e.deltaY < 0 ? 1.1 : 0.91;
+  const r = vp.getBoundingClientRect();
+  const mx = e.clientX - r.left, my = e.clientY - r.top;
+  tx = mx + (tx - mx) * f; ty = my + (ty - my) * f; sc *= f;
+  apply();
+}, { passive: false });
+
+let drag = null;
+vp.addEventListener('mousedown', e => {
+  if (e.target.closest('.node')) return;
+  drag = { x: e.clientX - tx, y: e.clientY - ty };
+  vp.classList.add('dragging');
+});
+window.addEventListener('mousemove', e => { if (!drag) return; tx = e.clientX-drag.x; ty = e.clientY-drag.y; apply(); });
+window.addEventListener('mouseup', () => { drag = null; vp.classList.remove('dragging'); });
 </script>
 </body>
 </html>

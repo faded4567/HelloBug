@@ -29,7 +29,10 @@ class EnvelopeSigner {
   }) async {
     return _algo.verify(
       utf8.encode('$from$to$sessionId$seq$ts'),
-      signature: Signature(base64Url.decode(sigBase64), publicKey: pubKey),
+      signature: Signature(
+        base64Url.decode(base64Url.normalize(sigBase64)),
+        publicKey: pubKey,
+      ),
     );
   }
 }

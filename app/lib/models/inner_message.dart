@@ -28,7 +28,7 @@ class InnerMessage {
 
   factory InnerMessage.fromJson(Map<String, dynamic> json) => InnerMessage(
         v: (json['v'] as num?)?.toInt() ?? 1,
-        id: json['id'] as String,
+        id: (json['id'] as String?) ?? _uuid(),
         type: json['type'] as String,
         payload: (json['payload'] as Map<String, dynamic>?) ?? {},
       );

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>51 · 新建工作区</title>
+<link rel="stylesheet" href="_common.css">
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+
+  <div class="phone-label">51 · 新建工作区</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg><svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg></div></div>
+
+    <div class="nav">
+      <button style="color:var(--tint);font-size:16px;background:none;border:none">取消</button>
+      <div class="nav-title">新建工作区</div>
+      <button style="color:var(--tint);font-size:16px;background:none;border:none;font-weight:600">添加</button>
+    </div>
+
+    <div class="screen-body" style="padding:20px 16px;gap:24px">
+      <div>
+        <div style="font-size:12px;color:var(--fg3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;padding-left:4px">工作区名称</div>
+        <input style="width:100%;background:var(--bg2);border:1px solid var(--bg4);border-radius:10px;padding:10px 12px;color:var(--fg);font-size:15px;outline:none" value="HelloBug" />
+      </div>
+
+      <div>
+        <div style="font-size:12px;color:var(--fg3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;padding-left:4px">本地路径</div>
+        <div style="display:flex;gap:8px">
+          <input style="flex:1;background:var(--bg2);border:1px solid var(--bg4);border-radius:10px;padding:10px 12px;color:var(--fg3);font-size:13px;font-family:var(--font-mono);outline:none" value="/Users/shuai/Projects/HelloBug" readonly />
+          <button style="background:var(--bg2);border:1px solid var(--bg4);border-radius:10px;padding:10px 12px;color:var(--tint);font-size:13px;white-space:nowrap">浏览</button>
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size:12px;color:var(--fg3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;padding-left:4px">Agent</div>
+        <div style="background:var(--bg2);border-radius:var(--r);overflow:hidden">
+          <div style="display:flex;align-items:center;padding:12px 14px;border-bottom:1px solid var(--bg3)">
+            <div style="flex:1">
+              <div style="font-size:15px">Claude Code</div>
+              <div style="font-size:12px;color:var(--fg3);margin-top:2px">claude-sonnet-4-5</div>
+            </div>
+            <div style="width:36px;height:22px;border-radius:11px;background:var(--tint);position:relative;flex-shrink:0">
+              <div style="width:18px;height:18px;border-radius:50%;background:#fff;position:absolute;right:2px;top:2px;box-shadow:0 1px 3px rgba(0,0,0,.3)"></div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;padding:12px 14px">
+            <div style="flex:1">
+              <div style="font-size:15px;color:var(--fg2)">Codex CLI</div>
+              <div style="font-size:12px;color:var(--fg3);margin-top:2px">gpt-4o</div>
+            </div>
+            <div style="width:36px;height:22px;border-radius:11px;background:var(--bg4);position:relative;flex-shrink:0">
+              <div style="width:18px;height:18px;border-radius:50%;background:#fff;position:absolute;left:2px;top:2px;box-shadow:0 1px 3px rgba(0,0,0,.3)"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size:12px;color:var(--fg3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;padding-left:4px">描述（可选）</div>
+        <textarea style="width:100%;background:var(--bg2);border:1px solid var(--bg4);border-radius:10px;padding:10px 12px;color:var(--fg);font-size:14px;resize:none;height:72px;outline:none" placeholder="这个工作区是用来做什么的…"></textarea>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+function toggleTheme() {
+  const h = document.documentElement, d = h.getAttribute('data-theme') === 'dark';
+  h.setAttribute('data-theme', d ? 'light' : 'dark');
+  document.querySelector('.theme-toggle').textContent = d ? '🌙 深色' : '☀ 浅色';
+}
+</script>
+</body>
+</html>

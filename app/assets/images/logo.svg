@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" rx="224" fill="#1A1A1C"/>
+
+  <!-- Bug body -->
+  <ellipse cx="512" cy="590" rx="210" ry="252" fill="#30D158"/>
+  <!-- Bug head -->
+  <circle cx="512" cy="338" r="108" fill="#30D158"/>
+
+  <!-- Wing division -->
+  <line x1="512" y1="430" x2="512" y2="842" stroke="#1A1A1C" stroke-width="16" stroke-linecap="round"/>
+
+  <!-- Spots -->
+  <circle cx="454" cy="565" r="32" fill="#1A1A1C" opacity="0.28"/>
+  <circle cx="570" cy="565" r="32" fill="#1A1A1C" opacity="0.28"/>
+  <circle cx="454" cy="668" r="26" fill="#1A1A1C" opacity="0.28"/>
+  <circle cx="570" cy="668" r="26" fill="#1A1A1C" opacity="0.28"/>
+
+  <!-- Eyes -->
+  <circle cx="474" cy="326" r="24" fill="#1A1A1C"/>
+  <circle cx="550" cy="326" r="24" fill="#1A1A1C"/>
+  <circle cx="474" cy="326" r="9" fill="white"/>
+  <circle cx="550" cy="326" r="9" fill="white"/>
+
+  <!-- Antennae -->
+  <line x1="476" y1="234" x2="426" y2="148" stroke="#30D158" stroke-width="20" stroke-linecap="round"/>
+  <line x1="548" y1="234" x2="598" y2="148" stroke="#30D158" stroke-width="20" stroke-linecap="round"/>
+  <circle cx="412" cy="136" r="28" fill="#30D158"/>
+  <circle cx="612" cy="136" r="28" fill="#30D158"/>
+
+  <!-- Legs left -->
+  <line x1="302" y1="518" x2="192" y2="472" stroke="#30D158" stroke-width="20" stroke-linecap="round"/>
+  <line x1="302" y1="600" x2="184" y2="600" stroke="#30D158" stroke-width="20" stroke-linecap="round"/>
+  <line x1="302" y1="682" x2="192" y2="728" stroke="#30D158" stroke-width="20" stroke-linecap="round"/>
+
+  <!-- Legs right -->
+  <line x1="722" y1="518" x2="832" y2="472" stroke="#30D158" stroke-width="20" stroke-linecap="round"/>
+  <line x1="722" y1="600" x2="840" y2="600" stroke="#30D158" stroke-width="20" stroke-linecap="round"/>
+  <line x1="722" y1="682" x2="832" y2="728" stroke="#30D158" stroke-width="20" stroke-linecap="round"/>
+</svg>

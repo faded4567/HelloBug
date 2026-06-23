@@ -4,39 +4,57 @@ import 'package:go_router/go_router.dart';
 import '../theme/index.dart';
 
 class RootTabScaffold extends StatelessWidget {
-  const RootTabScaffold({super.key, required this.child});
-  final Widget child;
+  const RootTabScaffold({super.key, required this.navigationShell});
+  final StatefulNavigationShell navigationShell;
 
   static const _tabs = [
-    _TabItem(label: '设备',   icon: CupertinoIcons.device_laptop,      path: '/devices'),
-    _TabItem(label: '会话',   icon: CupertinoIcons.chat_bubble_2,       path: '/sessions'),
-    _TabItem(label: '设置',   icon: CupertinoIcons.settings,            path: '/settings'),
+    _TabItem(label: '工作区', icon: CupertinoIcons.folder),
+    _TabItem(label: '设置', icon: CupertinoIcons.settings),
   ];
 
   @override
   Widget build(BuildContext context) {
-    final location = GoRouterState.of(context).uri.toString();
-    final activeIndex = _tabs.indexWhere((t) => location.startsWith(t.path));
-
-    return CupertinoTabScaffold(
-      tabBar: CupertinoTabBar(
-        currentIndex: activeIndex < 0 ? 0 : activeIndex,
-        backgroundColor: context.colors.bg,
-        border: Border(top: BorderSide(color: context.colors.separator, width: .5)),
-        onTap: (i) => context.go(_tabs[i].path),
-        items: _tabs.map((t) => BottomNavigationBarItem(
-          icon: Icon(t.icon),
-          label: t.label,
-        )).toList(),
+    final colors = context.colors;
+    return ColoredBox(
+      color: colors.bg,
+      child: Column(
+        children: [
+          Expanded(child: navigationShell),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: colors.bg,
+              border: Border(
+                top: BorderSide(color: colors.separator, width: .5),
+              ),
+            ),
+            child: CupertinoTabBar(
+              currentIndex: navigationShell.currentIndex,
+              backgroundColor: colors.bg,
+              border: null,
+              onTap:
+                  (i) => navigationShell.goBranch(
+                    i,
+                    initialLocation: i == navigationShell.currentIndex,
+                  ),
+              items:
+                  _tabs
+                      .map(
+                        (t) => BottomNavigationBarItem(
+                          icon: Icon(t.icon),
+                          label: t.label,
+                        ),
+                      )
+                      .toList(),
+            ),
+          ),
+        ],
       ),
-      tabBuilder: (_, __) => child,
     );
   }
 }
 
 class _TabItem {
-  const _TabItem({required this.label, required this.icon, required this.path});
+  const _TabItem({required this.label, required this.icon});
   final String label;
   final IconData icon;
-  final String path;
 }

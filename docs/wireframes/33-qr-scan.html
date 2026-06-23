@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>33 · 扫码页</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+.qr-viewfinder {
+  position: relative;
+  width: 240px; height: 240px;
+  margin: 0 auto;
+}
+.qr-frame {
+  position: absolute; inset: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(0,0,0,.6);
+}
+/* 扫描线 */
+.qr-scan-line {
+  position: absolute;
+  left: 12px; right: 12px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--tint), transparent);
+  animation: scan 2s ease-in-out infinite;
+  top: 50%;
+}
+@keyframes scan {
+  0%,100% { top: 20%; opacity: .8; }
+  50%      { top: 80%; opacity: 1; }
+}
+/* 角框 */
+.qr-corner {
+  position: absolute;
+  width: 24px; height: 24px;
+  border-color: var(--tint);
+  border-style: solid;
+}
+.qr-corner.tl { top: 0; left: 0; border-width: 3px 0 0 3px; border-radius: 6px 0 0 0; }
+.qr-corner.tr { top: 0; right: 0; border-width: 3px 3px 0 0; border-radius: 0 6px 0 0; }
+.qr-corner.bl { bottom: 0; left: 0; border-width: 0 0 3px 3px; border-radius: 0 0 0 6px; }
+.qr-corner.br { bottom: 0; right: 0; border-width: 0 3px 3px 0; border-radius: 0 0 6px 0; }
+/* 模拟相机背景 */
+.camera-bg {
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, #1a2a1a 0%, #0d1a2e 50%, #1a1a2e 100%);
+}
+/* QR 码模拟 */
+.qr-mock {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100px; height: 100px;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-template-rows: repeat(7, 1fr);
+  gap: 2px;
+  opacity: .7;
+}
+.qr-px { background: rgba(255,255,255,.85); border-radius: 1px; }
+.qr-px.off { background: transparent; }
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+
+  <!-- 扫码中 -->
+  <div class="phone-label">33-A · 扫码 — 扫描中</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar" style="position:relative;z-index:20">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+
+    <!-- 全屏相机区 -->
+    <div style="flex:1;position:relative;overflow:hidden;background:#0a0a0a;display:flex;flex-direction:column">
+      <div class="camera-bg"></div>
+
+      <!-- 顶部导航覆盖在相机上 -->
+      <div style="position:relative;z-index:10;display:flex;align-items:center;padding:8px 16px 12px;background:linear-gradient(rgba(0,0,0,.6),transparent)">
+        <button style="color:#fff;font-size:17px;background:none;border:none;cursor:pointer">取消</button>
+        <div style="flex:1;text-align:center;font-size:17px;font-weight:600;color:#fff">扫描配对码</div>
+        <button style="font-size:20px;background:none;border:none;cursor:pointer">🔦</button>
+      </div>
+
+      <!-- 提示文字 -->
+      <div style="position:relative;z-index:10;text-align:center;font-size:14px;color:rgba(255,255,255,.7);padding:0 32px;margin-bottom:24px">
+        将终端显示的二维码对准框内
+      </div>
+
+      <!-- 取景框 -->
+      <div style="position:relative;z-index:10;flex:1;display:flex;align-items:center;justify-content:center">
+        <div class="qr-viewfinder">
+          <div class="qr-frame">
+            <div class="qr-scan-line"></div>
+          </div>
+          <div class="qr-corner tl"></div>
+          <div class="qr-corner tr"></div>
+          <div class="qr-corner bl"></div>
+          <div class="qr-corner br"></div>
+        </div>
+      </div>
+
+      <!-- 底部操作 -->
+      <div style="position:relative;z-index:10;padding:24px 32px 40px;background:linear-gradient(transparent,rgba(0,0,0,.7));text-align:center">
+        <button style="color:var(--tint);font-size:15px;background:none;border:none;cursor:pointer;padding:8px 0">
+          ⌨ 手动输入配对码
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 识别成功 -->
+  <div class="phone-label">33-B · 扫码 — 识别成功</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar" style="position:relative;z-index:20">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div style="flex:1;position:relative;overflow:hidden;background:#0a0a0a;display:flex;flex-direction:column">
+      <div class="camera-bg" style="opacity:.4"></div>
+      <div style="position:relative;z-index:10;display:flex;align-items:center;padding:8px 16px 12px;background:linear-gradient(rgba(0,0,0,.6),transparent)">
+        <button style="color:#fff;font-size:17px;background:none;border:none;cursor:pointer">取消</button>
+        <div style="flex:1;text-align:center;font-size:17px;font-weight:600;color:#fff">扫描配对码</div>
+        <div style="width:40px"></div>
+      </div>
+
+      <!-- 成功状态 -->
+      <div style="position:relative;z-index:10;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:0 32px">
+        <div style="width:80px;height:80px;border-radius:50%;background:rgba(52,199,89,.2);border:3px solid var(--green);display:flex;align-items:center;justify-content:center;font-size:36px">✓</div>
+        <div style="font-size:20px;font-weight:700;color:#fff">识别成功</div>
+        <div style="background:rgba(0,0,0,.5);border-radius:var(--r);padding:12px 20px;text-align:center">
+          <div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:4px">检测到设备</div>
+          <div style="font-size:17px;font-weight:600;color:#fff">💻 MacBook Pro</div>
+          <div style="font-size:13px;color:rgba(255,255,255,.6);margin-top:4px;font-family:var(--font-mono)">relay.hellobug.dev · 端口 7890</div>
+        </div>
+      </div>
+
+      <div style="position:relative;z-index:10;padding:24px 32px 40px;display:flex;flex-direction:column;gap:10px">
+        <button class="btn btn-primary" style="font-size:17px;border-radius:var(--r-lg)">继续配对</button>
+        <button style="color:rgba(255,255,255,.6);font-size:15px;background:none;border:none;cursor:pointer;padding:8px">重新扫描</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.querySelector('.theme-toggle').textContent = isDark ? '🌙 深色' : '☀ 浅色';
+}
+</script>
+</body>
+</html>

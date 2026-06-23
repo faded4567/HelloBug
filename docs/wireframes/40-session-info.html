@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>40 · 会话信息面板</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+.stat-row {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--separator);
+}
+.stat-row:last-child { border-bottom: none; }
+.stat-label { font-size: 14px; color: var(--fg2); flex: 1; }
+.stat-value { font-size: 14px; color: var(--fg); font-family: var(--font-mono); }
+.file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg3);
+  border-radius: var(--r-sm);
+  padding: 3px 8px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--fg2);
+  margin: 2px 3px;
+}
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+
+  <!-- A: 运行中会话 -->
+  <div class="phone-label">40-A · 会话信息 — 运行中</div>
+  <div class="phone" style="position:relative;overflow:hidden">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <!-- 模糊背景 -->
+    <div style="background:var(--bg2);border-bottom:1px solid var(--separator);padding:10px 16px 8px;display:flex;align-items:center;gap:8px;filter:blur(1px);flex-shrink:0">
+      <span style="font-size:17px;font-weight:600">HelloBug</span>
+      <div style="width:8px;height:8px;border-radius:50%;background:var(--green)"></div>
+    </div>
+    <div class="chat-area" style="filter:blur(2px);flex:1;overflow:hidden">
+      <div class="msg ai"><div class="bubble">分析 router.dart 缺失的路由…</div></div>
+      <div class="msg user"><div class="bubble">好的，继续</div></div>
+    </div>
+    <!-- Sheet -->
+    <div class="sheet-overlay"></div>
+    <div class="sheet" style="padding-bottom:40px">
+      <div class="sheet-handle"></div>
+      <div style="display:flex;align-items:center;padding:0 16px 14px">
+        <div style="font-size:17px;font-weight:600;flex:1">会话信息</div>
+        <button style="color:var(--tint);font-size:15px;background:none;border:none;cursor:pointer">完成</button>
+      </div>
+
+      <!-- 状态 -->
+      <div style="display:flex;align-items:center;gap:10px;padding:0 16px 14px">
+        <div style="width:10px;height:10px;border-radius:50%;background:var(--green)"></div>
+        <span style="font-size:15px;font-weight:600">HelloBug</span>
+        <span class="pill-label green" style="font-size:11px">运行中</span>
+        <div style="flex:1"></div>
+        <span style="font-size:12px;color:var(--fg3)">18 分钟</span>
+      </div>
+
+      <div style="background:var(--bg2);border-radius:var(--r);margin:0 0 12px">
+        <div class="stat-row"><span class="stat-label">模型</span><span class="stat-value" style="font-family:var(--font-ui);font-size:13px">claude-sonnet-4-5</span></div>
+        <div class="stat-row"><span class="stat-label">设备</span><span class="stat-value" style="font-family:var(--font-ui)">💻 MacBook Pro</span></div>
+        <div class="stat-row"><span class="stat-label">输入 Token</span><span class="stat-value">12,480</span></div>
+        <div class="stat-row"><span class="stat-label">输出 Token</span><span class="stat-value">3,214</span></div>
+        <div class="stat-row"><span class="stat-label">工具调用</span><span class="stat-value">7 次</span></div>
+      </div>
+
+      <!-- 涉及文件 -->
+      <div style="font-size:12px;color:var(--fg2);padding:0 0 8px;font-weight:600;text-transform:uppercase;letter-spacing:.04em">涉及文件</div>
+      <div style="display:flex;flex-wrap:wrap;margin:-2px -3px">
+        <div class="file-chip">📄 router.dart</div>
+        <div class="file-chip">📄 chat_page.dart</div>
+        <div class="file-chip">📄 main.dart</div>
+      </div>
+
+      <div style="margin-top:14px;display:flex;gap:8px">
+        <button class="btn" style="flex:1;font-size:13px">复制会话 ID</button>
+        <button class="btn" style="flex:1;font-size:13px;color:var(--red);border-color:var(--red)">终止会话</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- B: 已完成会话 -->
+  <div class="phone-label">40-B · 会话信息 — 已完成</div>
+  <div class="phone" style="position:relative;overflow:hidden">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div style="background:var(--bg2);border-bottom:1px solid var(--separator);padding:10px 16px 8px;display:flex;align-items:center;gap:8px;filter:blur(1px);flex-shrink:0">
+      <span style="font-size:17px;font-weight:600">api-server</span>
+      <div style="width:8px;height:8px;border-radius:50%;background:var(--fg3)"></div>
+    </div>
+    <div class="chat-area" style="filter:blur(2px);flex:1;overflow:hidden">
+      <div class="msg ai"><div class="bubble">已完成所有修改，共写入 3 个文件。</div></div>
+    </div>
+    <div class="sheet-overlay"></div>
+    <div class="sheet" style="padding-bottom:40px">
+      <div class="sheet-handle"></div>
+      <div style="display:flex;align-items:center;padding:0 16px 14px">
+        <div style="font-size:17px;font-weight:600;flex:1">会话信息</div>
+        <button style="color:var(--tint);font-size:15px;background:none;border:none;cursor:pointer">完成</button>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;padding:0 16px 14px">
+        <div style="width:10px;height:10px;border-radius:50%;background:var(--fg3)"></div>
+        <span style="font-size:15px;font-weight:600">api-server</span>
+        <span class="pill-label" style="font-size:11px">已完成</span>
+        <div style="flex:1"></div>
+        <span style="font-size:12px;color:var(--fg3)">共 42 分钟</span>
+      </div>
+
+      <div style="background:var(--bg2);border-radius:var(--r);margin:0 0 12px">
+        <div class="stat-row"><span class="stat-label">模型</span><span class="stat-value" style="font-family:var(--font-ui);font-size:13px">claude-opus-4</span></div>
+        <div class="stat-row"><span class="stat-label">设备</span><span class="stat-value" style="font-family:var(--font-ui)">💻 MacBook Pro</span></div>
+        <div class="stat-row"><span class="stat-label">输入 Token</span><span class="stat-value">38,920</span></div>
+        <div class="stat-row"><span class="stat-label">输出 Token</span><span class="stat-value">9,741</span></div>
+        <div class="stat-row"><span class="stat-label">工具调用</span><span class="stat-value">23 次</span></div>
+        <div class="stat-row"><span class="stat-label">写入文件</span><span class="stat-value">3 个</span></div>
+      </div>
+
+      <div style="font-size:12px;color:var(--fg2);padding:0 0 8px;font-weight:600;text-transform:uppercase;letter-spacing:.04em">涉及文件</div>
+      <div style="display:flex;flex-wrap:wrap;margin:-2px -3px">
+        <div class="file-chip">📄 server.ts</div>
+        <div class="file-chip">📄 routes.ts</div>
+        <div class="file-chip">📄 middleware.ts</div>
+        <div class="file-chip">📄 package.json</div>
+      </div>
+
+      <div style="margin-top:14px;display:flex;gap:8px">
+        <button class="btn" style="flex:1;font-size:13px">复制会话 ID</button>
+        <button class="btn btn-primary" style="flex:1;font-size:13px">查看历史</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.querySelector('.theme-toggle').textContent = isDark ? '🌙 深色' : '☀ 浅色';
+}
+</script>
+</body>
+</html>

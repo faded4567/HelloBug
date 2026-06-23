@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>27 · 历史列表</title>
+<link rel="stylesheet" href="_common.css">
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+  <div class="phone-label">27 · 历史列表</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+
+    <div class="nav">
+      <div class="nav-back">
+        <svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 1L1 9l7 8"/></svg>
+        会话
+      </div>
+      <div class="nav-title">操作历史</div>
+      <div class="nav-right" style="font-size:16px">筛选</div>
+    </div>
+
+    <!-- 统计条 -->
+    <div style="display:flex;padding:12px 16px;gap:0;border-bottom:1px solid var(--separator)">
+      <div style="flex:1;text-align:center;border-right:1px solid var(--separator)">
+        <div style="font-size:22px;font-weight:700;color:var(--fg)">47</div>
+        <div style="font-size:11px;color:var(--fg2);margin-top:2px">操作总数</div>
+      </div>
+      <div style="flex:1;text-align:center;border-right:1px solid var(--separator)">
+        <div style="font-size:22px;font-weight:700;color:var(--add-fg)">+284</div>
+        <div style="font-size:11px;color:var(--fg2);margin-top:2px">新增行</div>
+      </div>
+      <div style="flex:1;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:var(--del-fg)">−91</div>
+        <div style="font-size:11px;color:var(--fg2);margin-top:2px">删除行</div>
+      </div>
+    </div>
+
+    <div class="screen-body" style="padding-bottom:32px">
+      <div class="section-header">今天</div>
+
+      <!-- 历史条目 -->
+      <div class="card">
+        <div class="card-row" style="gap:12px;cursor:pointer">
+          <div style="width:36px;height:36px;border-radius:10px;background:rgba(52,199,89,.15);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">📝</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px;font-weight:600">WriteFile</div>
+            <div style="font-size:12px;color:var(--fg2);margin-top:2px;font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">app/lib/router.dart</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
+            <span style="font-size:11px;color:var(--add-fg)">+34</span>
+            <span style="font-size:11px;color:var(--fg3)">14:32</span>
+          </div>
+          <span style="color:var(--fg3);font-size:18px">›</span>
+        </div>
+        <div class="card-row" style="gap:12px;cursor:pointer">
+          <div style="width:36px;height:36px;border-radius:10px;background:rgba(255,149,0,.15);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🔧</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px;font-weight:600">Bash</div>
+            <div style="font-size:12px;color:var(--fg2);margin-top:2px;font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">flutter test lib/router_test.dart</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
+            <span class="pill-label green" style="font-size:10px">通过</span>
+            <span style="font-size:11px;color:var(--fg3)">14:35</span>
+          </div>
+          <span style="color:var(--fg3);font-size:18px">›</span>
+        </div>
+        <div class="card-row" style="gap:12px;cursor:pointer">
+          <div style="width:36px;height:36px;border-radius:10px;background:rgba(10,132,255,.15);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">📖</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px;font-weight:600">ReadFile</div>
+            <div style="font-size:12px;color:var(--fg2);margin-top:2px;font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">app/lib/screens/chat_screen.dart</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
+            <span style="font-size:11px;color:var(--fg3)">1.2 KB</span>
+            <span style="font-size:11px;color:var(--fg3)">14:30</span>
+          </div>
+          <span style="color:var(--fg3);font-size:18px">›</span>
+        </div>
+        <div class="card-row" style="gap:12px;cursor:pointer">
+          <div style="width:36px;height:36px;border-radius:10px;background:rgba(255,59,48,.12);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">⚠️</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px;font-weight:600">Bash <span style="color:var(--red);font-size:12px">— 被拒绝</span></div>
+            <div style="font-size:12px;color:var(--fg2);margin-top:2px;font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">rm -rf build/</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
+            <span class="pill-label" style="background:rgba(255,59,48,.12);color:var(--red);font-size:10px">已拒绝</span>
+            <span style="font-size:11px;color:var(--fg3)">14:28</span>
+          </div>
+          <span style="color:var(--fg3);font-size:18px">›</span>
+        </div>
+      </div>
+
+      <div class="section-header">昨天</div>
+
+      <div class="card">
+        <div class="card-row" style="gap:12px;cursor:pointer">
+          <div style="width:36px;height:36px;border-radius:10px;background:rgba(52,199,89,.15);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">📝</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px;font-weight:600">WriteFile</div>
+            <div style="font-size:12px;color:var(--fg2);margin-top:2px;font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">docs/protocol.md</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
+            <span style="font-size:11px;color:var(--add-fg)">+12</span>
+            <span style="font-size:11px;color:var(--fg3)">11:04</span>
+          </div>
+          <span style="color:var(--fg3);font-size:18px">›</span>
+        </div>
+        <div class="card-row" style="gap:12px;cursor:pointer">
+          <div style="width:36px;height:36px;border-radius:10px;background:rgba(255,149,0,.15);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🔧</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px;font-weight:600">Bash</div>
+            <div style="font-size:12px;color:var(--fg2);margin-top:2px;font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">dart format .</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
+            <span class="pill-label green" style="font-size:10px">通过</span>
+            <span style="font-size:11px;color:var(--fg3)">11:02</span>
+          </div>
+          <span style="color:var(--fg3);font-size:18px">›</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab Bar -->
+    <div class="tab-bar">
+      <div class="tab-item"><div class="tab-icon">💻</div><div>设备</div></div>
+      <div class="tab-item"><div class="tab-icon">💬</div><div>会话</div></div>
+      <div class="tab-item active"><div class="tab-icon">🕐</div><div>历史</div></div>
+      <div class="tab-item"><div class="tab-icon">⚙️</div><div>设置</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.querySelector('.theme-toggle').textContent = isDark ? '🌙 深色' : '☀ 浅色';
+}
+</script>
+</body>
+</html>

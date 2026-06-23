@@ -9,12 +9,13 @@ class SecureStore {
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
 
-  static const keyEd25519Private  = 'device.ed25519.private';
-  static const keyX25519Private   = 'device.x25519.private';
-  static const keyServerPin       = 'server.pin';
-  static const keyJwt             = 'app.jwt';
-  static const keyPairedDeviceId  = 'paired.device_id';
-  static const keyServerUrl       = 'server.url';
+  static const keyEd25519Private = 'device.ed25519.private';
+  static const keyX25519Private = 'device.x25519.private';
+  static const keyServerPin = 'server.pin';
+  static const keyJwt = 'app.jwt';
+  static const keyPairedDeviceId = 'paired.device_id';
+  static const keyServerUrl = 'server.url';
+  static const keyAppInstanceId = 'app.instance_id';
 
   static Future<void> write(String key, String value) =>
       _s.write(key: key, value: value);

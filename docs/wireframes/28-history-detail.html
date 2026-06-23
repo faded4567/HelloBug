@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>28 · 历史详情</title>
+<link rel="stylesheet" href="_common.css">
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+
+  <!-- WriteFile 详情 -->
+  <div class="phone-label">28-A · 历史详情 — WriteFile</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nav-back">
+        <svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 1L1 9l7 8"/></svg>
+        历史
+      </div>
+      <div class="nav-title">操作详情</div>
+      <div class="nav-right" style="font-size:16px">在 Diff 中查看</div>
+    </div>
+
+    <div class="screen-body" style="padding-bottom:32px">
+      <!-- 操作头 -->
+      <div style="display:flex;align-items:center;gap:14px;padding:16px 0 12px">
+        <div style="width:48px;height:48px;border-radius:14px;background:rgba(52,199,89,.15);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">📝</div>
+        <div>
+          <div style="font-size:20px;font-weight:700">WriteFile</div>
+          <div style="font-size:13px;color:var(--fg2);margin-top:2px">今天 14:32 · HelloBug · Claude Code</div>
+        </div>
+      </div>
+
+      <!-- 元信息 -->
+      <div class="card">
+        <div class="card-row">
+          <span style="color:var(--fg2);font-size:14px;width:72px;flex-shrink:0">文件</span>
+          <span style="font-family:var(--font-mono);font-size:13px;color:var(--tint)">app/lib/router.dart</span>
+        </div>
+        <div class="card-row">
+          <span style="color:var(--fg2);font-size:14px;width:72px;flex-shrink:0">变更</span>
+          <span style="font-size:14px"><span style="color:var(--add-fg)">+34 行</span> <span style="color:var(--fg3)">·</span> <span style="color:var(--del-fg)">−12 行</span></span>
+        </div>
+        <div class="card-row">
+          <span style="color:var(--fg2);font-size:14px;width:72px;flex-shrink:0">状态</span>
+          <span class="pill-label green">已应用</span>
+        </div>
+        <div class="card-row">
+          <span style="color:var(--fg2);font-size:14px;width:72px;flex-shrink:0">耗时</span>
+          <span style="font-size:14px">1.2 s</span>
+        </div>
+      </div>
+
+      <!-- AI 意图说明 -->
+      <div class="section-header">操作说明</div>
+      <div style="background:var(--bg2);border-radius:var(--r);padding:14px 16px;font-size:14px;color:var(--fg2);line-height:1.6">
+        重构 router.dart，将所有路由定义迁移至 GoRouter 模式，补全 /settings/security、/settings/notifications、/devices/:id 三条缺失路由入口。
+      </div>
+
+      <!-- Diff 预览 -->
+      <div class="section-header">变更预览</div>
+      <div class="diff-card">
+        <div class="diff-card-header">
+          <span style="font-family:var(--font-mono);font-size:12px;color:var(--fg2)">app/lib/router.dart</span>
+          <span class="diff-stat"><span class="add">+34</span> <span class="del">−12</span></span>
+        </div>
+        <div class="diff-card-body">
+          <pre><span class="diff-line-ctx"> import 'package:go_router/go_router.dart';</span>
+<span class="diff-line-del">-final router = Router(routes: [</span>
+<span class="diff-line-add">+final router = GoRouter(routes: [</span>
+<span class="diff-line-ctx">   GoRoute(path: '/onboarding', ...),</span>
+<span class="diff-line-add">+  GoRoute(path: '/devices/:id', ...),</span>
+<span class="diff-line-add">+  GoRoute(path: '/settings/security', ...),</span>
+<span class="diff-line-add">+  GoRoute(path: '/settings/notifications', ...),</span>
+<span class="diff-line-ctx"> ]);</span></pre>
+        </div>
+        <button class="diff-open-btn">在 Diff 全屏中查看 →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bash 详情（含被拒绝状态） -->
+  <div class="phone-label">28-B · 历史详情 — Bash 被拒绝</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nav-back">
+        <svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 1L1 9l7 8"/></svg>
+        历史
+      </div>
+      <div class="nav-title">操作详情</div>
+    </div>
+
+    <div class="banner error">此操作已被危险规则拒绝</div>
+
+    <div class="screen-body" style="padding-bottom:32px">
+      <div style="display:flex;align-items:center;gap:14px;padding:16px 0 12px">
+        <div style="width:48px;height:48px;border-radius:14px;background:rgba(255,59,48,.12);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">🔧</div>
+        <div>
+          <div style="font-size:20px;font-weight:700">Bash</div>
+          <div style="font-size:13px;color:var(--fg2);margin-top:2px">今天 14:28 · HelloBug · Claude Code</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-row">
+          <span style="color:var(--fg2);font-size:14px;width:72px;flex-shrink:0">命令</span>
+          <code style="font-family:var(--font-mono);font-size:13px;color:var(--red)">rm -rf build/</code>
+        </div>
+        <div class="card-row">
+          <span style="color:var(--fg2);font-size:14px;width:72px;flex-shrink:0">状态</span>
+          <span class="pill-label" style="background:rgba(255,59,48,.12);color:var(--red)">已拒绝</span>
+        </div>
+        <div class="card-row">
+          <span style="color:var(--fg2);font-size:14px;width:72px;flex-shrink:0">触发规则</span>
+          <span style="font-size:13px;color:var(--orange)">禁止 rm -rf</span>
+        </div>
+      </div>
+
+      <div class="section-header">拒绝原因</div>
+      <div style="background:rgba(255,59,48,.08);border:1px solid rgba(255,59,48,.2);border-radius:var(--r);padding:14px 16px;font-size:14px;color:var(--fg2);line-height:1.6">
+        命令匹配危险规则「禁止递归删除」，已自动阻止。若确实需要清理 build 目录，请在设置中临时解除此规则，或手动在终端执行。
+      </div>
+
+      <div style="margin-top:16px">
+        <button class="btn btn-secondary" style="width:100%;font-size:15px">查看危险规则设置</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.querySelector('.theme-toggle').textContent = isDark ? '🌙 深色' : '☀ 浅色';
+}
+</script>
+</body>
+</html>

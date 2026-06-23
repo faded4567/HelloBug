@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>42 · Tab 导航（3 Tab 重设计）</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+.seg-ctrl{display:flex;background:var(--bg3);border-radius:var(--r-sm);padding:2px;margin:8px 16px 0;flex-shrink:0}
+.seg-item{flex:1;text-align:center;padding:5px 0;font-size:13px;border-radius:calc(var(--r-sm) - 2px);color:var(--fg2)}
+.seg-item.active{background:var(--bg2);color:var(--fg);font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.fab{position:absolute;bottom:72px;right:16px;width:50px;height:50px;border-radius:50%;background:var(--tint);display:flex;align-items:center;justify-content:center;font-size:24px;color:#fff;box-shadow:0 4px 12px rgba(0,122,255,.4)}
+.sess-row{display:flex;align-items:flex-start;padding:12px 16px;gap:12px;border-bottom:1px solid var(--separator)}
+.sess-row:last-child{border-bottom:none}
+.chev{opacity:.3}
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+
+  <!-- A: 工作区 Tab -->
+  <div class="phone-label">42-A · 工作区 Tab</div>
+  <div class="phone" style="position:relative;overflow:hidden">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div class="nav">
+      <div style="display:flex;align-items:center;gap:4px;cursor:pointer">
+        <span style="font-size:17px;font-weight:600">HelloBug</span>
+        <svg viewBox="0 0 10 6" width="10" height="6" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 1l4 4 4-4"/></svg>
+      </div>
+      <button style="color:var(--tint);background:none;border:none;font-size:15px;cursor:pointer">⚙</button>
+    </div>
+    <div class="seg-ctrl">
+      <div class="seg-item active">会话</div>
+      <div class="seg-item">历史</div>
+    </div>
+    <div style="flex:1;overflow:hidden">
+      <div class="sess-row">
+        <div style="width:9px;height:9px;border-radius:50%;background:var(--green);margin-top:4px;flex-shrink:0"></div>
+        <div style="flex:1">
+          <div style="font-size:15px;font-weight:500">补全 router.dart 路由</div>
+          <div style="font-size:12px;color:var(--fg2);margin-top:2px">claude-sonnet · 18 分钟</div>
+        </div>
+        <svg class="chev" viewBox="0 0 8 14" width="8" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l6 6-6 6"/></svg>
+      </div>
+      <div class="sess-row">
+        <div style="width:9px;height:9px;border-radius:50%;background:var(--separator);margin-top:4px;flex-shrink:0"></div>
+        <div style="flex:1">
+          <div style="font-size:15px">修复登录页样式</div>
+          <div style="font-size:12px;color:var(--fg2);margin-top:2px">claude-opus · 昨天</div>
+        </div>
+        <svg class="chev" viewBox="0 0 8 14" width="8" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l6 6-6 6"/></svg>
+      </div>
+    </div>
+    <div class="fab">＋</div>
+    <div class="tab-bar">
+      <div class="tab-item active">📂<span>工作区</span></div>
+      <div class="tab-item">💻<span>设备</span></div>
+      <div class="tab-item">⚙️<span>设置</span></div>
+    </div>
+  </div>
+
+  <!-- B: 设备 Tab -->
+  <div class="phone-label">42-B · 设备 Tab</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nav-title">设备</div>
+      <button style="color:var(--tint);background:none;border:none;font-size:15px;cursor:pointer">添加</button>
+    </div>
+    <div class="screen-body" style="padding:0">
+      <div class="section-header">已配对设备</div>
+      <div class="list-group">
+        <div class="list-item">
+          <span style="font-size:20px;margin-right:6px">💻</span>
+          <div style="flex:1">
+            <div style="font-size:15px">MacBook Pro</div>
+            <div style="font-size:12px;color:var(--fg2);margin-top:2px">2 个工作区</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:5px">
+            <div style="width:7px;height:7px;border-radius:50%;background:var(--green)"></div>
+            <span style="font-size:12px;color:var(--green)">在线</span>
+          </div>
+        </div>
+        <div class="list-item">
+          <span style="font-size:20px;margin-right:6px">🖥</span>
+          <div style="flex:1">
+            <div style="font-size:15px">Linux Server</div>
+            <div style="font-size:12px;color:var(--fg2);margin-top:2px">1 个工作区</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:5px">
+            <div style="width:7px;height:7px;border-radius:50%;background:var(--separator)"></div>
+            <span style="font-size:12px;color:var(--fg3)">离线</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tab-bar">
+      <div class="tab-item">📂<span>工作区</span></div>
+      <div class="tab-item active">💻<span>设备</span></div>
+      <div class="tab-item">⚙️<span>设置</span></div>
+    </div>
+  </div>
+
+  <!-- C: 设置 Tab -->
+  <div class="phone-label">42-C · 设置 Tab</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div class="nav"><div class="nav-title">设置</div></div>
+    <div class="screen-body" style="padding:0">
+      <div class="section-header">通用</div>
+      <div class="list-group">
+        <div class="list-item"><span class="list-label">🌐 中继服务器</span><svg class="chev" viewBox="0 0 8 14" width="8" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l6 6-6 6"/></svg></div>
+        <div class="list-item"><span class="list-label">🎨 外观</span><svg class="chev" viewBox="0 0 8 14" width="8" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l6 6-6 6"/></svg></div>
+        <div class="list-item"><span class="list-label">🔒 App 锁定</span><svg class="chev" viewBox="0 0 8 14" width="8" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l6 6-6 6"/></svg></div>
+        <div class="list-item"><span class="list-label">🔔 通知</span><svg class="chev" viewBox="0 0 8 14" width="8" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l6 6-6 6"/></svg></div>
+      </div>
+      <div class="section-header">危险</div>
+      <div class="list-group">
+        <div class="list-item" style="justify-content:center"><span style="color:var(--red);font-size:15px">清除所有数据</span></div>
+      </div>
+      <div class="section-header">关于</div>
+      <div class="list-group">
+        <div class="list-item"><span class="list-label">版本</span><span style="color:var(--fg2);font-size:14px">1.0.0 (42)</span></div>
+      </div>
+    </div>
+    <div class="tab-bar">
+      <div class="tab-item">📂<span>工作区</span></div>
+      <div class="tab-item">💻<span>设备</span></div>
+      <div class="tab-item active">⚙️<span>设置</span></div>
+    </div>
+  </div>
+
+</div>
+<script>
+function toggleTheme(){const h=document.documentElement,d=h.getAttribute('data-theme')==='dark';h.setAttribute('data-theme',d?'light':'dark');document.querySelector('.theme-toggle').textContent=d?'🌙 深色':'☀ 浅色'}
+</script>
+</body>
+</html>

@@ -9,11 +9,11 @@ export const OptionalNullableStringSchema = z.string().min(1).nullable().optiona
 
 export const EnvelopeSchema = z.object({
   from: StringIdSchema,
-  to: StringIdSchema,
+  to: z.string(),
   session_id: z.string(),
   seq: SequenceSchema,
   ts: TimestampMsSchema,
-  sig: z.string().min(1),
+  sig: z.string(),
   ciphertext: z.string().min(1),
 });
 
@@ -34,4 +34,3 @@ export function validateEnvelope(raw: unknown): Envelope {
 export function validateInnerMessage(raw: unknown): InnerMessage {
   return InnerMessageSchema.parse(raw);
 }
-

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>26 · 会话搜索</title>
+<link rel="stylesheet" href="_common.css">
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+
+  <!-- 状态：空搜索（初始） -->
+  <div class="phone-label">26-A · 会话搜索 — 初始</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+
+    <!-- 搜索栏 + 取消 -->
+    <div style="padding:10px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--separator)">
+      <div style="flex:1;display:flex;align-items:center;gap:8px;background:var(--bg3);border-radius:10px;padding:8px 12px">
+        <span style="color:var(--fg3);font-size:14px">🔍</span>
+        <span style="color:var(--fg3);font-size:15px">搜索会话…</span>
+      </div>
+      <button style="color:var(--tint);font-size:17px;background:none;border:none;cursor:pointer">取消</button>
+    </div>
+
+    <!-- 过滤 chips -->
+    <div style="padding:10px 16px;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--separator)">
+      <div style="white-space:nowrap;padding:5px 14px;border-radius:var(--r-pill);background:var(--tint);color:#fff;font-size:13px;font-weight:600">全部</div>
+      <div style="white-space:nowrap;padding:5px 14px;border-radius:var(--r-pill);background:var(--bg3);color:var(--fg2);font-size:13px">进行中</div>
+      <div style="white-space:nowrap;padding:5px 14px;border-radius:var(--r-pill);background:var(--bg3);color:var(--fg2);font-size:13px">已完成</div>
+      <div style="white-space:nowrap;padding:5px 14px;border-radius:var(--r-pill);background:var(--bg3);color:var(--fg2);font-size:13px">已关闭</div>
+      <div style="white-space:nowrap;padding:5px 14px;border-radius:var(--r-pill);background:var(--bg3);color:var(--fg2);font-size:13px">Claude Code</div>
+    </div>
+
+    <div class="screen-body" style="padding-bottom:32px">
+      <div class="section-header">最近搜索</div>
+      <div class="list-group">
+        <div class="list-item">
+          <span style="color:var(--fg3);font-size:16px">🕐</span>
+          <span class="list-label" style="font-family:var(--font-mono);font-size:14px">router 重构</span>
+          <span style="color:var(--fg3);font-size:18px">×</span>
+        </div>
+        <div class="list-item">
+          <span style="color:var(--fg3);font-size:16px">🕐</span>
+          <span class="list-label" style="font-family:var(--font-mono);font-size:14px">analytics-svc</span>
+          <span style="color:var(--fg3);font-size:18px">×</span>
+        </div>
+      </div>
+
+      <div class="section-header">按设备筛选</div>
+      <div class="list-group">
+        <div class="list-item">
+          <span style="font-size:20px">💻</span>
+          <span class="list-label">MacBook Pro</span>
+          <span class="list-value">8</span>
+          <span class="list-arrow"></span>
+        </div>
+        <div class="list-item">
+          <span style="font-size:20px">🖥</span>
+          <span class="list-label">Mac Studio</span>
+          <span class="list-value">3</span>
+          <span class="list-arrow"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 状态：搜索结果 -->
+  <div class="phone-label">26-B · 会话搜索 — 有结果</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div style="padding:10px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--separator)">
+      <div style="flex:1;display:flex;align-items:center;gap:8px;background:var(--bg3);border-radius:10px;padding:8px 12px">
+        <span style="color:var(--fg3);font-size:14px">🔍</span>
+        <span style="font-size:15px;color:var(--fg)">router</span>
+        <span style="margin-left:auto;color:var(--fg3);font-size:16px">×</span>
+      </div>
+      <button style="color:var(--tint);font-size:17px;background:none;border:none;cursor:pointer">取消</button>
+    </div>
+    <div style="padding:6px 16px 2px;font-size:13px;color:var(--fg2)">找到 3 个会话</div>
+    <div class="screen-body" style="padding-bottom:32px">
+      <div class="session-item">
+        <div class="session-dot active"></div>
+        <div class="session-info">
+          <div class="session-name">HelloBug · <mark style="background:rgba(10,132,255,.25);color:var(--tint);border-radius:3px;padding:0 2px">router</mark> 重构</div>
+          <div class="session-preview">📝 修改 router.dart (+34 −12)</div>
+          <div class="session-meta">
+            <span class="session-time">3 分钟前</span>
+            <span class="session-badge active">进行中</span>
+          </div>
+        </div>
+      </div>
+      <div class="session-item">
+        <div class="session-dot done" style="background:var(--green);box-shadow:0 0 5px var(--green)"></div>
+        <div class="session-info">
+          <div class="session-name">api-gateway · <mark style="background:rgba(10,132,255,.25);color:var(--tint);border-radius:3px;padding:0 2px">router</mark> 模块</div>
+          <div class="session-preview">✅ 重构完成，测试通过</div>
+          <div class="session-meta">
+            <span class="session-time">2 天前</span>
+            <span class="session-badge" style="background:rgba(52,199,89,.12);color:var(--green)">已完成</span>
+          </div>
+        </div>
+      </div>
+      <div class="session-item">
+        <div class="session-dot done"></div>
+        <div class="session-info">
+          <div class="session-name">backend-mono · <mark style="background:rgba(10,132,255,.25);color:var(--tint);border-radius:3px;padding:0 2px">router</mark> 优化</div>
+          <div class="session-preview">帮我分析一下路由层的性能瓶颈</div>
+          <div class="session-meta">
+            <span class="session-time">上周</span>
+            <span class="session-badge" style="background:var(--bg3);color:var(--fg3)">已关闭</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 状态：无结果 -->
+  <div class="phone-label">26-C · 会话搜索 — 无结果</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div style="padding:10px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--separator)">
+      <div style="flex:1;display:flex;align-items:center;gap:8px;background:var(--bg3);border-radius:10px;padding:8px 12px">
+        <span style="color:var(--fg3);font-size:14px">🔍</span>
+        <span style="font-size:15px;color:var(--fg)">xyznonexistent</span>
+        <span style="margin-left:auto;color:var(--fg3);font-size:16px">×</span>
+      </div>
+      <button style="color:var(--tint);font-size:17px;background:none;border:none;cursor:pointer">取消</button>
+    </div>
+    <div class="screen-body" style="padding-bottom:32px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:400px;gap:12px">
+      <span style="font-size:48px">🔍</span>
+      <div style="font-size:17px;font-weight:600">无匹配会话</div>
+      <div style="font-size:14px;color:var(--fg2);text-align:center;max-width:240px;line-height:1.5">没有找到包含 "xyznonexistent" 的会话，试试其他关键词</div>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.querySelector('.theme-toggle').textContent = isDark ? '🌙 深色' : '☀ 浅色';
+}
+</script>
+</body>
+</html>

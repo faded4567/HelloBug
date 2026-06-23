@@ -7,11 +7,12 @@ import type { DeviceIdentity } from "../crypto/keys.js";
 import { getSas } from "./code.js";
 
 type DevicePairMessage = Extract<Message, { type: "device.pair" }>;
+type DevicePairSasMessage = Extract<Message, { type: "device.pair.sas" }>;
 
 export function buildPairingSasMessage(
   identity: DeviceIdentity,
   payload: DevicePairMessage["payload"],
-): Extract<Message, { type: "device.pair.sas" }> {
+): DevicePairSasMessage {
   return {
     v: 1,
     type: "device.pair.sas",
@@ -23,6 +24,10 @@ export function buildPairingSasMessage(
       os: platform(),
     },
   };
+}
+
+export function formatPairingSasLine(message: DevicePairSasMessage): string {
+  return message.payload.sas.join(" ");
 }
 
 function derivePairingSeed(

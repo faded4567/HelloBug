@@ -1,9 +1,10 @@
 # HelloBug — Codex 任务清单
 
+> 总任务完成状态以 `docs/app-remaining-work.md` 为准。
 > 本文件只包含 **Codex 负责的后端与基础设施任务**。
-> Flutter 前端由 Claude 负责，见 `docs/flutter-tasks.md`。
+> 整个 Flutter 客户端由 Claude 负责，见 `docs/flutter-tasks.md`。
 > 协议格式规范见 `docs/protocol.md`。
-> 更新：2026-06-22
+> 更新：2026-06-23
 
 ---
 

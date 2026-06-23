@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>48 · 配对码过期</title>
+<link rel="stylesheet" href="_common.css">
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+
+  <div class="phone-label">48 · 配对码过期</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg><svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg></div></div>
+
+    <div class="nav">
+      <button style="color:var(--tint);font-size:16px;background:none;border:none">‹ 返回</button>
+      <div class="nav-title">配对</div>
+      <div style="width:44px"></div>
+    </div>
+
+    <div class="screen-body" style="align-items:center;justify-content:center;gap:16px;padding:40px 28px;text-align:center">
+      <div style="font-size:56px">⏱️</div>
+      <div style="font-size:20px;font-weight:700">配对码已过期</div>
+      <div style="font-size:14px;color:var(--fg2);line-height:1.7">
+        二维码或配对码的有效期为 <b>5 分钟</b>，已超时失效。<br>
+        请在 Mac 端重新生成配对码。
+      </div>
+
+      <div style="width:100%;background:rgba(255,149,0,.1);border:1px solid rgba(255,149,0,.25);border-radius:var(--r);padding:12px 14px;margin-top:4px">
+        <div style="font-size:13px;color:var(--orange);line-height:1.6">
+          已输入的配对码：<br>
+          <span style="font-family:var(--font-mono);font-size:16px;letter-spacing:.15em;color:var(--fg3);text-decoration:line-through">ABCD-1234-EFGH</span>
+        </div>
+      </div>
+
+      <div style="margin-top:8px;font-size:13px;color:var(--fg3);line-height:1.8;text-align:left;width:100%">
+        在 Mac 上执行：<br>
+        <code style="font-family:var(--font-mono);color:var(--tint);font-size:12px">hellobug pair --renew</code>
+      </div>
+
+      <button class="btn btn-primary" style="width:100%;margin-top:8px">重新扫码</button>
+      <button style="color:var(--tint);font-size:14px;padding:4px">手动输入新配对码</button>
+    </div>
+  </div>
+
+</div>
+<script>
+function toggleTheme() {
+  const h = document.documentElement, d = h.getAttribute('data-theme') === 'dark';
+  h.setAttribute('data-theme', d ? 'light' : 'dark');
+  document.querySelector('.theme-toggle').textContent = d ? '🌙 深色' : '☀ 浅色';
+}
+</script>
+</body>
+</html>

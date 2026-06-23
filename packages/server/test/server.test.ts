@@ -1,9 +1,14 @@
 import type { AddressInfo } from "node:net";
+import { mkdtemp } from "node:fs/promises";
+import { Buffer } from "node:buffer";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 import { WebSocket } from "ws";
 
 import { buildServer } from "../src/app.js";
+import { ServerStateStore } from "../src/lib/state-store.js";
 import { RelayReplayBuffer } from "../src/relay/buffer.js";
 
 function createMessageReader(socket: WebSocket) {
@@ -69,6 +74,50 @@ function closeSocket(socket: WebSocket): Promise<void> {
   });
 }
 
+function encodeEnvelope(
+  message: Record<string, unknown>,
+  options: {
+    from?: string;
+    to?: string;
+    sessionId?: string;
+    seq?: number;
+  } = {},
+): string {
+  return JSON.stringify({
+    from: options.from ?? "app-device",
+    to: options.to ?? "",
+    session_id: options.sessionId ?? "",
+    seq: options.seq ?? 1,
+    ts: Date.now(),
+    sig: "",
+    ciphertext: Buffer.from(JSON.stringify(message), "utf8").toString("base64url"),
+  });
+}
+
+function decodeEnvelope(raw: any): { envelope: any; message: any } {
+  return {
+    envelope: raw,
+    message: JSON.parse(Buffer.from(raw.ciphertext, "base64url").toString("utf8")),
+  };
+}
+
+async function nextEnvelopeMessage(
+  reader: ReturnType<typeof createMessageReader>,
+  type?: string,
+): Promise<{ envelope: any; message: any }> {
+  while (true) {
+    const raw = await reader.next();
+    if (!raw || typeof raw !== "object" || !("ciphertext" in raw)) {
+      continue;
+    }
+
+    const decoded = decodeEnvelope(raw);
+    if (!type || decoded.message.type === type) {
+      return decoded;
+    }
+  }
+}
+
 describe("server skeleton", () => {
   it("responds to /health", async () => {
     const { app } = await buildServer();
@@ -79,6 +128,35 @@ describe("server skeleton", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ ok: true });
+    await app.close();
+  });
+
+  it("issues bootstrap tokens from the admin route when enabled", async () => {
+    const { app } = await buildServer({
+      bootstrapAdminToken: "debug-secret",
+    });
+
+    const unauthorized = await app.inject({
+      method: "POST",
+      url: "/v1/admin/bootstrap-token",
+    });
+    expect(unauthorized.statusCode).toBe(401);
+
+    const issued = await app.inject({
+      method: "POST",
+      url: "/v1/admin/bootstrap-token",
+      headers: {
+        "x-admin-token": "debug-secret",
+      },
+      payload: {
+        ttl_ms: 60_000,
+      },
+    });
+
+    expect(issued.statusCode).toBe(201);
+    const body = issued.json();
+    expect(body.token).toBeTypeOf("string");
+    expect(body.expires_at).toBeGreaterThan(Date.now());
     await app.close();
   });
 
@@ -127,6 +205,125 @@ describe("server skeleton", () => {
 
     expect(second.statusCode).toBe(401);
     expect(second.json().reason).toBe("used");
+    await app.close();
+  });
+
+  it("keeps daemon registrations across server restarts", async () => {
+    const stateDir = await mkdtemp(join(tmpdir(), "hellobug-server-test-"));
+    const stateStore = new ServerStateStore(join(stateDir, "server-state.json"));
+
+    const first = await buildServer({
+      jwtSecret: "restart-secret",
+      stateStore,
+    });
+    const bootstrap = first.services.bootstrapTokens.issueToken();
+    await first.services.persistState();
+
+    const registered = await first.app.inject({
+      method: "POST",
+      url: "/v1/register",
+      payload: {
+        device_pub_key: "restart-device-pub-key",
+        bootstrap_token: bootstrap.token,
+      },
+    });
+
+    expect(registered.statusCode).toBe(201);
+    const daemonDevice = registered.json();
+    await first.app.close();
+
+    const second = await buildServer({
+      jwtSecret: "different-secret-that-should-not-apply",
+      stateStore,
+    });
+
+    await second.app.listen({ host: "127.0.0.1", port: 0 });
+    const address = second.app.server.address() as AddressInfo;
+    const relayUrl = `ws://127.0.0.1:${address.port}/v1/relay`;
+
+    const daemonSocket = new WebSocket(relayUrl);
+    const daemonMessages = createMessageReader(daemonSocket);
+    await waitForOpen(daemonSocket);
+    await daemonMessages.next("server.hello");
+
+    daemonSocket.send(
+      JSON.stringify({
+        type: "daemon.hello",
+        payload: {
+          device_id: daemonDevice.device_id,
+          daemon_version: "0.1.0",
+          supported_features: ["e2ee_noise_ik", "multi_session"],
+        },
+      }),
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(daemonSocket.readyState).toBe(WebSocket.OPEN);
+    expect(second.services.deviceRegistry.getDaemonDevice(daemonDevice.device_id)).toBeTruthy();
+
+    await closeSocket(daemonSocket);
+    await second.app.close();
+  });
+
+  it("stores push tokens for authenticated app devices", async () => {
+    const { app, services } = await buildServer({
+      jwtSecret: "push-token-secret",
+    });
+
+    await app.listen({ host: "127.0.0.1", port: 0 });
+    const address = app.server.address() as AddressInfo;
+    const relayUrl = `ws://127.0.0.1:${address.port}/v1/relay`;
+
+    const appDevice = services.deviceRegistry.registerAppDevice({
+      linkedDaemonId: "daemon-1",
+      appPubKey: "app-pub-key",
+      appEd25519PubKey: "app-ed25519-pub-key",
+      appDeviceName: "Test iPhone",
+    });
+    const jwt = await services.jwtManager.issue(appDevice.deviceId);
+    await services.persistState();
+
+    const appSocket = new WebSocket(relayUrl);
+    const appMessages = createMessageReader(appSocket);
+    await waitForOpen(appSocket);
+    await appMessages.next("server.hello");
+
+    appSocket.send(
+      encodeEnvelope({
+        v: 1,
+        id: "auth-attach-1",
+        type: "auth.attach",
+        payload: {
+          jwt: jwt.jwt,
+        },
+      }),
+    );
+
+    await nextEnvelopeMessage(appMessages, "auth.token");
+
+    appSocket.send(
+      encodeEnvelope({
+        v: 1,
+        id: "push-token-1",
+        type: "device.push_token",
+        payload: {
+          platform: "ios",
+          apns_token: "abcd1234",
+          manufacturer: null,
+          vendor_token: null,
+        },
+      }),
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(services.deviceRegistry.getAppDevice(appDevice.deviceId)).toMatchObject({
+      deviceId: appDevice.deviceId,
+      pushPlatform: "ios",
+      apnsToken: "abcd1234",
+    });
+
+    await closeSocket(appSocket);
     await app.close();
   });
 
@@ -472,6 +669,208 @@ describe("server skeleton", () => {
     expect(replayDone.payload.session_id).toBe("session-replay-1");
     expect(replayDone.payload.replayed_count).toBe(2);
     expect(replayDone.payload.current_seq).toBe(3);
+
+    await closeSocket(resumedSocket);
+    await closeSocket(daemonSocket);
+    await app.close();
+  });
+
+  it("bridges envelope-framed app traffic for pairing and replay resume", async () => {
+    const { app, services } = await buildServer();
+    const bootstrap = services.bootstrapTokens.issueToken();
+    const registered = await app.inject({
+      method: "POST",
+      url: "/v1/register",
+      payload: {
+        device_pub_key: "device-pub-key-envelope",
+        bootstrap_token: bootstrap.token,
+      },
+    });
+
+    expect(registered.statusCode).toBe(201);
+    const daemonDevice = registered.json();
+
+    await app.listen({ host: "127.0.0.1", port: 0 });
+    const address = app.server.address() as AddressInfo;
+    const relayUrl = `ws://127.0.0.1:${address.port}/v1/relay`;
+
+    const daemonSocket = new WebSocket(relayUrl);
+    const daemonMessages = createMessageReader(daemonSocket);
+    await waitForOpen(daemonSocket);
+    await daemonMessages.next("server.hello");
+
+    daemonSocket.send(
+      JSON.stringify({
+        type: "daemon.hello",
+        payload: {
+          device_id: daemonDevice.device_id,
+          daemon_version: "0.1.0",
+          supported_features: ["e2ee_noise_ik", "multi_session"],
+        },
+      }),
+    );
+    daemonSocket.send(
+      JSON.stringify({
+        type: "device.pair.ready",
+        payload: {
+          pairing_id: "pairing-envelope-1",
+          pairing_code: "771244",
+          expires_at: Date.now() + 30_000,
+        },
+      }),
+    );
+
+    const appSocket = new WebSocket(relayUrl);
+    const appMessages = createMessageReader(appSocket);
+    await waitForOpen(appSocket);
+    await appMessages.next("server.hello");
+
+    appSocket.send(
+      encodeEnvelope({
+        v: 1,
+        id: "pair-start-1",
+        type: "device.pair",
+        payload: {
+          pairing_code: "771244",
+          server_url: relayUrl,
+          app_pubkey: "app-pub-key-envelope",
+          app_ed25519_pubkey: "app-ed25519-pub-key-envelope",
+          app_device_name: "Envelope iPhone",
+        },
+      }),
+    );
+
+    const forwardedPair = await daemonMessages.next("device.pair");
+    expect(forwardedPair.payload.app_device_name).toBe("Envelope iPhone");
+
+    daemonSocket.send(
+      JSON.stringify({
+        type: "device.pair.sas",
+        payload: {
+          sas: ["🐢", "🪐", "🍵", "🎷", "🌙"],
+          daemon_pubkey: "daemon-pub-key",
+          daemon_ed25519_pubkey: "daemon-ed25519-pub-key",
+          machine_name: "Envelope-Mac",
+          os: "darwin",
+        },
+      }),
+    );
+
+    const sas = await nextEnvelopeMessage(appMessages, "device.pair.sas");
+    expect(sas.message.payload.machine_name).toBe("Envelope-Mac");
+    expect(sas.envelope.sig).toBe("");
+
+    appSocket.send(
+      encodeEnvelope({
+        v: 1,
+        id: "pair-confirm-1",
+        type: "device.pair.confirm",
+        payload: {
+          confirmed: true,
+        },
+      }),
+    );
+
+    await daemonMessages.next("device.pair.confirm");
+    const authToken = await nextEnvelopeMessage(appMessages, "auth.token");
+    const onlineStatus = await nextEnvelopeMessage(appMessages, "device.status");
+    expect(authToken.message.payload.jwt).toBeTypeOf("string");
+    expect(onlineStatus.message.payload.machine_name).toBe("Envelope-Mac");
+
+    appSocket.send(
+      encodeEnvelope({
+        v: 1,
+        id: "session-start-1",
+        type: "session.start",
+        payload: {
+          session_id: "session-envelope-1",
+          agent_type: "claude_code",
+          workspace_path: "/tmp/workspace",
+          resume_session_id: null,
+        },
+      }),
+    );
+
+    await daemonMessages.next("session.start");
+
+    daemonSocket.send(
+      JSON.stringify({
+        type: "session.event",
+        payload: {
+          session_id: "session-envelope-1",
+          agent_id: null,
+          agent_type: null,
+          seq: 1,
+          event: {
+            event_type: "assistant.delta",
+            text: "first envelope chunk",
+          },
+        },
+      }),
+    );
+
+    const firstEvent = await nextEnvelopeMessage(appMessages, "session.event");
+    expect(firstEvent.message.payload.seq).toBe(1);
+    expect(firstEvent.envelope.seq).toBe(1);
+
+    await closeSocket(appSocket);
+
+    daemonSocket.send(
+      JSON.stringify({
+        type: "session.event",
+        payload: {
+          session_id: "session-envelope-1",
+          agent_id: null,
+          agent_type: null,
+          seq: 2,
+          event: {
+            event_type: "assistant.delta",
+            text: "second envelope chunk",
+          },
+        },
+      }),
+    );
+
+    const resumedSocket = new WebSocket(relayUrl);
+    const resumedMessages = createMessageReader(resumedSocket);
+    await waitForOpen(resumedSocket);
+    await resumedMessages.next("server.hello");
+
+    resumedSocket.send(
+      encodeEnvelope({
+        v: 1,
+        id: "auth-attach-1",
+        type: "auth.attach",
+        payload: {
+          jwt: authToken.message.payload.jwt,
+        },
+      }),
+    );
+
+    await nextEnvelopeMessage(resumedMessages, "auth.token");
+    await nextEnvelopeMessage(resumedMessages, "device.status");
+
+    resumedSocket.send(
+      encodeEnvelope({
+        v: 1,
+        id: "session-replay-1",
+        type: "session.replay",
+        payload: {
+          session_id: "session-envelope-1",
+          from_seq: 1,
+        },
+      }),
+    );
+
+    const replayedSecond = await nextEnvelopeMessage(resumedMessages, "session.event");
+    expect(replayedSecond.message.payload.seq).toBe(2);
+    expect(replayedSecond.message.payload.event.text).toBe("second envelope chunk");
+
+    const replayDone = await nextEnvelopeMessage(resumedMessages, "replay.done");
+    expect(replayDone.message.payload.session_id).toBe("session-envelope-1");
+    expect(replayDone.message.payload.replayed_count).toBe(1);
+    expect(replayDone.message.payload.current_seq).toBe(2);
+    expect(replayDone.envelope.seq).toBe(2);
 
     await closeSocket(resumedSocket);
     await closeSocket(daemonSocket);

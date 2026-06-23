@@ -9,6 +9,7 @@ import { WebSocketServer } from "ws";
 import { loadDaemonConfig } from "../src/config/load.js";
 import { DeviceKeyStore } from "../src/crypto/keys.js";
 import { SessionImageUploadStore } from "../src/fs/image.js";
+import { formatPairingSasLine } from "../src/pairing/responder.js";
 import { DaemonSessionManager } from "../src/sessions/manager.js";
 import { toBase64Url } from "../src/lib/base64url.js";
 import { PairingSlotManager, getSas } from "../src/pairing/code.js";
@@ -70,6 +71,26 @@ describe("daemon skeleton", () => {
 
     const config = await loadDaemonConfig(file);
     expect(config.allowed_paths).toEqual(["/tmp/work"]);
+  });
+
+  it("uses HELLOBUG_DAEMON_CONFIG_PATH when configPath is omitted", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "hellobug-config-env-"));
+    const file = join(dir, "daemon.json");
+    await writeFile(
+      file,
+      JSON.stringify({
+        server_url: "ws://localhost:3000/v1/relay",
+        bootstrap_token: "bootstrap-token",
+      }),
+    );
+
+    process.env.HELLOBUG_DAEMON_CONFIG_PATH = file;
+    try {
+      const config = await loadDaemonConfig();
+      expect(config.bootstrap_token).toBe("bootstrap-token");
+    } finally {
+      delete process.env.HELLOBUG_DAEMON_CONFIG_PATH;
+    }
   });
 
   it("creates and reuses device identity", async () => {
@@ -167,6 +188,22 @@ describe("daemon skeleton", () => {
     await new Promise<void>((resolve) => {
       server.close(() => resolve());
     });
+  });
+
+  it("formats SAS for terminal display", () => {
+    expect(
+      formatPairingSasLine({
+        v: 1,
+        type: "device.pair.sas",
+        payload: {
+          sas: ["🐢", "🪐", "🍵", "🎷", "🌙"],
+          daemon_pubkey: "daemon-pubkey",
+          daemon_ed25519_pubkey: "daemon-ed25519-pubkey",
+          machine_name: "CI-Mac",
+          os: "darwin",
+        },
+      }),
+    ).toBe("🐢 🪐 🍵 🎷 🌙");
   });
 
   it("starts a session, echoes input, and emits session.done on cancel", async () => {

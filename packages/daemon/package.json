@@ -6,9 +6,13 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
+    "ensure:protocol": "../node_modules/.bin/tsc -p ../protocol/tsconfig.json",
+    "prebuild": "npm run ensure:protocol",
     "build": "tsc -p tsconfig.json",
+    "pretest": "npm run ensure:protocol",
     "test": "vitest run",
     "lint": "eslint src test",
+    "predev": "npm run ensure:protocol",
     "dev": "tsx watch src/index.ts"
   },
   "dependencies": {
@@ -18,4 +22,3 @@
     "zod": "^3.25.76"
   }
 }
-

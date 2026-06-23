@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>41 · 断线重连状态</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+.reconnect-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(3px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  z-index: 20;
+}
+.reconnect-card {
+  background: var(--bg2);
+  border-radius: var(--r-lg);
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-width: 220px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.4);
+}
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+
+  <!-- A: 重连中（覆盖在聊天上） -->
+  <div class="phone-label">41-A · 断线重连 — 重连中</div>
+  <div class="phone" style="position:relative;overflow:hidden">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".3"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".3"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="8" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <!-- 背景聊天（模糊） -->
+    <div style="background:var(--bg2);border-bottom:1px solid var(--separator);padding:10px 16px 8px;display:flex;align-items:center;gap:8px;flex-shrink:0">
+      <span style="font-size:17px;font-weight:600">HelloBug</span>
+      <div style="width:8px;height:8px;border-radius:50%;background:var(--red)"></div>
+      <span style="font-size:13px;color:var(--red)">断线</span>
+    </div>
+    <div class="chat-area" style="flex:1;overflow:hidden">
+      <div class="msg user"><div class="bubble">补全 router.dart 路由</div></div>
+      <div class="msg ai"><div class="bubble">好的，我来看一下…</div></div>
+      <div class="tool-card">
+        <div class="tool-header">
+          <span class="tool-icon">📖</span>
+          <span class="tool-name">ReadFile</span>
+          <span class="pill-label green">完成</span>
+        </div>
+        <div class="tool-path">app/lib/router.dart</div>
+      </div>
+    </div>
+
+    <!-- 重连覆盖层 -->
+    <div class="reconnect-overlay">
+      <div class="reconnect-card">
+        <div style="width:40px;height:40px;border-radius:50%;border:3px solid var(--orange);border-top-color:transparent;animation:spin .9s linear infinite"></div>
+        <div style="font-size:16px;font-weight:600">正在重连…</div>
+        <div style="font-size:13px;color:var(--fg2);text-align:center">relay.hellobug.dev<br>第 2 次尝试，共 5 次</div>
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <div style="width:8px;height:8px;border-radius:50%;background:var(--green)"></div>
+          <div style="width:8px;height:8px;border-radius:50%;background:var(--orange);animation:pulse 1s ease-in-out infinite"></div>
+          <div style="width:8px;height:8px;border-radius:50%;background:var(--bg4)"></div>
+          <div style="width:8px;height:8px;border-radius:50%;background:var(--bg4)"></div>
+          <div style="width:8px;height:8px;border-radius:50%;background:var(--bg4)"></div>
+        </div>
+        <button style="margin-top:6px;color:var(--fg3);font-size:14px;background:none;border:none;cursor:pointer">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- B: 重连失败 -->
+  <div class="phone-label">41-B · 断线重连 — 连接失败</div>
+  <div class="phone" style="position:relative;overflow:hidden">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".3"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".3"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="5" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div style="background:var(--bg2);border-bottom:1px solid var(--separator);padding:10px 16px 8px;display:flex;align-items:center;gap:8px;flex-shrink:0">
+      <span style="font-size:17px;font-weight:600">HelloBug</span>
+      <div style="width:8px;height:8px;border-radius:50%;background:var(--red)"></div>
+      <span style="font-size:13px;color:var(--red)">离线</span>
+    </div>
+    <div class="chat-area" style="flex:1;overflow:hidden">
+      <div class="msg user"><div class="bubble">补全 router.dart 路由</div></div>
+      <div class="msg ai"><div class="bubble">好的，我来看一下…</div></div>
+      <div class="tool-card">
+        <div class="tool-header">
+          <span class="tool-icon">📖</span>
+          <span class="tool-name">ReadFile</span>
+          <span class="pill-label green">完成</span>
+        </div>
+        <div class="tool-path">app/lib/router.dart</div>
+      </div>
+    </div>
+
+    <div class="reconnect-overlay">
+      <div class="reconnect-card">
+        <div style="font-size:36px">📡</div>
+        <div style="font-size:16px;font-weight:600">连接已断开</div>
+        <div style="font-size:13px;color:var(--fg2);text-align:center;line-height:1.6">
+          已重试 5 次，均失败<br>
+          <span style="font-family:var(--font-mono);font-size:12px">ECONNREFUSED</span>
+        </div>
+        <button class="btn btn-primary" style="width:100%;margin-top:8px">立即重试</button>
+        <button style="color:var(--fg2);font-size:14px;background:none;border:none;cursor:pointer;padding:4px">切换服务器</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- C: 完全离线空状态（会话列表） -->
+  <div class="phone-label">41-C · 断线重连 — 全局离线（设备页）</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".15"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".15"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".15"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".15"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div class="nav" style="border-bottom:none">
+      <div class="nav-title" style="font-size:17px">设备</div>
+    </div>
+
+    <!-- 离线横幅 -->
+    <div style="background:rgba(255,59,48,.12);border-bottom:1px solid rgba(255,59,48,.25);padding:8px 16px;display:flex;align-items:center;gap:8px;flex-shrink:0">
+      <span style="font-size:14px">📡</span>
+      <span style="font-size:13px;color:var(--red);flex:1">无法连接中继服务器</span>
+      <button style="color:var(--tint);font-size:13px;background:none;border:none;cursor:pointer;white-space:nowrap">重试</button>
+    </div>
+
+    <div class="screen-body" style="align-items:center;justify-content:center;gap:12px;padding:40px 32px">
+      <div style="font-size:52px;opacity:.25">🔌</div>
+      <div style="font-size:17px;font-weight:600;color:var(--fg2)">已离线</div>
+      <div style="font-size:14px;color:var(--fg3);text-align:center;line-height:1.6">
+        无法连接到 relay.hellobug.dev<br>请检查网络后重试
+      </div>
+      <button class="btn btn-primary" style="margin-top:8px">重新连接</button>
+      <button style="color:var(--tint);font-size:14px;background:none;border:none;cursor:pointer">更改服务器</button>
+    </div>
+
+    <div class="tab-bar">
+      <div class="tab-item active">🏠<span>设备</span></div>
+      <div class="tab-item" style="opacity:.35">💬<span>会话</span></div>
+      <div class="tab-item" style="opacity:.35">📋<span>历史</span></div>
+      <div class="tab-item">⚙️<span>设置</span></div>
+    </div>
+  </div>
+
+</div>
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.querySelector('.theme-toggle').textContent = isDark ? '🌙 深色' : '☀ 浅色';
+}
+</script>
+</body>
+</html>

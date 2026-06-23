@@ -1,38 +1,78 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../theme/index.dart';
+import 'pairing_controller.dart';
 
-class PairingEntryPage extends StatefulWidget {
+class PairingEntryPage extends ConsumerStatefulWidget {
   const PairingEntryPage({super.key});
 
   @override
-  State<PairingEntryPage> createState() => _PairingEntryPageState();
+  ConsumerState<PairingEntryPage> createState() => _PairingEntryPageState();
 }
 
-class _PairingEntryPageState extends State<PairingEntryPage> {
+class _PairingEntryPageState extends ConsumerState<PairingEntryPage> {
+  static const _debugServerUrl = String.fromEnvironment(
+    'HELLOBUG_DEBUG_SERVER_URL',
+    defaultValue: 'ws://10.0.2.2:3000/v1/relay',
+  );
+  static const _debugPairingCode = String.fromEnvironment(
+    'HELLOBUG_DEBUG_PAIRING_CODE',
+    defaultValue: '',
+  );
+
   // 6-digit PIN split into two groups of 3
   final List<String> _digits = List.filled(6, '');
-  final _serverController = TextEditingController(text: 'wss://relay.example.com');
+  late final _serverController = TextEditingController(
+    text: kDebugMode ? _debugServerUrl : 'wss://relay.example.com',
+  );
 
-  bool get _canConnect => _digits.every((d) => d.isNotEmpty);
+  @override
+  void initState() {
+    super.initState();
+    if (kDebugMode && _debugPairingCode.length == 6) {
+      for (var i = 0; i < 6; i++) {
+        _digits[i] = _debugPairingCode[i];
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        unawaited(_connect(debugCodeOverride: _debugPairingCode));
+      });
+    }
+  }
+
+  bool _canConnect(PairingState pairing) =>
+      _digits.every((d) => d.isNotEmpty) && !pairing.isBusy;
 
   void _onPinChanged(int index, String value) {
-    setState(() => _digits[index] = value.isEmpty ? '' : value[value.length - 1]);
+    setState(
+      () => _digits[index] = value.isEmpty ? '' : value[value.length - 1],
+    );
   }
 
-  void _connect() {
-    if (!_canConnect) return;
-    final pin = _digits.join();
-    // Navigation to SAS page; pass pin + server as extra
-    context.push('/pairing/sas', extra: {
-      'pin': pin,
-      'server': _serverController.text,
-    });
+  Future<void> _connect({String? debugCodeOverride}) async {
+    final pairing = ref.read(pairingControllerProvider);
+    if (!_canConnect(pairing)) return;
+    final pin = debugCodeOverride ?? _digits.join();
+    final success = await ref
+        .read(pairingControllerProvider.notifier)
+        .startManual(pin, _serverController.text);
+    if (!mounted || !success) return;
+    context.push('/pairing/sas');
   }
 
-  void _scanQr() {
-    context.push('/pairing/manual');
+  Future<void> _scanQr() async {
+    final payload = await context.push<String>('/pairing/qr');
+    if (!mounted || payload == null || payload.isEmpty) return;
+    final success = await ref
+        .read(pairingControllerProvider.notifier)
+        .startFromQr(payload);
+    if (!mounted || !success) return;
+    context.push('/pairing/sas');
   }
 
   @override
@@ -43,6 +83,7 @@ class _PairingEntryPageState extends State<PairingEntryPage> {
 
   @override
   Widget build(BuildContext context) {
+    final pairing = ref.watch(pairingControllerProvider);
     return CupertinoPageScaffold(
       backgroundColor: context.colors.bg,
       navigationBar: CupertinoNavigationBar(
@@ -59,7 +100,10 @@ class _PairingEntryPageState extends State<PairingEntryPage> {
               // context banner
               Container(
                 margin: const EdgeInsets.only(top: 8, bottom: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 11,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFF34C759).withValues(alpha: .1),
                   borderRadius: BorderRadius.circular(8),
@@ -71,16 +115,27 @@ class _PairingEntryPageState extends State<PairingEntryPage> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text.rich(
-                        TextSpan(children: [
-                          TextSpan(
-                            text: '只需配对一次',
-                            style: TextStyle(fontWeight: FontWeight.w700, color: const Color(0xFF34C759), fontSize: 13),
-                          ),
-                          TextSpan(
-                            text: '，在家里电脑旁完成。\n之后在外面通过云中继发指令，Daemon 在你桌面机上执行，结果流回手机——看到的是 Claude Code 的文字输出，不是屏幕画面。',
-                            style: TextStyle(color: const Color(0xFF34C759), fontSize: 13, height: 1.55),
-                          ),
-                        ]),
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: '只需配对一次',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF34C759),
+                                fontSize: 13,
+                              ),
+                            ),
+                            TextSpan(
+                              text:
+                                  '，在家里电脑旁完成。\n之后在外面通过云中继发指令，Daemon 在你桌面机上执行，结果流回手机——看到的是 Claude Code 的文字输出，不是屏幕画面。',
+                              style: TextStyle(
+                                color: const Color(0xFF34C759),
+                                fontSize: 13,
+                                height: 1.55,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -90,7 +145,11 @@ class _PairingEntryPageState extends State<PairingEntryPage> {
               Text(
                 '在电脑上运行 HelloBug daemon\n后扫码或输入控制台显示的配对码',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: context.colors.fg2, height: 1.6),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: context.colors.fg2,
+                  height: 1.6,
+                ),
               ),
               const SizedBox(height: 4),
               // QR zone
@@ -103,16 +162,33 @@ class _PairingEntryPageState extends State<PairingEntryPage> {
                   decoration: BoxDecoration(
                     color: context.colors.bg3,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: context.colors.separator, width: 2, style: BorderStyle.solid),
+                    border: Border.all(
+                      color: context.colors.separator,
+                      width: 2,
+                      style: BorderStyle.solid,
+                    ),
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text('⬛', style: TextStyle(fontSize: 48)),
                       const SizedBox(height: 12),
-                      Text('点击扫描二维码', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: context.colors.fg)),
+                      Text(
+                        '点击扫描二维码',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: context.colors.fg,
+                        ),
+                      ),
                       const SizedBox(height: 4),
-                      Text('需要相机权限', style: TextStyle(fontSize: 14, color: context.colors.fg2)),
+                      Text(
+                        '需要相机权限',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: context.colors.fg2,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -122,22 +198,44 @@ class _PairingEntryPageState extends State<PairingEntryPage> {
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 child: Row(
                   children: [
-                    Expanded(child: Container(height: .5, color: context.colors.separator)),
+                    Expanded(
+                      child: Container(
+                        height: .5,
+                        color: context.colors.separator,
+                      ),
+                    ),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Text('或手动输入', style: TextStyle(fontSize: 13, color: context.colors.fg3)),
+                      child: Text(
+                        '或手动输入',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: context.colors.fg3,
+                        ),
+                      ),
                     ),
-                    Expanded(child: Container(height: .5, color: context.colors.separator)),
+                    Expanded(
+                      child: Container(
+                        height: .5,
+                        color: context.colors.separator,
+                      ),
+                    ),
                   ],
                 ),
               ),
               // PIN input label
-              Text('配对码（daemon 控制台显示，30 秒有效）', style: TextStyle(fontSize: 13, color: context.colors.fg2)),
+              Text(
+                '配对码（daemon 控制台显示，30 秒有效）',
+                style: TextStyle(fontSize: 13, color: context.colors.fg2),
+              ),
               const SizedBox(height: 8),
               _PinRow(digits: _digits, onChanged: _onPinChanged),
               const SizedBox(height: 16),
               // server address
-              Text('中继服务器地址', style: TextStyle(fontSize: 13, color: context.colors.fg2)),
+              Text(
+                '中继服务器地址',
+                style: TextStyle(fontSize: 13, color: context.colors.fg2),
+              ),
               const SizedBox(height: 6),
               CupertinoTextField(
                 controller: _serverController,
@@ -147,7 +245,10 @@ class _PairingEntryPageState extends State<PairingEntryPage> {
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: context.colors.separator),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
                 keyboardType: TextInputType.url,
                 autocorrect: false,
               ),
@@ -155,18 +256,39 @@ class _PairingEntryPageState extends State<PairingEntryPage> {
               SizedBox(
                 width: double.infinity,
                 child: CupertinoButton(
-                  onPressed: _canConnect ? _connect : null,
+                  onPressed: _canConnect(pairing) ? _connect : null,
                   color: context.colors.tint,
                   borderRadius: BorderRadius.circular(12),
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: const Text('连接', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: CupertinoColors.white)),
+                  child: Text(
+                    pairing.step == PairingStep.connecting ? '连接中...' : '连接',
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                      color: CupertinoColors.white,
+                    ),
+                  ),
                 ),
               ),
+              if (pairing.errorMessage != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  pairing.errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFFFF3B30),
+                    height: 1.5,
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               Text(
-                '配对完成后需在双端核对安全短串\n以防止中间人攻击',
+                '配对完成后需在双端核对安全短串以防止中间人攻击',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: context.colors.fg3, height: 1.6),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12, color: context.colors.fg3),
               ),
               const SizedBox(height: 32),
             ],
@@ -195,14 +317,21 @@ class _PinRowState extends State<_PinRow> {
   @override
   void initState() {
     super.initState();
-    _controllers = List.generate(6, (i) => TextEditingController(text: widget.digits[i]));
+    _controllers = List.generate(
+      6,
+      (i) => TextEditingController(text: widget.digits[i]),
+    );
     _nodes = List.generate(6, (_) => FocusNode());
   }
 
   @override
   void dispose() {
-    for (final c in _controllers) { c.dispose(); }
-    for (final n in _nodes) { n.dispose(); }
+    for (final c in _controllers) {
+      c.dispose();
+    }
+    for (final n in _nodes) {
+      n.dispose();
+    }
     super.dispose();
   }
 
@@ -215,6 +344,17 @@ class _PinRowState extends State<_PinRow> {
   }
 
   @override
+  void didUpdateWidget(covariant _PinRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    for (var i = 0; i < 6; i++) {
+      final next = widget.digits[i];
+      if (_controllers[i].text != next) {
+        _controllers[i].text = next;
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -223,7 +363,10 @@ class _PinRowState extends State<_PinRow> {
           if (i == 3)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: Text('—', style: TextStyle(fontSize: 20, color: context.colors.fg3)),
+              child: Text(
+                '—',
+                style: TextStyle(fontSize: 20, color: context.colors.fg3),
+              ),
             ),
           _PinBox(
             controller: _controllers[i],
@@ -238,7 +381,11 @@ class _PinRowState extends State<_PinRow> {
 }
 
 class _PinBox extends StatelessWidget {
-  const _PinBox({required this.controller, required this.focusNode, required this.onChanged});
+  const _PinBox({
+    required this.controller,
+    required this.focusNode,
+    required this.onChanged,
+  });
   final TextEditingController controller;
   final FocusNode focusNode;
   final ValueChanged<String> onChanged;
@@ -246,7 +393,8 @@ class _PinBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 44, height: 52,
+      width: 44,
+      height: 52,
       child: CupertinoTextField(
         controller: controller,
         focusNode: focusNode,

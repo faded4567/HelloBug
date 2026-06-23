@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>37 · 文件预览页</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+.code-area {
+  flex: 1;
+  overflow-y: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  background: var(--bg);
+}
+.code-line {
+  display: flex;
+  padding: 0 12px;
+}
+.code-line:hover { background: var(--bg2); }
+.code-line.highlight { background: rgba(255,214,10,.12); }
+.ln {
+  min-width: 28px;
+  color: var(--fg3);
+  text-align: right;
+  padding-right: 12px;
+  user-select: none;
+  flex-shrink: 0;
+}
+.code-text { color: var(--fg); white-space: pre; }
+.kw  { color: #cf8ef4; }
+.cls { color: #4ec9b0; }
+.str { color: #ce9178; }
+.cmt { color: #6a9955; }
+.num { color: #b5cea8; }
+.fn  { color: #dcdcaa; }
+.hl  { background: rgba(255,200,0,.25); border-radius: 2px; padding: 0 1px; }
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--separator);
+  flex-shrink: 0;
+}
+.search-bar input {
+  flex: 1;
+  background: var(--bg3);
+  border: none;
+  outline: none;
+  border-radius: var(--r-sm);
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--fg);
+  font-family: var(--font-mono);
+}
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+
+  <!-- A: 正常浏览 -->
+  <div class="phone-label">37-A · 文件预览 — 代码浏览</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nav-back">
+        <svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 1L1 9l7 8"/></svg>
+        文件树
+      </div>
+      <div class="nav-title" style="font-family:var(--font-mono);font-size:14px">router.dart</div>
+      <div style="display:flex;gap:14px;color:var(--tint);font-size:16px">
+        <span>🔍</span>
+        <span>⬆</span>
+      </div>
+    </div>
+
+    <!-- 文件信息条 -->
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 16px;background:var(--bg2);border-bottom:1px solid var(--separator);flex-shrink:0">
+      <span class="pill-label orange" style="font-size:11px">Dart</span>
+      <span style="font-size:12px;color:var(--fg2)">app/lib/</span>
+      <span style="font-size:12px;color:var(--fg)">router.dart</span>
+      <div style="flex:1"></div>
+      <span style="font-size:12px;color:var(--fg3)">87 行</span>
+    </div>
+
+    <div class="code-area">
+      <div class="code-line"><span class="ln">1</span><span class="code-text"><span class="kw">import</span> <span class="str">'package:flutter/material.dart'</span>;</span></div>
+      <div class="code-line"><span class="ln">2</span><span class="code-text"><span class="kw">import</span> <span class="str">'package:go_router/go_router.dart'</span>;</span></div>
+      <div class="code-line"><span class="ln">3</span><span class="code-text"></span></div>
+      <div class="code-line"><span class="ln">4</span><span class="code-text"><span class="kw">import</span> <span class="str">'screens/chat/chat_page.dart'</span>;</span></div>
+      <div class="code-line"><span class="ln">5</span><span class="code-text"><span class="kw">import</span> <span class="str">'screens/devices/devices_page.dart'</span>;</span></div>
+      <div class="code-line"><span class="ln">6</span><span class="code-text"><span class="kw">import</span> <span class="str">'screens/sessions/sessions_page.dart'</span>;</span></div>
+      <div class="code-line"><span class="ln">7</span><span class="code-text"></span></div>
+      <div class="code-line"><span class="ln">8</span><span class="code-text"><span class="kw">final</span> router = <span class="cls">GoRouter</span>(</span></div>
+      <div class="code-line"><span class="ln">9</span><span class="code-text">  initialLocation: <span class="str">'/devices'</span>,</span></div>
+      <div class="code-line"><span class="ln">10</span><span class="code-text">  routes: [</span></div>
+      <div class="code-line"><span class="ln">11</span><span class="code-text">    <span class="cls">GoRoute</span>(</span></div>
+      <div class="code-line"><span class="ln">12</span><span class="code-text">      path: <span class="str">'/devices'</span>,</span></div>
+      <div class="code-line"><span class="ln">13</span><span class="code-text">      builder: (ctx, _) => <span class="kw">const</span> <span class="cls">DevicesPage</span>(),</span></div>
+      <div class="code-line"><span class="ln">14</span><span class="code-text">    ),</span></div>
+      <div class="code-line"><span class="ln">15</span><span class="code-text">    <span class="cls">GoRoute</span>(</span></div>
+      <div class="code-line"><span class="ln">16</span><span class="code-text">      path: <span class="str">'/chat/:sessionId'</span>,</span></div>
+      <div class="code-line"><span class="ln">17</span><span class="code-text">      builder: (ctx, state) => <span class="cls">ChatPage</span>(</span></div>
+      <div class="code-line"><span class="ln">18</span><span class="code-text">        sessionId: state.pathParameters[<span class="str">'sessionId'</span>]!,</span></div>
+      <div class="code-line"><span class="ln">19</span><span class="code-text">      ),</span></div>
+      <div class="code-line"><span class="ln">20</span><span class="code-text">    ),</span></div>
+      <div class="code-line"><span class="ln">21</span><span class="code-text">    <span class="cls">GoRoute</span>(</span></div>
+      <div class="code-line"><span class="ln">22</span><span class="code-text">      path: <span class="str">'/sessions'</span>,</span></div>
+      <div class="code-line"><span class="ln">23</span><span class="code-text">      builder: (ctx, _) => <span class="kw">const</span> <span class="cls">SessionsPage</span>(),</span></div>
+      <div class="code-line"><span class="ln">24</span><span class="code-text">    ),</span></div>
+      <div class="code-line"><span class="ln">25</span><span class="code-text">  ],</span></div>
+      <div class="code-line"><span class="ln">26</span><span class="code-text">);</span></div>
+      <div style="height:24px"></div>
+    </div>
+
+    <!-- 底部工具栏 -->
+    <div style="display:flex;align-items:center;border-top:1px solid var(--separator);background:var(--bg2);flex-shrink:0">
+      <button style="flex:1;padding:11px 0;font-size:13px;color:var(--tint);background:none;border:none;cursor:pointer">复制全文</button>
+      <div style="width:1px;height:20px;background:var(--separator)"></div>
+      <button style="flex:1;padding:11px 0;font-size:13px;color:var(--tint);background:none;border:none;cursor:pointer">分享</button>
+      <div style="width:1px;height:20px;background:var(--separator)"></div>
+      <button style="flex:1;padding:11px 0;font-size:13px;color:var(--tint);background:none;border:none;cursor:pointer">在终端打开</button>
+    </div>
+  </div>
+
+  <!-- B: 搜索激活 -->
+  <div class="phone-label">37-B · 文件预览 — 搜索激活</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nav-back" style="color:var(--tint)">取消</div>
+      <div class="nav-title" style="font-family:var(--font-mono);font-size:14px">router.dart</div>
+      <div style="font-size:12px;color:var(--fg2)">3/5</div>
+    </div>
+
+    <div class="search-bar">
+      <input value="GoRoute" style="border:1.5px solid var(--tint)">
+      <span style="font-size:12px;color:var(--fg2);white-space:nowrap">3 / 5</span>
+      <span style="color:var(--tint);font-size:14px">↑</span>
+      <span style="color:var(--tint);font-size:14px">↓</span>
+    </div>
+
+    <div class="code-area">
+      <div class="code-line"><span class="ln">8</span><span class="code-text"><span class="kw">final</span> router = <span class="cls">GoRouter</span>(</span></div>
+      <div class="code-line"><span class="ln">9</span><span class="code-text">  initialLocation: <span class="str">'/devices'</span>,</span></div>
+      <div class="code-line"><span class="ln">10</span><span class="code-text">  routes: [</span></div>
+      <div class="code-line highlight"><span class="ln">11</span><span class="code-text">    <span class="cls"><span class="hl">GoRoute</span></span>(  <span class="cmt">← 当前匹配</span></span></div>
+      <div class="code-line"><span class="ln">12</span><span class="code-text">      path: <span class="str">'/devices'</span>,</span></div>
+      <div class="code-line"><span class="ln">13</span><span class="code-text">      builder: (ctx, _) => <span class="kw">const</span> <span class="cls">DevicesPage</span>(),</span></div>
+      <div class="code-line"><span class="ln">14</span><span class="code-text">    ),</span></div>
+      <div class="code-line"><span class="ln">15</span><span class="code-text">    <span class="cls"><span class="hl">GoRoute</span></span>(</span></div>
+      <div class="code-line"><span class="ln">16</span><span class="code-text">      path: <span class="str">'/chat/:sessionId'</span>,</span></div>
+      <div class="code-line"><span class="ln">17</span><span class="code-text">      builder: (ctx, state) => <span class="cls">ChatPage</span>(</span></div>
+      <div class="code-line"><span class="ln">18</span><span class="code-text">        sessionId: state.pathParameters[<span class="str">'sessionId'</span>]!,</span></div>
+      <div class="code-line"><span class="ln">19</span><span class="code-text">      ),</span></div>
+      <div class="code-line"><span class="ln">20</span><span class="code-text">    ),</span></div>
+      <div class="code-line"><span class="ln">21</span><span class="code-text">    <span class="cls"><span class="hl">GoRoute</span></span>(</span></div>
+      <div class="code-line"><span class="ln">22</span><span class="code-text">      path: <span class="str">'/sessions'</span>,</span></div>
+    </div>
+
+    <div style="display:flex;align-items:center;border-top:1px solid var(--separator);background:var(--bg2);flex-shrink:0">
+      <button style="flex:1;padding:11px 0;font-size:13px;color:var(--tint);background:none;border:none;cursor:pointer">复制全文</button>
+      <div style="width:1px;height:20px;background:var(--separator)"></div>
+      <button style="flex:1;padding:11px 0;font-size:13px;color:var(--tint);background:none;border:none;cursor:pointer">分享</button>
+      <div style="width:1px;height:20px;background:var(--separator)"></div>
+      <button style="flex:1;padding:11px 0;font-size:13px;color:var(--tint);background:none;border:none;cursor:pointer">在终端打开</button>
+    </div>
+  </div>
+
+  <!-- C: 不支持的文件类型 -->
+  <div class="phone-label">37-C · 文件预览 — 不支持预览</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nav-back">
+        <svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 1L1 9l7 8"/></svg>
+        文件树
+      </div>
+      <div class="nav-title" style="font-family:var(--font-mono);font-size:14px">app.ipa</div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 16px;background:var(--bg2);border-bottom:1px solid var(--separator);flex-shrink:0">
+      <span class="pill-label" style="font-size:11px">二进制</span>
+      <span style="font-size:12px;color:var(--fg2)">build/ios/</span>
+      <span style="font-size:12px;color:var(--fg)">app.ipa</span>
+      <div style="flex:1"></div>
+      <span style="font-size:12px;color:var(--fg3)">48.3 MB</span>
+    </div>
+
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:32px">
+      <div style="font-size:48px;opacity:.3">📦</div>
+      <div style="font-size:16px;font-weight:600;color:var(--fg2)">无法预览此文件</div>
+      <div style="font-size:14px;color:var(--fg3);text-align:center;line-height:1.6">
+        二进制文件不支持文本预览
+      </div>
+      <button class="btn btn-primary" style="margin-top:8px">分享文件</button>
+    </div>
+  </div>
+
+</div>
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.querySelector('.theme-toggle').textContent = isDark ? '🌙 深色' : '☀ 浅色';
+}
+</script>
+</body>
+</html>

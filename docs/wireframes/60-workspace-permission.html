@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>60 · 工作区权限受限</title>
+<link rel="stylesheet" href="_common.css">
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+
+  <div class="phone-label">60-A · 工作区权限受限 — 只读</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg><svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg></div></div>
+
+    <div class="nav">
+      <button style="color:var(--tint);font-size:16px;background:none;border:none">‹</button>
+      <div class="nav-title">HelloBug</div>
+      <div style="width:44px"></div>
+    </div>
+
+    <!-- 警告横幅 -->
+    <div style="background:rgba(255,149,0,.1);border-bottom:1px solid rgba(255,149,0,.2);padding:10px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0">
+      <span style="font-size:16px">🔒</span>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600;color:var(--orange)">只读模式 — 权限不足</div>
+        <div style="font-size:11px;color:var(--fg3);margin-top:2px">Agent 无法写入工作区文件</div>
+      </div>
+      <button style="color:var(--tint);font-size:12px;background:none;border:none;white-space:nowrap">如何修复</button>
+    </div>
+
+    <div class="screen-body" style="padding:20px 16px;gap:16px">
+      <div style="background:var(--bg2);border-radius:var(--r);padding:14px">
+        <div style="font-size:12px;color:var(--fg3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">权限详情</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px">
+            <span style="color:var(--fg2)">工作区路径</span>
+            <span style="font-family:var(--font-mono);font-size:11px;color:var(--fg3)">/Projects/HelloBug</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px">
+            <span style="color:var(--fg2)">当前权限</span>
+            <span style="color:var(--orange)">r-x (只读)</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px">
+            <span style="color:var(--fg2)">所需权限</span>
+            <span style="color:var(--green)">rwx (读写)</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:var(--bg2);border-radius:var(--r);padding:14px">
+        <div style="font-size:12px;color:var(--fg3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">在 Mac 上执行</div>
+        <div style="background:var(--bg3);border-radius:8px;padding:10px 12px;font-family:var(--font-mono);font-size:12px;color:var(--tint);line-height:1.8">
+          chmod -R 755 /Projects/HelloBug
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button class="btn btn-primary" style="width:100%">已修复，重新检测权限</button>
+        <button style="color:var(--tint);font-size:14px;background:var(--bg2);border-radius:var(--r);padding:11px">以只读模式继续（仅可查看）</button>
+      </div>
+    </div>
+
+    <div class="tab-bar">
+      <div class="tab-item active">📂<span>工作区</span></div>
+      <div class="tab-item">🖥<span>设备</span></div>
+      <div class="tab-item">⚙️<span>设置</span></div>
+    </div>
+  </div>
+
+  <div class="phone-label">60-B · 工作区权限受限 — 完全无权限</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg><svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg></div></div>
+
+    <div class="nav">
+      <button style="color:var(--tint);font-size:16px;background:none;border:none">‹</button>
+      <div class="nav-title">HelloBug</div>
+      <div style="width:44px"></div>
+    </div>
+
+    <div class="screen-body" style="align-items:center;justify-content:center;gap:16px;padding:40px 28px;text-align:center">
+      <div style="width:72px;height:72px;border-radius:50%;background:rgba(255,59,48,.12);display:flex;align-items:center;justify-content:center;font-size:36px">🚫</div>
+      <div style="font-size:19px;font-weight:700;color:var(--red)">无法访问工作区</div>
+      <div style="font-size:13px;color:var(--fg2);line-height:1.7;max-width:280px">
+        Agent 对 <b>HelloBug</b> 工作区没有任何访问权限，可能是因为目录归属或 SIP 限制。
+      </div>
+
+      <div style="width:100%;background:var(--bg2);border-radius:var(--r);padding:12px 14px;text-align:left">
+        <div style="font-size:12px;color:var(--fg3);margin-bottom:8px">可能原因</div>
+        <div style="font-size:13px;color:var(--fg2);line-height:2">
+          <div>• 目录由 root 或其他用户拥有</div>
+          <div>• 系统完整性保护 (SIP) 限制</div>
+          <div>• macOS 隐私权限未授予终端</div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" style="width:100%;margin-top:4px">查看详细修复指引</button>
+      <button style="color:var(--fg3);font-size:13px;padding:4px">选择其他工作区</button>
+    </div>
+
+    <div class="tab-bar">
+      <div class="tab-item active">📂<span>工作区</span></div>
+      <div class="tab-item">🖥<span>设备</span></div>
+      <div class="tab-item">⚙️<span>设置</span></div>
+    </div>
+  </div>
+
+</div>
+<script>
+function toggleTheme() {
+  const h = document.documentElement, d = h.getAttribute('data-theme') === 'dark';
+  h.setAttribute('data-theme', d ? 'light' : 'dark');
+  document.querySelector('.theme-toggle').textContent = d ? '🌙 深色' : '☀ 浅色';
+}
+</script>
+</body>
+</html>

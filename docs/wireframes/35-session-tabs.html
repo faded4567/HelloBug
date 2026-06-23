@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>35 · 多会话 Tab</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+.session-tab-bar {
+  display: flex;
+  align-items: stretch;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--separator);
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex-shrink: 0;
+  padding: 0 4px;
+}
+.session-tab-bar::-webkit-scrollbar { display: none; }
+.s-tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 12px;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  color: var(--fg2);
+  flex-shrink: 0;
+  position: relative;
+}
+.s-tab.active {
+  color: var(--fg);
+  border-bottom-color: var(--tint);
+}
+.s-tab-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.s-tab-close {
+  font-size: 14px;
+  color: var(--fg3);
+  line-height: 1;
+  padding: 1px 2px;
+  border-radius: 3px;
+}
+.s-tab-close:hover { background: var(--bg4); color: var(--fg); }
+.s-tab-add {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  font-size: 20px;
+  color: var(--fg3);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+
+  <!-- 多标签展开 -->
+  <div class="phone-label">35-A · 多会话 Tab — 2 个会话</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+
+    <!-- Tab 栏 + 导航合并 -->
+    <div style="background:var(--bg2);border-bottom:1px solid var(--separator)">
+      <div style="display:flex;align-items:center;padding:10px 16px 0">
+        <div class="nav-back" style="font-size:15px;color:var(--tint)">
+          <svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 1L1 9l7 8"/></svg>
+          会话
+        </div>
+        <div style="flex:1"></div>
+        <div style="display:flex;gap:16px;color:var(--tint);font-size:16px">
+          <span>📷</span>
+          <span>⋯</span>
+        </div>
+      </div>
+      <div class="session-tab-bar">
+        <!-- Tab 1 active -->
+        <div class="s-tab active">
+          <div class="s-tab-dot" style="background:var(--green)"></div>
+          <span>HelloBug</span>
+          <span class="s-tab-close">×</span>
+        </div>
+        <!-- Tab 2 -->
+        <div class="s-tab">
+          <div class="s-tab-dot" style="background:var(--orange)"></div>
+          <span>api-server</span>
+          <span class="pill-label orange" style="font-size:10px;padding:1px 5px">等待</span>
+          <span class="s-tab-close">×</span>
+        </div>
+        <!-- 新增 -->
+        <div class="s-tab-add">＋</div>
+      </div>
+    </div>
+
+    <!-- 当前 Tab 内容：聊天界面 -->
+    <div class="chat-area">
+      <div class="msg ai">
+        <div class="bubble">
+          我来分析 <code>router.dart</code> 里缺失的路由入口…
+        </div>
+      </div>
+      <div class="tool-card">
+        <div class="tool-header">
+          <span class="tool-icon">📖</span>
+          <span class="tool-name">ReadFile</span>
+          <span class="pill-label green">完成</span>
+        </div>
+        <div class="tool-path">app/lib/router.dart</div>
+      </div>
+      <div class="msg ai">
+        <div class="bubble">
+          找到 3 处缺失的路由：<br>
+          • <code>/workspace-list</code><br>
+          • <code>/session-search</code><br>
+          • <code>/history</code><br>
+          正在补全…
+        </div>
+      </div>
+      <div class="tool-card running">
+        <div class="tool-header">
+          <span class="tool-icon">📝</span>
+          <span class="tool-name">WriteFile</span>
+          <div style="width:10px;height:10px;border-radius:50%;border:2px solid var(--tint);border-top-color:transparent;animation:spin .8s linear infinite"></div>
+        </div>
+        <div class="tool-path">app/lib/router.dart</div>
+      </div>
+    </div>
+
+    <!-- 输入栏 -->
+    <div class="input-bar">
+      <div class="input-row">
+        <div class="input-field">继续…</div>
+        <div class="input-send">↑</div>
+      </div>
+    </div>
+
+    <div class="tab-bar">
+      <div class="tab-item">🏠<span>设备</span></div>
+      <div class="tab-item active">💬<span>会话</span></div>
+      <div class="tab-item">📋<span>历史</span></div>
+      <div class="tab-item">⚙️<span>设置</span></div>
+    </div>
+  </div>
+
+  <!-- Tab 溢出 + 切换器 -->
+  <div class="phone-label">35-B · 多会话 Tab — 4 个会话（溢出）</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+
+    <div style="background:var(--bg2);border-bottom:1px solid var(--separator)">
+      <div style="display:flex;align-items:center;padding:10px 16px 0">
+        <div class="nav-back" style="font-size:15px;color:var(--tint)">
+          <svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 1L1 9l7 8"/></svg>
+          会话
+        </div>
+        <div style="flex:1"></div>
+        <div style="display:flex;align-items:center;gap:4px;background:var(--bg3);border-radius:var(--r-pill);padding:3px 10px;font-size:13px;font-weight:600;color:var(--tint)">
+          4 <span style="font-size:11px;color:var(--fg2)">个会话</span>
+        </div>
+        <div style="display:flex;gap:16px;color:var(--tint);font-size:16px;margin-left:12px">
+          <span>⋯</span>
+        </div>
+      </div>
+      <div class="session-tab-bar">
+        <div class="s-tab">
+          <div class="s-tab-dot" style="background:var(--fg3)"></div>
+          <span>backend</span>
+          <span class="s-tab-close">×</span>
+        </div>
+        <div class="s-tab active">
+          <div class="s-tab-dot" style="background:var(--green)"></div>
+          <span>HelloBug</span>
+          <span class="s-tab-close">×</span>
+        </div>
+        <div class="s-tab">
+          <div class="s-tab-dot" style="background:var(--orange)"></div>
+          <span>api-server</span>
+          <span class="s-tab-close">×</span>
+        </div>
+        <div class="s-tab">
+          <div class="s-tab-dot" style="background:var(--blue)"></div>
+          <span>design-tokens</span>
+          <span class="s-tab-close">×</span>
+        </div>
+        <div class="s-tab-add">＋</div>
+      </div>
+    </div>
+
+    <!-- 聊天 -->
+    <div class="chat-area">
+      <div class="msg user"><div class="bubble">补全 router.dart 的路由入口</div></div>
+      <div class="msg ai">
+        <div class="bubble">
+          已补全 3 条路由，并添加了对应的懒加载导入。<br><br>
+          修改已写入 <code>app/lib/router.dart</code>。
+        </div>
+      </div>
+      <div class="tool-card">
+        <div class="tool-header">
+          <span class="tool-icon">📝</span>
+          <span class="tool-name">WriteFile</span>
+          <span class="pill-label green">完成</span>
+        </div>
+        <div class="tool-path">app/lib/router.dart · +18 −2</div>
+      </div>
+      <div class="msg ai">
+        <div class="bubble">需要我运行 <code>flutter analyze</code> 验证一下吗？</div>
+      </div>
+    </div>
+
+    <div class="input-bar">
+      <div class="input-row">
+        <div class="input-field">回复…</div>
+        <div class="input-send">↑</div>
+      </div>
+    </div>
+
+    <div class="tab-bar">
+      <div class="tab-item">🏠<span>设备</span></div>
+      <div class="tab-item active">💬<span>会话</span></div>
+      <div class="tab-item">📋<span>历史</span></div>
+      <div class="tab-item">⚙️<span>设置</span></div>
+    </div>
+  </div>
+
+  <!-- Tab 切换器（Sheet） -->
+  <div class="phone-label">35-C · 会话切换器（Sheet）</div>
+  <div class="phone" style="position:relative;overflow:hidden">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div style="background:var(--bg2);border-bottom:1px solid var(--separator);padding:10px 16px 8px;display:flex;align-items:center;gap:8px">
+      <span style="font-size:17px;font-weight:600">HelloBug</span>
+      <div class="s-tab-dot" style="background:var(--green);width:8px;height:8px"></div>
+      <div style="flex:1"></div>
+      <span style="color:var(--tint)">⋯</span>
+    </div>
+    <!-- 模糊背景聊天 -->
+    <div class="chat-area" style="filter:blur(2px);flex:1;overflow:hidden">
+      <div class="msg ai"><div class="bubble">已补全 3 条路由…</div></div>
+      <div class="msg user"><div class="bubble">好的，继续</div></div>
+    </div>
+    <!-- Sheet 覆盖层 -->
+    <div class="sheet-overlay"></div>
+    <div class="sheet" style="padding-bottom:40px">
+      <div class="sheet-handle"></div>
+      <div style="display:flex;align-items:center;padding:0 16px 12px">
+        <div style="font-size:17px;font-weight:600;flex:1">所有会话</div>
+        <button style="color:var(--tint);font-size:15px;background:none;border:none;cursor:pointer">＋ 新建</button>
+      </div>
+      <!-- 会话列表 -->
+      <div style="display:flex;flex-direction:column;gap:0">
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--tint-bg);border-radius:var(--r);margin:0 8px 4px">
+          <div class="s-tab-dot" style="background:var(--green);width:10px;height:10px"></div>
+          <div style="flex:1">
+            <div style="font-size:15px;font-weight:600">HelloBug</div>
+            <div style="font-size:12px;color:var(--fg2);margin-top:2px">MacBook Pro · 运行中 · 刚刚</div>
+          </div>
+          <span class="pill-label green" style="font-size:11px">当前</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 16px">
+          <div class="s-tab-dot" style="background:var(--orange);width:10px;height:10px"></div>
+          <div style="flex:1">
+            <div style="font-size:15px">api-server</div>
+            <div style="font-size:12px;color:var(--fg2);margin-top:2px">MacBook Pro · 等待输入 · 3 分钟前</div>
+          </div>
+          <span class="pill-label orange" style="font-size:11px">等待</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 16px">
+          <div class="s-tab-dot" style="background:var(--fg3);width:10px;height:10px"></div>
+          <div style="flex:1">
+            <div style="font-size:15px">backend</div>
+            <div style="font-size:12px;color:var(--fg2);margin-top:2px">iMac · 已完成 · 1 小时前</div>
+          </div>
+          <span class="pill-label" style="font-size:11px">完成</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 16px">
+          <div class="s-tab-dot" style="background:var(--blue);width:10px;height:10px"></div>
+          <div style="flex:1">
+            <div style="font-size:15px">design-tokens</div>
+            <div style="font-size:12px;color:var(--fg2);margin-top:2px">MacBook Pro · 运行中 · 5 分钟前</div>
+          </div>
+          <span class="pill-label blue" style="font-size:11px">运行</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.querySelector('.theme-toggle').textContent = isDark ? '🌙 深色' : '☀ 浅色';
+}
+</script>
+</body>
+</html>

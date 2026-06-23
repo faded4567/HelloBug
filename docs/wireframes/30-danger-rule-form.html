@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>30 · 危险规则表单</title>
+<link rel="stylesheet" href="_common.css">
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+
+  <!-- 新建规则 -->
+  <div class="phone-label">30-A · 新建危险规则</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+
+    <div class="nav">
+      <div class="nav-back" style="color:var(--tint)">取消</div>
+      <div class="nav-title">新建规则</div>
+      <div class="nav-right" style="color:var(--tint);font-weight:600">保存</div>
+    </div>
+
+    <div class="screen-body" style="padding-bottom:40px">
+      <div class="section-header">规则名称</div>
+      <div class="list-group">
+        <div class="list-item" style="padding:0 16px">
+          <input style="flex:1;background:none;border:none;outline:none;font-size:16px;color:var(--fg);font-family:inherit;padding:13px 0" placeholder="例：禁止递归删除" value="">
+        </div>
+      </div>
+
+      <div class="section-header">触发方式</div>
+      <div class="list-group">
+        <div class="list-item">
+          <span style="font-size:20px">🔍</span>
+          <span class="list-label">关键词匹配</span>
+          <div style="width:20px;height:20px;border-radius:50%;border:2px solid var(--tint);background:var(--tint);display:flex;align-items:center;justify-content:center">
+            <span style="color:#fff;font-size:12px">✓</span>
+          </div>
+        </div>
+        <div class="list-item">
+          <span style="font-size:20px">⚡</span>
+          <span class="list-label">正则表达式</span>
+          <div style="width:20px;height:20px;border-radius:50%;border:2px solid var(--bg4)"></div>
+        </div>
+        <div class="list-item">
+          <span style="font-size:20px">🤖</span>
+          <span class="list-label">工具类型</span>
+          <div style="width:20px;height:20px;border-radius:50%;border:2px solid var(--bg4)"></div>
+        </div>
+      </div>
+
+      <div class="section-header">匹配模式</div>
+      <div class="list-group">
+        <div class="list-item" style="padding:0 16px;flex-direction:column;align-items:stretch;gap:0">
+          <div style="padding:13px 0 4px;font-size:14px;color:var(--fg2)">关键词（每行一个）</div>
+          <textarea style="background:none;border:none;outline:none;font-size:15px;color:var(--fg);font-family:var(--font-mono);resize:none;padding:0 0 13px;min-height:80px;width:100%">rm -rf
+sudo rm</textarea>
+        </div>
+      </div>
+      <div style="padding:0 4px;font-size:13px;color:var(--fg3);line-height:1.5;margin-top:-4px">
+        命令或文件路径中包含以上任意关键词时触发。
+      </div>
+
+      <div class="section-header">命中时的动作</div>
+      <div class="list-group">
+        <div class="list-item">
+          <span style="font-size:20px">🚫</span>
+          <span class="list-label">自动拒绝</span>
+          <div style="width:20px;height:20px;border-radius:50%;border:2px solid var(--tint);background:var(--tint);display:flex;align-items:center;justify-content:center">
+            <span style="color:#fff;font-size:12px">✓</span>
+          </div>
+        </div>
+        <div class="list-item">
+          <span style="font-size:20px">⚠️</span>
+          <span class="list-label">弹出确认</span>
+          <div style="width:20px;height:20px;border-radius:50%;border:2px solid var(--bg4)"></div>
+        </div>
+        <div class="list-item">
+          <span style="font-size:20px">📢</span>
+          <span class="list-label">仅通知</span>
+          <div style="width:20px;height:20px;border-radius:50%;border:2px solid var(--bg4)"></div>
+        </div>
+      </div>
+
+      <div class="section-header">适用范围</div>
+      <div class="list-group">
+        <div class="list-item">
+          <span class="list-label">全局（所有工作区）</span>
+          <div class="switch on"></div>
+        </div>
+        <div class="list-item">
+          <span class="list-label">仅 Bash 工具</span>
+          <div class="switch"></div>
+        </div>
+        <div class="list-item">
+          <span class="list-label">仅 WriteFile 工具</span>
+          <div class="switch"></div>
+        </div>
+      </div>
+
+      <!-- 预览按钮 -->
+      <div style="margin-top:8px">
+        <button class="btn btn-secondary" style="width:100%;font-size:15px">🧪 测试规则匹配</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 编辑现有规则（带删除） -->
+  <div class="phone-label">30-B · 编辑危险规则</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nav-back" style="color:var(--tint)">取消</div>
+      <div class="nav-title">编辑规则</div>
+      <div class="nav-right" style="color:var(--tint);font-weight:600">保存</div>
+    </div>
+
+    <div class="screen-body" style="padding-bottom:40px">
+      <div class="section-header">规则名称</div>
+      <div class="list-group">
+        <div class="list-item" style="padding:0 16px">
+          <input style="flex:1;background:none;border:none;outline:none;font-size:16px;color:var(--fg);font-family:inherit;padding:13px 0" value="禁止递归删除">
+        </div>
+      </div>
+
+      <div class="section-header">触发方式</div>
+      <div class="list-group">
+        <div class="list-item">
+          <span style="font-size:20px">🔍</span>
+          <span class="list-label">关键词匹配</span>
+          <div style="width:20px;height:20px;border-radius:50%;border:2px solid var(--tint);background:var(--tint);display:flex;align-items:center;justify-content:center">
+            <span style="color:#fff;font-size:12px">✓</span>
+          </div>
+        </div>
+        <div class="list-item" style="opacity:.5">
+          <span style="font-size:20px">⚡</span>
+          <span class="list-label">正则表达式</span>
+          <div style="width:20px;height:20px;border-radius:50%;border:2px solid var(--bg4)"></div>
+        </div>
+      </div>
+
+      <div class="section-header">匹配模式</div>
+      <div class="list-group">
+        <div class="list-item" style="padding:0 16px;flex-direction:column;align-items:stretch;gap:0">
+          <div style="padding:13px 0 4px;font-size:14px;color:var(--fg2)">关键词（每行一个）</div>
+          <textarea style="background:none;border:none;outline:none;font-size:15px;color:var(--fg);font-family:var(--font-mono);resize:none;padding:0 0 13px;min-height:80px;width:100%">rm -rf
+sudo rm
+rimraf</textarea>
+        </div>
+      </div>
+
+      <div class="section-header">命中时的动作</div>
+      <div class="list-group">
+        <div class="list-item">
+          <span style="font-size:20px">🚫</span>
+          <span class="list-label">自动拒绝</span>
+          <div style="width:20px;height:20px;border-radius:50%;border:2px solid var(--tint);background:var(--tint);display:flex;align-items:center;justify-content:center">
+            <span style="color:#fff;font-size:12px">✓</span>
+          </div>
+        </div>
+        <div class="list-item" style="opacity:.5">
+          <span style="font-size:20px">⚠️</span>
+          <span class="list-label">弹出确认</span>
+          <div style="width:20px;height:20px;border-radius:50%;border:2px solid var(--bg4)"></div>
+        </div>
+      </div>
+
+      <!-- 统计 -->
+      <div class="section-header">使用统计</div>
+      <div class="list-group">
+        <div class="list-item">
+          <span class="list-label" style="color:var(--fg2)">触发次数</span>
+          <span class="list-value">3 次</span>
+        </div>
+        <div class="list-item">
+          <span class="list-label" style="color:var(--fg2)">上次命中</span>
+          <span class="list-value">今天 14:28</span>
+        </div>
+      </div>
+
+      <!-- 删除 -->
+      <div style="margin-top:16px">
+        <button class="btn btn-ghost" style="width:100%;font-size:15px">删除此规则</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.querySelector('.theme-toggle').textContent = isDark ? '🌙 深色' : '☀ 浅色';
+}
+</script>
+</body>
+</html>

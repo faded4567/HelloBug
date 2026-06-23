@@ -10,6 +10,8 @@ export const DaemonConfigSchema = z.object({
   register_url: z.string().url().optional(),
   bootstrap_token: z.string().min(1).optional(),
   allowed_paths: z.array(z.string().min(1)).default([]),
+  pairing_ttl_ms: z.number().int().positive().optional(),
+  pairing_refresh_ms: z.number().int().positive().optional(),
 });
 
 export type DaemonConfig = z.infer<typeof DaemonConfigSchema>;
@@ -26,4 +28,3 @@ export function resolveRegisterUrl(config: DaemonConfig): string {
   }
   return config.server_url;
 }
-

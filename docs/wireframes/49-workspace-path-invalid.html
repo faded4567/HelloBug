@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>49 · 工作区路径失效</title>
+<link rel="stylesheet" href="_common.css">
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+
+  <div class="phone-label">49 · 工作区路径失效</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg><svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg></div></div>
+
+    <div class="nav">
+      <button style="color:var(--tint);font-size:16px;background:none;border:none">‹</button>
+      <div class="nav-title">HelloBug</div>
+      <div style="width:44px"></div>
+    </div>
+
+    <!-- 警告横幅 -->
+    <div style="background:rgba(255,59,48,.1);border-bottom:1px solid rgba(255,59,48,.2);padding:10px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0">
+      <span style="font-size:16px">⚠️</span>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600;color:var(--red)">工作区路径不存在</div>
+        <div style="font-size:11px;color:var(--fg3);font-family:var(--font-mono);margin-top:2px">/Users/shuai/Projects/old-app</div>
+      </div>
+    </div>
+
+    <div class="screen-body" style="align-items:center;justify-content:center;gap:16px;padding:40px 28px;text-align:center">
+      <div style="font-size:52px;opacity:.4">📁</div>
+      <div style="font-size:17px;font-weight:600">路径已失效</div>
+      <div style="font-size:13px;color:var(--fg2);line-height:1.7;max-width:280px">
+        工作区 <b>old-app</b> 对应的本地路径已不存在，可能已被删除或移动。
+      </div>
+
+      <div style="width:100%;display:flex;flex-direction:column;gap:10px;margin-top:8px">
+        <button class="btn btn-primary" style="width:100%">更新工作区路径</button>
+        <button style="color:var(--tint);font-size:15px;padding:8px;background:var(--bg2);border-radius:var(--r);width:100%">在 Mac 端重新创建目录</button>
+        <button style="color:var(--red);font-size:14px;padding:6px">移除此工作区</button>
+      </div>
+    </div>
+
+    <div class="tab-bar">
+      <div class="tab-item active">📂<span>工作区</span></div>
+      <div class="tab-item">🖥<span>设备</span></div>
+      <div class="tab-item">⚙️<span>设置</span></div>
+    </div>
+  </div>
+
+</div>
+<script>
+function toggleTheme() {
+  const h = document.documentElement, d = h.getAttribute('data-theme') === 'dark';
+  h.setAttribute('data-theme', d ? 'light' : 'dark');
+  document.querySelector('.theme-toggle').textContent = d ? '🌙 深色' : '☀ 浅色';
+}
+</script>
+</body>
+</html>

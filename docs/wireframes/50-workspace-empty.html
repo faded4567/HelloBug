@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>50 · 空工作区引导</title>
+<link rel="stylesheet" href="_common.css">
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+
+  <div class="phone-label">50 · 空工作区引导</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg><svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg></div></div>
+
+    <div class="nav">
+      <div style="width:44px"></div>
+      <div class="nav-title">工作区</div>
+      <button style="color:var(--tint);font-size:14px;background:none;border:none;padding:0 8px">+ 新建</button>
+    </div>
+
+    <div class="screen-body" style="align-items:center;justify-content:center;gap:20px;padding:32px 28px;text-align:center">
+      <div style="font-size:64px;opacity:.25">📂</div>
+      <div style="font-size:20px;font-weight:700">还没有工作区</div>
+      <div style="font-size:14px;color:var(--fg2);line-height:1.7;max-width:280px">
+        工作区对应你电脑上的一个项目目录，Agent 在其中运行。
+      </div>
+
+      <div style="width:100%;background:var(--bg2);border-radius:var(--r);padding:16px;text-align:left;margin-top:4px">
+        <div style="font-size:12px;color:var(--fg3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">如何开始</div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;align-items:flex-start;gap:10px">
+            <div style="width:24px;height:24px;border-radius:50%;background:var(--tint);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">1</div>
+            <div style="font-size:13px;color:var(--fg2);line-height:1.5">在 Mac 上打开终端，进入项目目录</div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:10px">
+            <div style="width:24px;height:24px;border-radius:50%;background:var(--tint);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">2</div>
+            <div style="font-size:13px;color:var(--fg2);line-height:1.5">运行 <code style="font-family:var(--font-mono);color:var(--tint)">hellobug init</code> 注册工作区</div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:10px">
+            <div style="width:24px;height:24px;border-radius:50%;background:var(--tint);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">3</div>
+            <div style="font-size:13px;color:var(--fg2);line-height:1.5">回到此页面刷新即可看到工作区</div>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" style="width:100%">手动添加工作区</button>
+    </div>
+
+    <div class="tab-bar">
+      <div class="tab-item active">📂<span>工作区</span></div>
+      <div class="tab-item">🖥<span>设备</span></div>
+      <div class="tab-item">⚙️<span>设置</span></div>
+    </div>
+  </div>
+
+</div>
+<script>
+function toggleTheme() {
+  const h = document.documentElement, d = h.getAttribute('data-theme') === 'dark';
+  h.setAttribute('data-theme', d ? 'light' : 'dark');
+  document.querySelector('.theme-toggle').textContent = d ? '🌙 深色' : '☀ 浅色';
+}
+</script>
+</body>
+</html>

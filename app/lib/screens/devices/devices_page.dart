@@ -1,38 +1,17 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../models/device_summary.dart';
+import '../../state/devices_provider.dart';
 import '../../theme/index.dart';
 
-// Stub model — will be replaced by Riverpod provider in M2
-class _Device {
-  const _Device({
-    required this.id,
-    required this.name,
-    required this.os,
-    required this.isOnline,
-    this.activeSessions = 0,
-    this.workspaces = 0,
-    this.lastSeenMinutes,
-  });
-  final String id;
-  final String name;
-  final String os;
-  final bool isOnline;
-  final int activeSessions;
-  final int workspaces;
-  final int? lastSeenMinutes;
-}
-
-const _stubDevices = [
-  _Device(id: 'd1', name: 'MacBook Pro M3', os: 'macOS 14.5', isOnline: true, activeSessions: 2, workspaces: 3),
-  _Device(id: 'd2', name: '办公室主机', os: 'Ubuntu 22.04', isOnline: false, lastSeenMinutes: 12),
-];
-
-class DevicesPage extends StatelessWidget {
+class DevicesPage extends ConsumerWidget {
   const DevicesPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final devices = ref.watch(devicesProvider);
     return CupertinoPageScaffold(
       backgroundColor: context.colors.bg,
       navigationBar: CupertinoNavigationBar(
@@ -50,7 +29,7 @@ class DevicesPage extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           children: [
             _SectionHeader(label: '已配对'),
-            ..._stubDevices.map((d) => _DeviceCard(device: d)),
+            ...devices.values.map((d) => _DeviceCard(device: d)),
             _SectionHeader(label: '添加'),
             _AddDeviceRow(onTap: () => context.push('/pairing')),
             const SizedBox(height: 20),
@@ -93,11 +72,16 @@ class _SectionHeader extends StatelessWidget {
 
 class _DeviceCard extends StatelessWidget {
   const _DeviceCard({required this.device});
-  final _Device device;
+  final DeviceSummary device;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final lastSeenMins = device.lastSeen != null
+        ? DateTime.now().difference(device.lastSeen!).inMinutes
+        : null;
+    return GestureDetector(
+      onTap: () => context.push('/device/${device.deviceId}', extra: device),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -109,44 +93,47 @@ class _DeviceCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(device.isOnline ? '💻' : '🖥', style: const TextStyle(fontSize: 20)),
+              Text(device.online ? '💻' : '🖥', style: const TextStyle(fontSize: 20)),
               const SizedBox(width: 10),
               Expanded(
-                child: Text(device.name,
+                child: Text(device.machineName,
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: context.colors.fg)),
               ),
               Container(
                 width: 8, height: 8,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: device.isOnline ? const Color(0xFF34C759) : context.colors.fg3,
+                  color: device.online ? const Color(0xFF34C759) : context.colors.fg3,
                 ),
               ),
               const SizedBox(width: 6),
               Text(
-                device.isOnline ? '在线' : '离线',
+                device.online ? '在线' : '离线',
                 style: TextStyle(
                   fontSize: 13,
-                  color: device.isOnline ? const Color(0xFF34C759) : context.colors.fg3,
+                  color: device.online ? const Color(0xFF34C759) : context.colors.fg3,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          Text(device.os, style: TextStyle(fontSize: 13, color: context.colors.fg2)),
+          if (device.os.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(device.os, style: TextStyle(fontSize: 13, color: context.colors.fg2)),
+          ],
           const SizedBox(height: 2),
-          if (device.isOnline)
+          if (device.online && device.activeSessions > 0)
             Text(
-              '${device.activeSessions} 个活跃会话 · ${device.workspaces} 个工作区',
+              '${device.activeSessions} 个活跃会话',
               style: TextStyle(fontSize: 13, color: context.colors.fg2),
             )
-          else if (device.lastSeenMinutes != null)
+          else if (!device.online && lastSeenMins != null)
             Text(
-              '最后在线 ${device.lastSeenMinutes} 分钟前',
+              '最后在线 $lastSeenMins 分钟前',
               style: TextStyle(fontSize: 13, color: context.colors.fg2),
             ),
         ],
       ),
+    ),
     );
   }
 }

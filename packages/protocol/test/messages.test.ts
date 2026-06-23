@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { validateEnvelope } from "../src/envelope.js";
 import { validateMessage, validateNotificationPushPayload } from "../src/messages.js";
 
 describe("protocol message validation", () => {
@@ -104,5 +105,19 @@ describe("protocol message validation", () => {
     });
 
     expect(payload.event_type).toBe("task_done");
+  });
+
+  it("accepts development envelopes with an empty signature placeholder", () => {
+    const envelope = validateEnvelope({
+      from: "app-1",
+      to: "",
+      session_id: "",
+      seq: 1,
+      ts: 1718956800000,
+      sig: "",
+      ciphertext: "eyJ0eXBlIjoiYXV0aC5hdHRhY2gifQ",
+    });
+
+    expect(envelope.sig).toBe("");
   });
 });

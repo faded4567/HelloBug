@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>59 · 按Agent筛选历史</title>
+<link rel="stylesheet" href="_common.css">
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+
+  <div class="phone-label">59 · 按 Agent 筛选历史</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg><svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg></div></div>
+
+    <div class="nav">
+      <button style="color:var(--tint);font-size:16px;background:none;border:none">‹</button>
+      <div class="nav-title">历史记录</div>
+      <button style="color:var(--tint);font-size:13px;background:none;border:none">筛选</button>
+    </div>
+
+    <!-- Filter chips -->
+    <div style="display:flex;gap:8px;padding:8px 16px;overflow-x:auto;flex-shrink:0;scrollbar-width:none">
+      <div style="white-space:nowrap;padding:5px 12px;border-radius:16px;font-size:12px;font-weight:500;background:var(--tint);color:#fff;flex-shrink:0">全部</div>
+      <div style="white-space:nowrap;padding:5px 12px;border-radius:16px;font-size:12px;font-weight:500;background:var(--bg2);color:var(--fg2);flex-shrink:0">🤖 Claude Code</div>
+      <div style="white-space:nowrap;padding:5px 12px;border-radius:16px;font-size:12px;font-weight:500;background:var(--bg2);color:var(--fg2);flex-shrink:0">🤖 Codex CLI</div>
+      <div style="white-space:nowrap;padding:5px 12px;border-radius:16px;font-size:12px;font-weight:500;background:var(--bg2);color:var(--fg2);flex-shrink:0">👥 群组会话</div>
+    </div>
+
+    <div class="screen-body" style="padding:0;gap:0">
+      <!-- Date group -->
+      <div style="padding:8px 16px 4px;font-size:12px;color:var(--fg3);font-weight:600">今天</div>
+
+      <div style="margin:0 12px;background:var(--bg2);border-radius:var(--r);overflow:hidden;margin-bottom:12px">
+        <div style="display:flex;align-items:center;padding:12px 14px;gap:12px;border-bottom:1px solid var(--bg3)">
+          <div style="width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#0a84ff,#5e5ce6);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">🤖</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">优化 bundle 体积</div>
+            <div style="font-size:11px;color:var(--fg3);margin-top:1px">Claude Code · HelloBug</div>
+          </div>
+          <div style="font-size:11px;color:var(--fg3)">09:32</div>
+        </div>
+        <div style="display:flex;align-items:center;padding:12px 14px;gap:12px">
+          <div style="width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#ff9f0a,#ff6b00);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">🤖</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">修复 TypeScript 类型错误</div>
+            <div style="font-size:11px;color:var(--fg3);margin-top:1px">Codex CLI · HelloBug</div>
+          </div>
+          <div style="font-size:11px;color:var(--fg3)">08:14</div>
+        </div>
+      </div>
+
+      <div style="padding:8px 16px 4px;font-size:12px;color:var(--fg3);font-weight:600">昨天</div>
+
+      <div style="margin:0 12px;background:var(--bg2);border-radius:var(--r);overflow:hidden;margin-bottom:12px">
+        <div style="display:flex;align-items:center;padding:12px 14px;gap:12px;border-bottom:1px solid var(--bg3)">
+          <div style="width:32px;height:32px;border-radius:8px;background:rgba(94,92,230,.3);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">👥</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">重构认证模块 · 群组会话</div>
+            <div style="font-size:11px;color:var(--fg3);margin-top:1px">3 个 Agent · HelloBug</div>
+          </div>
+          <div style="font-size:11px;color:var(--fg3)">16:50</div>
+        </div>
+        <div style="display:flex;align-items:center;padding:12px 14px;gap:12px">
+          <div style="width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#0a84ff,#5e5ce6);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">🤖</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">添加单元测试覆盖</div>
+            <div style="font-size:11px;color:var(--fg3);margin-top:1px">Claude Code · HelloBug</div>
+          </div>
+          <div style="font-size:11px;color:var(--fg3)">14:23</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-bar">
+      <div class="tab-item">📂<span>工作区</span></div>
+      <div class="tab-item active">📋<span>历史</span></div>
+      <div class="tab-item">⚙️<span>设置</span></div>
+    </div>
+  </div>
+
+</div>
+<script>
+function toggleTheme() {
+  const h = document.documentElement, d = h.getAttribute('data-theme') === 'dark';
+  h.setAttribute('data-theme', d ? 'light' : 'dark');
+  document.querySelector('.theme-toggle').textContent = d ? '🌙 深色' : '☀ 浅色';
+}
+</script>
+</body>
+</html>

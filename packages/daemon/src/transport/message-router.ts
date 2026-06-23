@@ -1,7 +1,7 @@
 import type { Message } from "@hellobug/protocol";
 
 import type { DeviceIdentity } from "../crypto/keys.js";
-import { buildPairingSasMessage } from "../pairing/responder.js";
+import { buildPairingSasMessage, formatPairingSasLine } from "../pairing/responder.js";
 import { DaemonSessionError } from "../sessions/manager.js";
 import type { DaemonSessionManager } from "../sessions/manager.js";
 import type { DaemonConnection } from "./connection.js";
@@ -88,11 +88,18 @@ export function createDaemonMessageRouter(options: DaemonMessageRouterOptions) {
 
     if (message.type === "device.pair") {
       await options.onPairingRequest?.(message.payload);
-      connection.sendMessage(buildPairingSasMessage(options.identity, message.payload));
+      const sasMessage = buildPairingSasMessage(options.identity, message.payload);
+      console.log(
+        `[pairing] sas: ${formatPairingSasLine(sasMessage)}${message.payload.app_device_name ? ` <- ${message.payload.app_device_name}` : ""}`,
+      );
+      connection.sendMessage(sasMessage);
       return;
     }
 
     if (message.type === "device.pair.confirm") {
+      console.log(
+        `[pairing] ${message.payload.confirmed ? "confirmed" : "cancelled"} by app`,
+      );
       await options.onPairingConfirmed?.(message.payload);
       return;
     }

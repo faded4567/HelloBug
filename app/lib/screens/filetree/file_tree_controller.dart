@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'tree_cache.dart';
 
 class TreeNode {
   TreeNode({
@@ -33,6 +34,7 @@ class FileTreeController extends ChangeNotifier {
 
   TreeNode? root;
   List<FlatTreeEntry> flatList = [];
+  final _cache = TreeCache();
 
   void loadRoot(String workspacePath) {
     root = TreeNode(name: workspacePath.split('/').last, path: workspacePath, isDir: true, loading: true);
@@ -49,6 +51,7 @@ class FileTreeController extends ChangeNotifier {
       isDir: j['is_dir'] as bool? ?? false,
       modified: j['modified'] as bool? ?? false,
     )).toList();
+    _cache.put(parentPath, children);
     _applyToNode(root, parentPath, children);
     _rebuild();
   }
@@ -69,9 +72,14 @@ class FileTreeController extends ChangeNotifier {
   void toggle(TreeNode node) {
     if (!node.isDir) return;
     node.expanded = !node.expanded;
-    if (node.expanded && node.children == null) {
-      node.loading = true;
-      onRequestChildren(node.path);
+    if (node.expanded) {
+      final cached = _cache.get(node.path);
+      if (cached != null) {
+        node.children = cached;
+      } else if (node.children == null) {
+        node.loading = true;
+        onRequestChildren(node.path);
+      }
     }
     _rebuild();
   }

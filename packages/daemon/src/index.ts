@@ -14,6 +14,7 @@ import { CertificateStore, registerDaemon } from "./transport/register.js";
 export async function bootstrapDaemon(): Promise<{
   connection: DaemonConnection;
   pairingSlotManager: PairingSlotManager;
+  announcePairingSlot: () => void;
 }> {
   const config = await loadDaemonConfig();
   const identity = await new DeviceKeyStore().loadOrCreate();
@@ -58,7 +59,16 @@ export async function bootstrapDaemon(): Promise<{
     auditLogger,
     dangerInterceptor,
   });
-  const connection = new DaemonConnection({
+  let connection: DaemonConnection;
+  const announcePairingSlot = () => {
+    pairingSlotManager.pruneExpired();
+    const slot = pairingSlotManager.issuePairingSlot(
+      config.pairing_ttl_ms ?? 30_000,
+    );
+    connection.announcePairingSlot(slot);
+    logPairingSlot(config.server_url, slot);
+  };
+  connection = new DaemonConnection({
     serverUrl: config.server_url,
     identity,
     certificates,
@@ -66,6 +76,7 @@ export async function bootstrapDaemon(): Promise<{
       onMessage: createDaemonMessageRouter({
         identity,
         sessions: sessionManager,
+        onPairingConfirmed: announcePairingSlot,
       }),
     },
   });
@@ -73,13 +84,22 @@ export async function bootstrapDaemon(): Promise<{
     connection.sendMessage(message);
   };
 
-  return { connection, pairingSlotManager };
+  return { connection, pairingSlotManager, announcePairingSlot };
 }
 
 async function main(): Promise<void> {
-  const { connection, pairingSlotManager } = await bootstrapDaemon();
+  const { connection, announcePairingSlot } = await bootstrapDaemon();
   await connection.connect();
-  connection.announcePairingSlot(pairingSlotManager.issuePairingSlot());
+  announcePairingSlot();
+  const timer = setInterval(
+    announcePairingSlot,
+    configRefreshInterval(await loadDaemonConfig()),
+  );
+  timer.unref();
+}
+
+function configRefreshInterval(config: Awaited<ReturnType<typeof loadDaemonConfig>>): number {
+  return config.pairing_refresh_ms ?? 25_000;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
@@ -87,4 +107,21 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.error(error);
     process.exitCode = 1;
   });
+}
+
+function logPairingSlot(
+  serverUrl: string,
+  slot: {
+    pairing_code: string;
+    expires_at: number;
+  },
+): void {
+  const payload = JSON.stringify({
+    pairing_code: slot.pairing_code,
+    server_url: serverUrl,
+  });
+
+  console.log(`[pairing] code: ${slot.pairing_code} (expires ${new Date(slot.expires_at).toISOString()})`);
+  console.log(`[pairing] server: ${serverUrl}`);
+  console.log(`[pairing] qr-payload: ${payload}`);
 }

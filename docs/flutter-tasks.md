@@ -1,8 +1,10 @@
 # HelloBug — Flutter 任务清单
 
-> 本文件只包含 **Claude 负责的 Flutter 前端任务，更新：2026-06-22**。
+> 本文件只包含 **Claude 负责的整个 Flutter 客户端任务，更新：2026-06-23**。
+> 任务完成状态以 `docs/app-remaining-work.md` 为准；本文档主要用于规划与验收。
 > 后端与基础设施由 Codex 负责，见 `docs/codex-tasks.md`。
 > 协议格式规范见 `docs/protocol.md`。
+> Claude 如需快速获取真实现状，请先读 `memory/claude-current.md` 与 `memory/shared/flutter-status.md`；本文档不保证每个里程碑描述都和当前代码完全同步。
 
 ## 进度总览
 
@@ -10,35 +12,40 @@
 |---|---|---|
 | **Spike F1** E2EE 跨端互通 | ⬜ 未完成 | 阻塞：需 Node 端输出跨端 fixture，`noise_ik` / `session_cipher` 仍为占位 |
 | **Spike F2** iOS 后台保活验证 | ⬜ 未开始 | 可与 F1 并行启动；完整验证依赖 F1 完成（加密回放链路） |
-| **Spike F3** Diff 渲染可行性 | ⬜ 未开始 | 与其他 Spike 独立，可随时启动 |
-| **Spike F4** TLS Pinning + JWT 重连 | ⬜ 未开始 | 阻塞：服务器证书 pin bytes 未就绪，`PinnedHttpClient` 为占位 |
-| **M1** 安全骨架 | ⚠️ 基本完成 | 1.4 crypto 层 2 个占位待 F1；1.6 pairing 协议流程待后端联调 |
-| **M2** 聊天闭环 | ⬜ 未开始 | 阻塞：M1 须完全完成（F1 + 后端联调） |
-| **M3** Diff + 文件树 | ⬜ 未开始 | 阻塞：M2 完成 + Spike F3 完成 |
-| **M4** 多并发 + 输入增强 + 推送 | ⬜ 未开始 | 阻塞：M3 完成 + Spike F2/F4 完成 |
+| **Spike F3** Diff 渲染可行性 | ⚠️ 已有 Demo，结论未冻结 | `screens/diff_spike/` 与 `screens/diff/` 已存在，但性能结论和最终路径未正式收口 |
+| **Spike F4** TLS Pinning + JWT 重连 | ⚠️ 骨架已落地，验证未完成 | `PinnedHttpClient`、`auth.attach`、replay 逻辑已在代码中，但 pin 与完整恢复链路未完成 |
+| **M1** 安全骨架 | ⚠️ UI 骨架已深度落地，运行时未闭环 | crypto 仍有 stub；pairing 已部分联调但未闭环；`wsClientProvider` 仍默认 `null` 但 bootstrap / pairing 已能注入真实 client；unlock / devices 仍有未接线处 |
+| **M2** 聊天闭环 | ⚠️ 第一版页面与 Provider 已存在，未形成真实闭环 | sessions / new-session / chat / history / danger rules / workspace switch 等已在代码中，但大多仍缺真实 transport 接线 |
+| **M3** Diff + 文件树 | ⚠️ 第一版实现已存在，协议与大文件能力未收口 | diff、file tree、file preview 已有代码，但仍有 `fs.read` / `content` 等协议偏差 |
+| **M4** 多并发 + 输入增强 + 推送 | ⚠️ 部分模块已落地，后半段仍未开始 | terminal、image input、voice input、slash palette、security、notifications、device detail、appearance、about 已存在；push wiring 与 multi-tab 仍未完成 |
+
+## 现状说明（2026-06-23）
+
+- 本文档仍是 **Flutter 侧任务规划与验收文档**，但当前 `app/` 代码已经明显超前于其中不少“M2/M3/M4 未开始”的描述。
+- 当前最需要 Claude 理解的不是“哪些页面还没写”，而是“哪些页面已经有了第一版 UI / 本地逻辑，但还没有真正接上运行时链路”。
+- Claude 当前负责的是整个 Flutter 客户端，不只是页面层；因此这里的重点同时包含 `state / transport / crypto / bootstrap / router`。
+- 核心阻塞不是 UI 数量，而是：
+  1. `wsClientProvider` 默认仍为 `null`，但 `bootstrap()` 与配对成功后都已能注入真实 `WsClient`
+  2. `bootstrap()` 还没串起 local auth 生命周期、pinning、transport lifecycle observer
+  3. 配对流程已部分打通，但缺 `device.push_token`、pin 保存与 E2EE 握手
+  4. app 与 server / daemon 在协议边界和部分消息字段上还有偏差（当前最明显是 `fs.read` / `content`）
 
 ---
 
 ## 后续工作执行顺序
 
 ```
-当前可并行启动：
-  ├── Spike F1（E2EE 跨端互通）   ← 等待 Node 端 fixture 输出
-  ├── Spike F2 前半段（后台/保活，非加密部分）
-  └── Spike F3（Diff 渲染可行性） ← 完全独立，随时可开始
+当前优先收口：
+  ├── Spike F1（E2EE 跨端互通）
+  ├── M1 运行时接线：真实 WsClient 注入、bootstrap 初始化、pairing 联调
+  ├── App 协议对齐：`session.resume` / `fs.file.req` / `data`
+  ├── 现有页面接活：devices / danger.pending / file preview / history / reconnect
+  └── Spike F4（pinning + JWT 恢复）
 
-F1 完成后解锁：
-  ├── Spike F2 后半段（加密回放链路完整验证）
-  └── M1 1.4 crypto 层（noise_ik / session_cipher 真实实现）
-
-后端 server 联调完成后解锁：
-  └── M1 1.6 pairing_controller 协议流程补全
-
-M1 全部完成 → M2（聊天闭环，5-7 天）
-
-M2 完成 + Spike F3 完成 → M3（Diff + 文件树，5-7 天）
-
-M3 完成 + Spike F2 完成 + Spike F4 完成 → M4（多并发 + 推送，7-10 天）
+完成以上收口后：
+  ├── 把已存在的 M2 页面和 Provider 接成真实闭环
+  ├── 结束 Spike F3 结论，并把已存在的 diff / filetree 实现收口到 M3 标准
+  └── 再进入 M4 后半段（voice / push / security / device detail / multi-tab）
 ```
 
 > **Spike F4 启动条件**：服务器证书 pin bytes 就绪后随时可开始，不依赖其他 Spike，但须在 M4 开始前完成。
@@ -103,6 +110,7 @@ M3 完成 + Spike F2 完成 + Spike F4 完成 → M4（多并发 + 推送，7-10
 ## M1：安全骨架（约 5-7 天）
 
 ### ✅ 1.1 Flutter 工程骨架与 `pubspec`
+> **现状补充**：工程骨架、路由、主题、模型与依赖已经落地；`bootstrap.dart` 已能恢复持久化 runtime、安装 `WsClient` 并自动连接，但仍未串起本地生物识别生命周期、证书 pin 与 transport lifecycle observer。
 
 ```
 app/
@@ -126,7 +134,7 @@ app/
 - `app/pubspec.yaml`：固定 Flutter 3.27+ / Dart 3.7+ 约束，补齐 `freezed`、`Riverpod`、加密、推送、终端、diff 等核心依赖
 - `app/lib/main.dart`：只负责 `WidgetsFlutterBinding.ensureInitialized()`、错误上报入口、调用 `bootstrap()`
 - `app/lib/bootstrap.dart`：初始化 `flutter_secure_storage`、本地生物识别、证书 pin、日志、根 ProviderScope
-- `app/lib/app.dart`：实现根 `CupertinoApp`，统一路由表、深浅主题、全局 `CupertinoTabScaffold`
+- `app/lib/app.dart`：实现根 `CupertinoApp.router`，统一路由表、深浅主题，并通过 `GoRouter` 壳接出根导航
 - `app/lib/models/`：建立 `Envelope`、`Payload`、`SessionEvent`、`DeviceSummary` 等 `freezed` 模型与 `json_serializable` 代码生成链路
 - `analysis_options.yaml`：打开严格 lint，禁止 UI 层直接拼协议 JSON，要求经 model / mapper 统一转换
 
@@ -149,9 +157,11 @@ app/lib/theme/
 - `code_theme.dart`：为 `flutter_highlight` 单独定义深浅代码高亮色，不直接复用正文主题
 - `theme_controller.dart`：用 Riverpod 暴露 `themeMode`、`codeFontScale`、`diffViewMode` 等可持久化设置
 - Android 侧仍以 `Cupertino` 为主，不额外做一套 `Material` UI；Material 仅用于必须的宿主能力桥接
-- 根级 Tab 固定为 `设备 | 会话 | 设置`，色彩和选中态也由 token 控制，不允许各页各自定义
+- 根级导航当前已切到 2-tab 方向，视觉上以 `工作区 | 设置` 为准；但当前第一 branch 仍挂在 `/sessions`，真正的工作区主页语义还未完全落地
+- 根级导航的色彩和选中态也由 token 控制，不允许各页各自定义
 
 ### ✅ 1.3 `app/lib/transport/` — WebSocket 网络层骨架
+> **现状补充**：`WsClient`、reconnect、`auth.attach`、`last_seq` bookkeeping 等骨架都已存在；`PinnedHttpClient` 仍为占位实现，`wsClientProvider` 仍默认返回 `null`，但应用已经有两条真实 client 注入路径：`bootstrap()` 恢复已持久化 runtime，以及配对成功后直接安装 live client。
 
 文件结构：
 ```
@@ -212,7 +222,7 @@ app/lib/crypto/
   - 文案要和真实能力对齐，不提前承诺未做完的多人协作或云端持久化
 
 ### ⚠️ 1.6 `app/lib/screens/pairing/` — 配对页（扫码 + 手动）与 SAS 核对页
-> **未完成项**：`pairing_controller._start()` 中 `device.pair` / `device.pair.sas` / `device.pair.confirm` / `auth.token` / `device.push_token` 的实际协议流程为 stub，等 `WsClient` 与后端联调后补全。页面骨架（`pairing_entry_page`、`qr_scan_page`、`manual_pair_page`、`sas_verify_page`、`pairing_controller`）已全部创建。
+> **现状补充**：配对页骨架已齐，且 `pairing_controller.dart` 已经会发送 `device.pair`、等待 `device.pair.sas`、发送 `device.pair.confirm`、等待 `auth.token`、持久化 runtime 并安装 live `WsClient`。未完成项主要是 `device.push_token`、pin 持久化、设备元数据持久化与真实 E2EE 握手。另：`manual_pair_page.dart` 当前仍是命名/职责错位的占位页，真实手输流程已内嵌在 `pairing_entry_page.dart`。
 
 文件结构：
 ```
@@ -238,7 +248,8 @@ app/lib/screens/pairing/
 - 配对成功后要把设备别名、服务器地址、公钥指纹持久化，供设备列表页显示
 - 配对完成后立即向服务器上报推送注册信息：iOS 上报 `apns_token`，Android 上报 `manufacturer`（Xiaomi / OPPO / vivo / Other）和对应的厂商推送 token；服务器依赖这两个字段路由推送，必须在首次配对时完成，不能延迟到 M4
 
-### ✅ 1.7 `app/lib/screens/unlock/` — 启动锁屏页与生命周期锁
+### ⚠️ 1.7 `app/lib/screens/unlock/` — 启动锁屏页与生命周期锁
+> **现状补充**：`UnlockPage`、`UnlockController`、`AppLifecycleObserver` 与 `UnlockGate` 都已存在，且 `HelloBugApp` 现在已经用 `UnlockGate` 包住根路由；但 `AppLifecycleObserver` 还没有在 `bootstrap()` 中 attach，当前“后台超过 5 分钟重新上锁”链路并未真正启用。
 
 - `unlock_gate.dart`：应用启动时统一拦截，未解锁前不进入 Tab 主界面
 - `unlock_page.dart`：展示 Face ID / 指纹解锁按钮和失败态
@@ -249,12 +260,12 @@ app/lib/screens/pairing/
   - 生物识别失败时允许密码兜底，但不允许直接绕过
   - 解锁成功后恢复上一页状态，不清空当前会话草稿
 
-### ✅ 1.8 `app/lib/screens/devices/` — 设备列表页与根 Tab 壳
-> **说明**：当前使用 stub 数据，M2 接入真实 `devices_provider` 后替换。
+### ⚠️ 1.8 `app/lib/screens/devices/` — 设备列表页与根 Tab 壳
+> **现状补充**：`devices_provider.dart` 已存在并可消费 `device.status`，`devices_page.dart` 也已经使用 provider 数据渲染设备卡片；同时根导航壳已经从旧的 3-tab 假设切到 2-tab 方向。当前缺口主要在设备详情入口、解绑/吊销流、刷新与错误态，以及新 2-tab 信息架构下的页面语义收口。
 
 - `devices_page.dart`：显示已绑定设备、在线/离线、系统版本、活跃会话数、最近在线时间
 - `device_card.dart`：设备卡片样式统一，在线状态与颜色来自 token，不在业务层硬编码
-- `root_tab_scaffold.dart`：根 `CupertinoTabScaffold`，承载 `设备 | 会话 | 设置`
+- `root_tab_scaffold.dart`：根导航壳；当前已切成 2 个 tab，但第一 branch 仍暂时承载 `SessionsPage`
 - `devices_provider.dart`：拉取设备状态，订阅 `device.status` 变化并驱动 UI
 - 交互要求：
   - 支持下拉刷新
@@ -264,11 +275,12 @@ app/lib/screens/pairing/
 
 ---
 
-## M2：聊天闭环（约 5-7 天）⬜ 未开始
+## M2：聊天闭环（约 5-7 天）⚠️ 第一版代码已落地，未形成真实闭环
 
-> **未开始原因**：阻塞于 M1 完全完成——1.4 `noise_ik` / `session_cipher` 须在 Spike F1 fixture 核对后实现；1.6 `pairing_controller` 协议流程须后端（Codex）server 联调完成。两项均未解锁前不应进入 M2。
+> **现状说明**：M2 的多数页面、widgets 与 providers 已经存在于 `app/lib/` 中，不应再按“从零开始”理解；当前工作重点是把它们接上真实 transport、补协议对齐、补全全局交互链路。
 
-### ⬜ 2.1 `app/lib/state/` — 会话领域模型与 Riverpod Provider
+### ⚠️ 2.1 `app/lib/state/` — 会话领域模型与 Riverpod Provider
+> **现状补充**：`sessions_provider.dart`、`chat_provider.dart`、`devices_provider.dart`、`drafts_provider.dart`、`settings_provider.dart` 已存在；`chat_item.dart`、`danger_request.dart`、`template_summary.dart` 也已创建。当前主要缺口是 provider 仍缺少真实 `WsClient` 来源、持久化与更完整的事件建模。
 
 文件结构：
 ```
@@ -295,7 +307,8 @@ app/lib/state/
   - 流式 `assistant.delta` 必须增量拼接，不能每个 token 新建一个气泡
   - `assistant.thinking` 与 `tool.use` 要保留原始事件结构，方便后续跳转与调试
 
-### ⬜ 2.2 `app/lib/screens/sessions/` — 会话列表页
+### ⚠️ 2.2 `app/lib/screens/sessions/` — 会话列表页
+> **现状补充**：`SessionsPage` 与 `SessionTile` 已存在，可显示空态、未读数与进入聊天页；搜索页、过滤能力与真实后台更新链路仍未完成。
 
 - `sessions_page.dart`：显示进行中与最近会话，两类信息流可混排但视觉上要区分
 - `session_tile.dart`：每项包含项目名、agent 类型、最后一条摘要、未读点、进行中标记
@@ -306,7 +319,8 @@ app/lib/state/
   - 最近查看的置顶
   - 后台会话继续流式更新未读数
 
-### ⬜ 2.3 `app/lib/screens/new_session/` — 新建会话向导（三步）
+### ⚠️ 2.3 `app/lib/screens/new_session/` — 新建会话向导（三步）
+> **现状补充**：`new_session_flow.dart` 已实现三步设备 / 工作区 / agent 选择，并会 optimistic 创建本地会话后发送 `session.start`；但当前仍保留 dev stub device 兜底，也缺少更完整的确认项与错误处理。
 
 文件结构：
 ```
@@ -328,7 +342,8 @@ app/lib/screens/new_session/
   - 新建会话过程中如果设备离线，要明确提示而不是静默失败
   - 如果协议最终把工作区选择拆为单独消息，向导层要可兼容，不把协议细节写死在 widget 内
 
-### ⬜ 2.4 `app/lib/screens/chat/` — 聊天主页骨架
+### ⚠️ 2.4 `app/lib/screens/chat/` — 聊天主页骨架
+> **现状补充**：`ChatPage`、`ChatTimeline`、`ChatInputBar`、`ChatHeader`、`ChatStatusBanner` 均已存在，并能消费第一版 provider；但全局 `danger.pending`、图片 / 语音入口与真实 transport 闭环仍未完成。
 
 文件结构：
 ```
@@ -351,7 +366,8 @@ app/lib/screens/chat/
   - `session.cancel` 能从 header 或输入栏快捷触发
   - `session.done` 到达后正确收口“处理中”状态，不遗留 loading
 
-### ⬜ 2.5 `app/lib/widgets/` — 消息泡与折叠卡片
+### ⚠️ 2.5 `app/lib/widgets/` — 消息泡与折叠卡片
+> **现状补充**：`message_bubble.dart`、`tool_use_card.dart`、`tool_result_card.dart`、`thinking_card.dart`、`diff_card.dart` 已存在；`message_actions_sheet.dart` 尚未实现，折叠状态持久化也还不完整。
 
 文件结构：
 ```
@@ -375,7 +391,8 @@ app/lib/widgets/
   - 所有折叠态都要持久到 provider，不要因为列表重建而丢失展开状态
   - `tool_input` / `tool_result` 可能很大，卡片内必须有截断和懒展开机制
 
-### ⬜ 2.6 输入栏、模板芯片与消息发送流
+### ⚠️ 2.6 输入栏、模板芯片与消息发送流
+> **现状补充**：`chat_input_bar.dart`、`template_chip_bar.dart`、`slash_palette/` 已存在，文本发送、斜杠命令发送与 optimistic echo 已有第一版逻辑；但模板仍是静态 `kDefaultTemplates`，尚未接 `templates.list` 与设置页。
 
 - `template_chip_bar.dart`：横向滚动模板芯片，至少支持 `git status`、`跑测试`、`看最近 5 个 commit`
 - `chat_input_controller.dart`：管理草稿、发送态、禁用态、多行高度
@@ -384,7 +401,8 @@ app/lib/widgets/
 - 模板点击后先插入输入框，由用户确认再发，不要直接无提示发送
 - 后续 M4 的图片、语音、斜杠入口在这里扩展，M2 先把插槽和布局留好
 
-### ⬜ 2.7 `app/lib/widgets/danger_confirm/` 与 `workspace_switch/`
+### ⚠️ 2.7 `app/lib/widgets/danger_confirm/` 与 `workspace_switch/`
+> **现状补充**：`danger_confirm_sheet.dart`、`workspace_switch_sheet.dart` 与工作区历史持久化都已存在；但 `danger.pending` 还没有全局监听并自动弹出确认框，工作区切换也仍缺与聊天 / 文件树 / 分支上下文的完整联动。
 
 文件结构：
 ```
@@ -407,7 +425,8 @@ app/lib/widgets/workspace_switch/
   - `danger.pending` 到来时要能从任何前台页弹出，不要求用户先回聊天页
   - 超时 60 秒自动拒绝的 UI 反馈要明显，不能用户以为还在等待
 
-### ⬜ 2.8 `app/lib/screens/settings/danger_rules_page.dart` — 危险规则设置页
+### ⚠️ 2.8 `app/lib/screens/settings/danger_rules_page.dart` — 危险规则设置页
+> **现状补充**：页面、增删改 UI 与正则基础校验已存在；当前规则仍主要存于 app 侧内存 settings state，尚未完成持久化深度与 daemon 侧同步约定。
 
 - `danger_rules_page.dart`：黑白名单列表页
 - `danger_rule_form_sheet.dart`：新建 / 编辑规则，支持 pattern、mode、desc
@@ -418,7 +437,8 @@ app/lib/widgets/workspace_switch/
   - 不允许保存明显非法的正则
 - 页面文案要强调：规则实际执行在 daemon 侧，Flutter 只负责管理与确认
 
-### ⬜ 2.9 `app/lib/screens/history/` — 历史 Transcript 浏览
+### ⚠️ 2.9 `app/lib/screens/history/` — 历史 Transcript 浏览
+> **现状补充**：`HistoryListPage` 与 `HistoryDetailPage` 已存在，并具备 `history.list` / `history.get` 的分页读取第一版逻辑；但专门的 controller 分层、只读态约束与“从历史继续”仍未收口。
 
 文件结构：
 ```
@@ -439,11 +459,12 @@ app/lib/screens/history/
 
 ---
 
-## M3：Diff + 文件树（约 5-7 天）
+## M3：Diff + 文件树（约 5-7 天）⚠️ 第一版代码已存在，需继续收口
 
-> **未开始原因**：阻塞于 M2 完成 + Spike F3（diff 渲染可行性）完成。M3 的 diff 实现路径直接取决于 F3 结论（自写 vs 第三方）。
+> **现状说明**：`app/lib/diff/`、`screens/diff/`、`screens/diff_spike/`、`screens/filetree/` 已经不是空白目录；当前重点是把现有实现和 Spike F3 结论、后端协议、超大文件体验收敛一致。
 
-### 3.1 `app/lib/screens/diff/` — Diff 全屏页
+### ⚠️ 3.1 `app/lib/screens/diff/` — Diff 全屏页
+> **现状补充**：`DiffPage`、diff parser、统一/分栏视图与 hunk 跳转第一版都已存在；但专门 controller / navigator 分层尚未独立，F3 的正式结论也还没有冻结。
 
 文件结构：
 ```
@@ -468,7 +489,8 @@ app/lib/screens/diff/
   - 深色主题下增删颜色要对比清楚，但不能刺眼
   - 空白行、仅改缩进、无换行符结尾等边界要正确显示
 
-### 3.2 `app/lib/widgets/diff_card.dart` — 聊天内 diff 内联卡片
+### ⚠️ 3.2 `app/lib/widgets/diff_card.dart` — 聊天内 diff 内联卡片
+> **现状补充**：`diff_card.dart` 已存在并可在聊天流中展示；后续主要是与真实 `file.changed` 数据、全屏 diff 跳转和多文件改动样式继续收口。
 
 - 卡片信息至少包含：`file_path`、新增行数、删除行数、首个 hunk 摘要
 - 点击进入 `diff_page.dart`
@@ -476,7 +498,8 @@ app/lib/screens/diff/
 - 如果同一轮修改多个文件，卡片样式要支持连续列表展示
 - 与 `session.event` 的 `file.changed` 字段严格对齐，不自己猜 diff
 
-### 3.3 `app/lib/screens/filetree/` — 文件树页
+### ⚠️ 3.3 `app/lib/screens/filetree/` — 文件树页
+> **现状补充**：`FileTreePage`、`FileTreeController`、`TreeNodeTile`、`TreeCache` 均已存在，支持第一版懒加载与展开；但稳定协议与 session wiring 仍未完成。
 
 文件结构：
 ```
@@ -497,7 +520,8 @@ app/lib/screens/filetree/
   - 目录展开状态在横竖屏切换时保持
   - 修改文件用橙色点或标记，不要用整行强色块压住层级结构
 
-### 3.4 `app/lib/screens/filetree/file_preview_page.dart` — 单文件只读预览
+### ⚠️ 3.4 `app/lib/screens/filetree/file_preview_page.dart` — 单文件只读预览
+> **现状补充**：`file_preview_page.dart` 已存在并能做第一版分片拼装；但当前仍使用 `fs.read` + `content`，与 `docs/protocol.md` 的 `fs.file.req` + `data` 存在偏差，也还没有高亮与虚拟滚动。
 
 - `file_preview_page.dart`：只读内容页，支持代码高亮和文本类文件预览
 - `chunked_file_controller.dart`：处理 `fs.file` 分片拼装、base64 解码、大文件分段加载
@@ -507,7 +531,8 @@ app/lib/screens/filetree/
   - 大文件滚动位置要稳定，不因后续 chunk 到达而跳动
   - 内容只读，不开放编辑入口，避免越过项目边界
 
-### 3.5 工作区切换与聊天 / 文件树联动补全
+### ⚠️ 3.5 工作区切换与聊天 / 文件树联动补全
+> **现状补充**：工作区切换 sheet 与 `workspace_history_provider.dart` 已存在，并且最近 / 置顶历史可持久化；但聊天、文件树、Diff、分支上下文之间的联动仍是半成品。
 
 - 把 M2 的 `workspace_switch_sheet.dart` 扩展成完整工作区上下文入口
 - 聊天页、文件树页、Diff 页都要感知当前工作区与当前分支
@@ -516,11 +541,12 @@ app/lib/screens/filetree/
 
 ---
 
-## M4：多并发 + 输入增强 + 推送（约 7-10 天）
+## M4：多并发 + 输入增强 + 推送（约 7-10 天）⚠️ 前半段部分已落地
 
-> **未开始原因**：阻塞于 M3 完成 + Spike F2（iOS 后台保活）+ Spike F4（TLS Pinning + JWT 重连）。F2 结论决定推送策略；F4 填入真实 pin 材料和完整连接恢复逻辑，两项均为 M4 硬前置。
+> **现状说明**：terminal、image input、voice input、slash palette、security、notifications、device detail、appearance、about 等已经不再是空白；M4 当前更像“前半段已有第一版实现，后半段推送 wiring / 多会话并发 / 若干运行时接线还未收口”。
 
-### 4.1 `app/lib/screens/terminal/` — 终端页
+### ⚠️ 4.1 `app/lib/screens/terminal/` — 终端页
+> **现状补充**：`TerminalPage`、`PtySessionController`、`TerminalToolbar` 已存在，并能通过 `pty.input` / `pty.data` 走第一版消息链路；连接状态、字号与更多宿主行为仍未收口。
 
 文件结构：
 ```
@@ -541,7 +567,8 @@ app/lib/screens/terminal/
   - 竖屏优先展示内容，工具栏固定在键盘上方
   - 横屏时尽量减少 chrome，让 terminal 可视区足够大
 
-### 4.2 `app/lib/screens/image_input/` — 图片输入页
+### ⚠️ 4.2 `app/lib/screens/image_input/` — 图片输入页
+> **现状补充**：`image_input_sheet.dart` 与 `image_compress_service.dart` 已存在，可完成选择、压缩与分片发送；但当前是 inline 预览流程，尚未实现独立 preview page，也还未补终止帧等更严格协议细节。
 
 - `image_input_sheet.dart`：相机 / 相册入口
 - `image_preview_page.dart`：预览、裁剪、旋转、压缩结果确认
@@ -551,7 +578,8 @@ app/lib/screens/terminal/
   - 压缩失败或图片过大时要有明确提示
   - 发送前预览必须可取消，不能拍完即自动上行
 
-### 4.3 `app/lib/screens/voice_input/` — 语音输入页
+### ⚠️ 4.3 `app/lib/screens/voice_input/` — 语音输入页
+> **现状补充**：`voice_input_sheet.dart` 已存在，聊天输入栏也已经接入语音入口；当前主要缺口是权限、转写状态、失败恢复与 `session.input.voice_text` 的完整客户端状态机收口。
 
 - `voice_input_sheet.dart`：按住录音、取消、重试入口
 - `speech_session_controller.dart`：封装 `speech_to_text` 的权限、开始、停止、错误恢复
@@ -564,7 +592,8 @@ app/lib/screens/terminal/
   - 部分转写与最终转写要区分显示
   - 权限被拒后要能回到手动输入，不阻塞聊天
 
-### 4.4 `app/lib/widgets/slash_palette/` — 斜杠命令浮动面板
+### ⚠️ 4.4 `app/lib/widgets/slash_palette/` — 斜杠命令浮动面板
+> **现状补充**：`slash_palette.dart` 与 `slash_palette_controller.dart` 已存在，可通过 `slash.list` 拉当前命令集并做筛选 / 插入；更完整的参数 UI 与不同 agent 差异化体验仍待补强。
 
 文件结构：
 ```
@@ -583,7 +612,8 @@ app/lib/widgets/slash_palette/
   - Claude Code / Codex / shell 的命令集不同，面板不能写死
   - 浮层要兼容软键盘、横屏和外接键盘焦点切换
 
-### 4.5 通知、推送注册与设置页收口
+### ⚠️ 4.5 通知、推送注册与设置页收口
+> **现状补充**：`settings_home_page.dart`、`notifications_page.dart`、`security_page.dart`、`appearance_page.dart`、`templates_page.dart`、`danger_rules_page.dart`、`device_detail_page.dart`、`about_page.dart` 都已经有第一版页面；当前缺口主要在推送注册、真实权限状态、真实设备/安全数据源，以及设置页状态机收口。
 
 文件结构：
 ```
@@ -616,7 +646,7 @@ app/lib/notifications/
   - 推送 payload 只展示高层事件，不泄漏代码或用户输入
   - M2 已实现的 `danger_rules_page.dart` 在 M4 需要归档进完整设置体系
 
-### 4.6 多 tab 并发会话 UI 与横屏双栏布局
+### ⬜ 4.6 多 tab 并发会话 UI 与横屏双栏布局
 
 文件结构：
 ```
@@ -666,6 +696,10 @@ Flutter 不直连 daemon，不直接访问本地文件系统，也不假设 daem
 9. M4 终端模式下，`pty.data` 必须是 base64 字节流，`pty.resize` 的响应时序需要稳定。
 
 ### Flutter 调用的 WebSocket 消息（完整列表见 `docs/protocol.md`）
+
+> **当前代码偏差（待统一，2026-06-23）**：
+> - `WsClient` 重放当前已经发送 `session.resume`
+> - 文件预览当前仍在发送 `fs.read` 并读取 `fs.file.payload.content`，后续需统一到 `fs.file.req` 与 `data`
 
 ```
 App → Server:
@@ -739,30 +773,31 @@ Flutter 对这些消息的 UI 映射必须固定：
 ```yaml
 app/pubspec.yaml 关键依赖:
 dependencies:
-  web_socket_channel: 3.0.3
-  cryptography: 2.9.0
-  flutter_riverpod: 3.3.2
-  riverpod: 3.3.2
-  freezed_annotation: 3.1.0
-  json_annotation: 4.12.0
-  mobile_scanner: 7.2.0
-  flutter_secure_storage: 10.3.1
-  local_auth: 3.0.1
-  dio: 5.9.2
-  http_certificate_pinning: 3.0.1
+  web_socket_channel: ^3.0.2
+  cryptography: ^2.7.0
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.6.1
+  freezed_annotation: ^3.0.0
+  json_annotation: ^4.9.0
+  mobile_scanner: ^7.0.1
+  flutter_secure_storage: ^9.2.4
+  local_auth: ^2.3.0
+  dio: ^5.8.0+1
   xterm: 4.0.0
   flutter_highlight: 0.7.0
-  image_picker: 1.2.2
-  flutter_image_compress: 2.4.0
-  speech_to_text: 7.4.0
-  flutter_apns_only: 1.6.0
+  image_picker: ^1.1.2
+  flutter_image_compress: ^2.3.0
+  speech_to_text: ^7.0.0
+  go_router: ^14.6.3
 
 dev_dependencies:
-  build_runner: 2.15.0
-  freezed: 3.2.5
-  json_serializable: 6.14.0
+  build_runner: ^2.4.13
+  freezed: ^3.0.0
+  json_serializable: ^6.8.0
+  riverpod_generator: ^2.6.5
 ```
 
-所有依赖版本固定，`pubspec.lock` 一并提交入库；加密、网络与推送相关依赖升级前必须重新跑 Spike F1 / F2 / F4。  
+当前仓库实际依赖以上述 `pubspec.yaml` 为准；F4 / 推送相关依赖（如 `http_certificate_pinning`、`flutter_apns_only`）尚未进入当前代码快照，待相应 Spike / M4 收口后再固定。  
+`pubspec.lock` 应继续一并提交入库；加密、网络与推送相关依赖升级前必须重新跑 Spike F1 / F2 / F4。  
 `golden_toolkit` 已不再维护，golden test 直接使用 `flutter_test` 内置的 `matchesGoldenFile`，删除该依赖。  
 `http_certificate_pinning` 与 `dio 5.x` 的兼容性需在 Spike F4 中验证；若不兼容，替换为直接操作 `SecurityContext` 的自写方案，版本号待 Spike 确认后固定。

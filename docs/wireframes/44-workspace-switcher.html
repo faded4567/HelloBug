@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>44 · 工作区切换器</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+.seg-ctrl{display:flex;background:var(--bg3);border-radius:var(--r-sm);padding:2px;margin:8px 16px 0;flex-shrink:0}
+.seg-item{flex:1;text-align:center;padding:5px 0;font-size:13px;border-radius:calc(var(--r-sm) - 2px);color:var(--fg2)}
+.seg-item.active{background:var(--bg2);color:var(--fg);font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.ws-row{display:flex;align-items:flex-start;padding:12px 16px;gap:12px;border-bottom:1px solid var(--separator)}
+.ws-row:last-child{border-bottom:none}
+.chk{width:20px;height:20px;border-radius:50%;border:2px solid var(--separator);flex-shrink:0;margin-top:1px}
+.chk.on{border-color:var(--tint);background:var(--tint);display:flex;align-items:center;justify-content:center}
+.field-row{padding:10px 16px;border-bottom:1px solid var(--separator);display:flex;flex-direction:column;gap:4px}
+.field-label{font-size:12px;color:var(--fg3)}
+.field-input{font-size:15px;color:var(--fg);background:none;border:none;outline:none;width:100%;font-family:var(--font-ui)}
+.field-input.mono{font-family:var(--font-mono);font-size:13px}
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+
+  <!-- A: 工作区列表 sheet -->
+  <div class="phone-label">44-A · 工作区切换器 — 列表</div>
+  <div class="phone" style="position:relative;overflow:hidden">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <!-- blurred background -->
+    <div class="nav" style="filter:blur(1px)">
+      <div style="display:flex;align-items:center;gap:4px">
+        <span style="font-size:17px;font-weight:600">HelloBug</span>
+        <svg viewBox="0 0 10 6" width="10" height="6" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 1l4 4 4-4"/></svg>
+      </div>
+    </div>
+    <div class="seg-ctrl" style="filter:blur(1px)">
+      <div class="seg-item active">会话</div>
+      <div class="seg-item">历史</div>
+    </div>
+    <div style="flex:1;filter:blur(2px)">
+      <div class="ws-row">
+        <div style="width:9px;height:9px;border-radius:50%;background:var(--green);margin-top:4px;flex-shrink:0"></div>
+        <div><div style="font-size:15px">补全 router.dart 路由</div></div>
+      </div>
+    </div>
+
+    <!-- Sheet -->
+    <div class="sheet-overlay"></div>
+    <div class="sheet" style="padding-bottom:40px;max-height:72%">
+      <div class="sheet-handle"></div>
+      <div style="display:flex;align-items:center;padding:0 16px 14px">
+        <div style="font-size:17px;font-weight:600;flex:1">切换工作区</div>
+        <button style="color:var(--tint);font-size:15px;background:none;border:none;cursor:pointer">完成</button>
+      </div>
+
+      <!-- workspace list -->
+      <div style="overflow-y:auto;flex:1">
+        <!-- active -->
+        <div class="ws-row">
+          <div class="chk on">
+            <svg viewBox="0 0 10 8" width="10" height="8" fill="none" stroke="#fff" stroke-width="2"><path d="M1 4l3 3 5-6"/></svg>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px;font-weight:500">HelloBug</div>
+            <div style="font-size:12px;color:var(--fg3);font-family:var(--font-mono);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">/Users/shuai/HelloBug</div>
+            <div style="font-size:12px;color:var(--fg2);margin-top:2px">💻 MacBook Pro · 2 个 agent</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <div style="width:7px;height:7px;border-radius:50%;background:var(--green)"></div>
+            <span style="font-size:12px;color:var(--green)">运行中</span>
+          </div>
+        </div>
+        <!-- idle -->
+        <div class="ws-row">
+          <div class="chk"></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px">api-server</div>
+            <div style="font-size:12px;color:var(--fg3);font-family:var(--font-mono);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">/Users/shuai/api-server</div>
+            <div style="font-size:12px;color:var(--fg2);margin-top:2px">💻 MacBook Pro · 1 个 agent</div>
+          </div>
+          <span style="font-size:12px;color:var(--fg3)">空闲</span>
+        </div>
+        <!-- different device -->
+        <div class="ws-row">
+          <div class="chk"></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px">data-pipeline</div>
+            <div style="font-size:12px;color:var(--fg3);font-family:var(--font-mono);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">/root/data-pipeline</div>
+            <div style="font-size:12px;color:var(--fg2);margin-top:2px">🖥 Linux Server · 1 个 agent</div>
+          </div>
+          <span style="font-size:12px;color:var(--fg3)">离线</span>
+        </div>
+      </div>
+
+      <!-- new workspace button -->
+      <div style="padding:12px 16px 0;border-top:1px solid var(--separator);margin-top:4px">
+        <button style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border-radius:var(--r);border:1.5px dashed var(--tint);background:rgba(0,122,255,.06);color:var(--tint);font-size:15px;cursor:pointer">
+          <span style="font-size:18px;line-height:1">＋</span>新建工作区
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- B: 新建工作区表单 -->
+  <div class="phone-label">44-B · 工作区切换器 — 新建工作区</div>
+  <div class="phone" style="position:relative;overflow:hidden">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div class="nav" style="filter:blur(1px)">
+      <div style="display:flex;align-items:center;gap:4px">
+        <span style="font-size:17px;font-weight:600">HelloBug</span>
+        <svg viewBox="0 0 10 6" width="10" height="6" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 1l4 4 4-4"/></svg>
+      </div>
+    </div>
+    <div style="flex:1;filter:blur(2px)"></div>
+
+    <div class="sheet-overlay"></div>
+    <div class="sheet" style="padding-bottom:40px">
+      <div class="sheet-handle"></div>
+      <div style="display:flex;align-items:center;padding:0 16px 14px">
+        <button style="color:var(--tint);font-size:15px;background:none;border:none;cursor:pointer">取消</button>
+        <div style="font-size:17px;font-weight:600;flex:1;text-align:center">新建工作区</div>
+        <button style="color:var(--tint);font-size:15px;font-weight:600;background:none;border:none;cursor:pointer">创建</button>
+      </div>
+
+      <div style="background:var(--bg2);border-radius:var(--r);overflow:hidden;margin-bottom:12px">
+        <div class="field-row">
+          <div class="field-label">工作区名称</div>
+          <input class="field-input" placeholder="my-project" value="">
+        </div>
+        <div class="field-row" style="border-bottom:none">
+          <div class="field-label">工作目录路径</div>
+          <input class="field-input mono" placeholder="/Users/shuai/my-project" value="/Users/shuai/">
+        </div>
+      </div>
+
+      <!-- device picker -->
+      <div style="font-size:12px;color:var(--fg3);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">选择设备</div>
+      <div style="background:var(--bg2);border-radius:var(--r);overflow:hidden;margin-bottom:12px">
+        <div class="ws-row" style="padding:10px 16px">
+          <div class="chk on">
+            <svg viewBox="0 0 10 8" width="10" height="8" fill="none" stroke="#fff" stroke-width="2"><path d="M1 4l3 3 5-6"/></svg>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:15px">MacBook Pro</div>
+            <div style="font-size:12px;color:var(--green);margin-top:1px">在线</div>
+          </div>
+          <span style="font-size:20px">💻</span>
+        </div>
+        <div class="ws-row" style="padding:10px 16px;border-bottom:none">
+          <div class="chk"></div>
+          <div style="flex:1">
+            <div style="font-size:15px">Linux Server</div>
+            <div style="font-size:12px;color:var(--fg3);margin-top:1px">离线</div>
+          </div>
+          <span style="font-size:20px">🖥</span>
+        </div>
+      </div>
+
+      <!-- hint -->
+      <div style="font-size:13px;color:var(--fg3);line-height:1.6;padding:0 2px">
+        工作区创建后可在工作区设置中添加 agent。
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+function toggleTheme(){const h=document.documentElement,d=h.getAttribute('data-theme')==='dark';h.setAttribute('data-theme',d?'light':'dark');document.querySelector('.theme-toggle').textContent=d?'🌙 深色':'☀ 浅色'}
+</script>
+</body>
+</html>

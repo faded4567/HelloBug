@@ -46,6 +46,13 @@ export class CertificateAuthority {
     );
   }
 
+  static fromState(state: {
+    caCertPem: string;
+    caKeyPem: string;
+  }): CertificateAuthority {
+    return new CertificateAuthority(state.caCertPem, state.caKeyPem);
+  }
+
   signClientCertificate(deviceId: string): SignedClientCertificate {
     const caCert = forge.pki.certificateFromPem(this.caCertPem);
     const caKey = forge.pki.privateKeyFromPem(this.caKeyPem);
@@ -73,6 +80,16 @@ export class CertificateAuthority {
     return {
       certPem: forge.pki.certificateToPem(cert),
       caCertPem: this.caCertPem,
+    };
+  }
+
+  exportState(): {
+    caCertPem: string;
+    caKeyPem: string;
+  } {
+    return {
+      caCertPem: this.caCertPem,
+      caKeyPem: this.caKeyPem,
     };
   }
 }

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>47 · 设备已吊销</title>
+<link rel="stylesheet" href="_common.css">
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+
+  <div class="phone-label">47 · 设备已吊销</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg><svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg></div></div>
+
+    <div class="screen-body" style="align-items:center;justify-content:center;gap:16px;padding:40px 28px;text-align:center">
+      <div style="width:72px;height:72px;border-radius:50%;background:rgba(255,59,48,.15);display:flex;align-items:center;justify-content:center;font-size:36px">🔐</div>
+      <div style="font-size:20px;font-weight:700;color:var(--red)">设备访问已吊销</div>
+      <div style="font-size:14px;color:var(--fg2);line-height:1.7;max-width:280px">
+        <b>MacBook Pro</b> 的访问权限已在 <b>另一台设备</b> 上撤销。<br>出于安全考虑，本次连接已终止。
+      </div>
+
+      <div style="width:100%;background:var(--bg2);border-radius:var(--r);padding:12px 14px;margin-top:8px;text-align:left">
+        <div style="font-size:11px;color:var(--fg3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">吊销详情</div>
+        <div style="font-size:13px;color:var(--fg2);line-height:2">
+          <div>设备名称：<span style="color:var(--fg)">MacBook Pro</span></div>
+          <div>吊销时间：<span style="color:var(--fg)">2025-06-23 08:14</span></div>
+          <div>操作来源：<span style="color:var(--fg)">iPhone 15 Pro</span></div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" style="width:100%;margin-top:8px">重新配对新设备</button>
+      <button style="color:var(--fg3);font-size:13px;padding:4px">了解为什么会发生这种情况</button>
+    </div>
+
+    <div class="tab-bar">
+      <div class="tab-item active">🖥<span>设备</span></div>
+      <div class="tab-item">💬<span>会话</span></div>
+      <div class="tab-item">⚙️<span>设置</span></div>
+    </div>
+  </div>
+
+</div>
+<script>
+function toggleTheme() {
+  const h = document.documentElement, d = h.getAttribute('data-theme') === 'dark';
+  h.setAttribute('data-theme', d ? 'light' : 'dark');
+  document.querySelector('.theme-toggle').textContent = d ? '🌙 深色' : '☀ 浅色';
+}
+</script>
+</body>
+</html>

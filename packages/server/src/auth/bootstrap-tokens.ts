@@ -11,6 +11,12 @@ export interface BootstrapTokenRecord {
 export class BootstrapTokenRegistry {
   private readonly records = new Map<string, BootstrapTokenRecord>();
 
+  constructor(records: BootstrapTokenRecord[] = []) {
+    for (const record of records) {
+      this.records.set(record.tokenHash, { ...record });
+    }
+  }
+
   issueToken(ttlMs = 5 * 60_000): { token: string; expiresAt: number } {
     const token = encodeBase58(randomBytes(32));
     const tokenHash = this.hashToken(token);
@@ -44,8 +50,11 @@ export class BootstrapTokenRegistry {
     }
   }
 
+  exportState(): BootstrapTokenRecord[] {
+    return Array.from(this.records.values(), (record) => ({ ...record }));
+  }
+
   private hashToken(token: string): string {
     return createHash("sha256").update(token).digest("base64url");
   }
 }
-

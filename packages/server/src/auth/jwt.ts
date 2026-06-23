@@ -9,7 +9,7 @@ export class JwtManager {
   private readonly secretBytes: Uint8Array;
 
   constructor(
-    secret: string,
+    private readonly secret: string,
     private readonly issuer = "hellobug-server",
   ) {
     this.secretBytes = new TextEncoder().encode(secret);
@@ -42,5 +42,8 @@ export class JwtManager {
 
     return { deviceId };
   }
-}
 
+  exportSecret(): string {
+    return this.secret;
+  }
+}

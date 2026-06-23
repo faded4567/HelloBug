@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>31 · 终端 + 状态栏</title>
+<link rel="stylesheet" href="_common.css">
+<style>
+.term-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  background: var(--bg2);
+  border-top: 1px solid var(--separator);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.term-status-bar::-webkit-scrollbar { display: none; }
+.tsb-seg {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  color: var(--fg2);
+  padding: 3px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.tsb-seg:hover { background: var(--bg3); }
+.tsb-seg.active { color: var(--tint); }
+.tsb-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.term-body {
+  flex: 1;
+  background: #0d0d0d;
+  padding: 12px 14px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+[data-theme="light"] .term-body { background: #1e1e1e; }
+.term-body::-webkit-scrollbar { display: none; }
+.t-prompt { color: #4ec9b0; }
+.t-cmd    { color: #f0f0f0; }
+.t-out    { color: #a0a0a0; }
+.t-err    { color: #f44747; }
+.t-ok     { color: #4ec9b0; }
+.t-cur    { display: inline-block; width: 8px; height: 14px; background: #f0f0f0; animation: blink 1s step-end infinite; vertical-align: text-bottom; }
+@keyframes blink { 50% { opacity: 0; } }
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+
+  <!-- 正常运行中 -->
+  <div class="phone-label">31-A · 终端 — 运行中</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+
+    <div class="nav" style="background:var(--bg2)">
+      <div class="nav-back">
+        <svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 1L1 9l7 8"/></svg>
+        会话
+      </div>
+      <div class="nav-title" style="font-family:var(--font-mono);font-size:15px">终端</div>
+      <div style="margin-left:auto;display:flex;gap:12px;color:var(--tint);font-size:16px">
+        <span>⌨</span>
+        <span>⋯</span>
+      </div>
+    </div>
+
+    <!-- 终端输出区 -->
+    <div class="term-body">
+      <div><span class="t-prompt">~/projects/HelloBug</span> <span class="t-cmd">$</span> <span class="t-cmd">flutter test</span></div>
+      <div class="t-out">00:01 +0: loading…</div>
+      <div class="t-out">00:03 +12: dart test/widget_test.dart</div>
+      <div class="t-ok">00:05 +24: All tests passed!</div>
+      <div style="margin-top:8px"><span class="t-prompt">~/projects/HelloBug</span> <span class="t-cmd">$</span> <span class="t-cmd">dart format lib/</span></div>
+      <div class="t-out">Formatted 18 files (3 changed) in 0.8 seconds.</div>
+      <div style="margin-top:8px"><span class="t-prompt">~/projects/HelloBug</span> <span class="t-cmd">$</span> <span class="t-cmd">git status</span></div>
+      <div class="t-out">On branch main</div>
+      <div class="t-out">Changes not staged for commit:</div>
+      <div class="t-out">  modified:   app/lib/router.dart</div>
+      <div class="t-out">  modified:   app/lib/screens/chat_screen.dart</div>
+      <div style="margin-top:8px"><span class="t-prompt">~/projects/HelloBug</span> <span class="t-cmd">$</span> <span class="t-cur"></span></div>
+    </div>
+
+    <!-- 状态栏 -->
+    <div class="term-status-bar">
+      <div class="tsb-seg active">
+        <div class="tsb-dot" style="background:var(--green)"></div>
+        <span>main</span>
+      </div>
+      <div class="tsb-seg">
+        <span>⎇</span>
+        <span>2 changed</span>
+      </div>
+      <div class="tsb-seg">
+        <span>📁</span>
+        <span>HelloBug</span>
+      </div>
+      <div class="tsb-seg" style="margin-left:auto">
+        <span>🐍</span>
+        <span>Flutter 3.22</span>
+      </div>
+    </div>
+
+    <!-- 快捷键行 -->
+    <div style="display:flex;gap:0;border-top:1px solid var(--separator);background:var(--bg2);flex-shrink:0;overflow-x:auto;scrollbar-width:none">
+      <button style="flex:1;padding:9px 0;font-size:13px;font-family:var(--font-mono);color:var(--fg2);background:none;border:none;border-right:1px solid var(--separator);cursor:pointer">Tab</button>
+      <button style="flex:1;padding:9px 0;font-size:13px;font-family:var(--font-mono);color:var(--fg2);background:none;border:none;border-right:1px solid var(--separator);cursor:pointer">Ctrl+C</button>
+      <button style="flex:1;padding:9px 0;font-size:13px;font-family:var(--font-mono);color:var(--fg2);background:none;border:none;border-right:1px solid var(--separator);cursor:pointer">↑</button>
+      <button style="flex:1;padding:9px 0;font-size:13px;font-family:var(--font-mono);color:var(--fg2);background:none;border:none;border-right:1px solid var(--separator);cursor:pointer">↓</button>
+      <button style="flex:1;padding:9px 0;font-size:13px;font-family:var(--font-mono);color:var(--fg2);background:none;border:none;cursor:pointer">Esc</button>
+    </div>
+
+    <!-- 输入行 -->
+    <div class="input-bar" style="padding:8px 12px 20px">
+      <div class="input-row">
+        <div class="input-field" style="font-family:var(--font-mono);font-size:14px;color:var(--fg3)">命令…</div>
+        <div class="input-send">↑</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 命令执行中 + 错误状态 -->
+  <div class="phone-label">31-B · 终端 — 错误状态</div>
+  <div class="phone">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div class="nav" style="background:var(--bg2)">
+      <div class="nav-back">
+        <svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 1L1 9l7 8"/></svg>
+        会话
+      </div>
+      <div class="nav-title" style="font-family:var(--font-mono);font-size:15px">终端</div>
+      <div style="margin-left:auto;display:flex;gap:12px;color:var(--tint);font-size:16px">
+        <span>⌨</span><span>⋯</span>
+      </div>
+    </div>
+    <div class="term-body">
+      <div><span class="t-prompt">~/projects/HelloBug</span> <span class="t-cmd">$</span> <span class="t-cmd">flutter build apk</span></div>
+      <div class="t-out">Building with sound null safety…</div>
+      <div class="t-out">Running Gradle task 'assembleRelease'…</div>
+      <div class="t-err">FAILURE: Build failed with an exception.</div>
+      <div class="t-err">* What went wrong:</div>
+      <div class="t-err">  Execution failed for task ':app:compileReleaseKotlin'.</div>
+      <div class="t-err">  > error: unresolved reference: NoiseIK</div>
+      <div class="t-out">BUILD FAILED in 42s</div>
+      <div style="margin-top:8px"><span class="t-prompt">~/projects/HelloBug</span> <span class="t-cmd">$</span> <span class="t-cur"></span></div>
+    </div>
+
+    <!-- 状态栏 — 错误 -->
+    <div class="term-status-bar">
+      <div class="tsb-seg active">
+        <div class="tsb-dot" style="background:var(--green)"></div>
+        <span>main</span>
+      </div>
+      <div class="tsb-seg" style="color:var(--red)">
+        <span>✕</span>
+        <span>exit 1</span>
+      </div>
+      <div class="tsb-seg">
+        <span>📁</span>
+        <span>HelloBug</span>
+      </div>
+      <div class="tsb-seg" style="margin-left:auto;color:var(--red)">
+        <span>⚠ 1 error</span>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:0;border-top:1px solid var(--separator);background:var(--bg2);flex-shrink:0">
+      <button style="flex:1;padding:9px 0;font-size:13px;font-family:var(--font-mono);color:var(--fg2);background:none;border:none;border-right:1px solid var(--separator);cursor:pointer">Tab</button>
+      <button style="flex:1;padding:9px 0;font-size:13px;font-family:var(--font-mono);color:var(--fg2);background:none;border:none;border-right:1px solid var(--separator);cursor:pointer">Ctrl+C</button>
+      <button style="flex:1;padding:9px 0;font-size:13px;font-family:var(--font-mono);color:var(--fg2);background:none;border:none;border-right:1px solid var(--separator);cursor:pointer">↑</button>
+      <button style="flex:1;padding:9px 0;font-size:13px;font-family:var(--font-mono);color:var(--fg2);background:none;border:none;cursor:pointer">↓</button>
+    </div>
+    <div class="input-bar" style="padding:8px 12px 20px">
+      <div class="input-row">
+        <div class="input-field" style="font-family:var(--font-mono);font-size:14px;color:var(--fg3)">命令…</div>
+        <div class="input-send">↑</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.querySelector('.theme-toggle').textContent = isDark ? '🌙 深色' : '☀ 浅色';
+}
+</script>
+</body>
+</html>

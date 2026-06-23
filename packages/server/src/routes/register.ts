@@ -33,6 +33,7 @@ export async function registerRegisterRoute(
       certPem: signed.certPem,
       caCertPem: signed.caCertPem,
     });
+    await services.persistState();
 
     const response = RegisterDaemonResponseSchema.parse({
       device_id: device.deviceId,
@@ -42,4 +43,3 @@ export async function registerRegisterRoute(
     return reply.code(201).send(response);
   });
 }
-

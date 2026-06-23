@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import '../../models/session_summary.dart';
 import '../../theme/index.dart';
+import '../sessions/session_info_sheet.dart';
 
 class ChatHeader extends StatelessWidget {
   const ChatHeader({
@@ -33,7 +34,7 @@ class ChatHeader extends StatelessWidget {
         child: Icon(CupertinoIcons.xmark, size: 18, color: c.fg2),
       ),
       middle: GestureDetector(
-        onTap: onWorkspaceSwitch,
+        onTap: () => SessionInfoSheet.show(context, session),
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           Text(wsName, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.fg)),
           Text(agentLabel, style: TextStyle(fontSize: 12, color: c.fg2)),
