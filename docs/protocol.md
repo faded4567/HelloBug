@@ -120,6 +120,7 @@ derive session keys
 | `history.get` | 读取 transcript 分页 |
 | `templates.list` | 拉取指令模板列表 |
 | `slash.list` | 拉取斜杠命令列表 |
+| `pty.input` | 向 PTY 写入原始输入字节（base64） |
 | `pty.resize` | 调整 PTY 终端大小 |
 
 ### Server / Daemon → App
@@ -196,7 +197,7 @@ mTLS 握手完成后 daemon 立即发送（方向：Daemon→Server，不加密�
 
 ### 4.3 device.pair.ready
 
-daemon 在 `daemon.hello` ACK 后发送，上报当前配对槽，服务器建立 `pairing_id → daemon_connection` 映射（TTL 30 秒）。
+daemon 在 `daemon.hello` ACK 后发送，上报当前配对槽，服务器建立 `pairing_id → daemon_connection` 映射（默认 TTL 30 秒，可由 daemon 配置覆盖）。
 
 ```json
 {
@@ -310,13 +311,14 @@ JWT 即将过期时 App 主动续期（方向：App→Server），不依赖重�
   "payload": {
     "session_id": "sess-uuid",
     "agent_type": "claude_code",
-    "workspace_path": "/Users/shuai/projects/HelloBug",
+    "workspace_path": "",
     "resume_session_id": null
   }
 }
 ```
 
 `agent_type` 枚举：`claude_code` / `codex` / `shell`  
+`workspace_path`：可为空字符串；为空时表示“使用 daemon 默认工作区”  
 `resume_session_id`：非空时 daemon 用 `claude --resume <id>` 续接历史会话。
 
 ---
@@ -338,6 +340,7 @@ JWT 即将过期时 App 主动续期（方向：App→Server），不依赖重�
 
 `agent_id`：由发起方生成，在同一 `session_id` 内唯一。  
 `agent_type` 枚举：`claude_code` / `codex` / `shell`。
+当前阶段 daemon 尚未真正落地多 agent runtime；收到该消息时应返回明确错误，而不是静默忽略。
 
 ---
 
@@ -366,7 +369,7 @@ JWT 即将过期时 App 主动续期（方向：App→Server），不依赖重�
 - M1-M4 单 agent 会话里，省略 `routing_mode` 等价于 `direct`，消息投递给会话内唯一 agent。
 - M5 群组会话里，`target_agent_id = null` 不再表示广播；如需广播，必须显式传 `routing_mode: "broadcast"`。
 
-PTY 会话时 `text` 直接写入 PTY stdin（含控制字符，如 `\x03` = Ctrl-C）。
+PTY 会话的逐键输入统一走 `pty.input`，`session.input` 仍保留给普通 agent 文本消息。
 
 ---
 
@@ -416,13 +419,14 @@ PTY 会话时 `text` 直接写入 PTY stdin（含控制字符，如 `\x03` = Ctr
   "type": "session.command.slash",
   "payload": {
     "session_id": "sess-uuid",
-    "command": "/compact",
+    "command": "compact",
     "args": []
   }
 }
 ```
 
-Daemon 将斜杠命令透传给 Claude Code stdin。
+App 侧 `command` 发送裸命令名，不带前导 `/`；UI 自己负责展示 `/compact` 这样的样式。
+Daemon 会在目标 runtime 需要时再补前导 `/`（例如 Claude Code），shell agent 则可直接使用原始命令名。
 
 ---
 
@@ -695,7 +699,21 @@ App 端 xterm.dart 直接写入。
 
 ---
 
-### 4.20 pty.resize
+### 4.20 pty.input
+
+```json
+{
+  "type": "pty.input",
+  "payload": {
+    "session_id": "sess-uuid",
+    "data": "<base64 PTY 输入字节>"
+  }
+}
+```
+
+---
+
+### 4.21 pty.resize
 
 ```json
 {
@@ -710,7 +728,7 @@ App 端 xterm.dart 直接写入。
 
 ---
 
-### 4.21 history.list / history.get
+### 4.22 history.list / history.get
 
 请求列表：
 
@@ -813,14 +831,16 @@ App 端 xterm.dart 直接写入。
   "type": "slash.list",
   "payload": {
     "commands": [
-      { "name": "/clear",   "desc": "清空当前会话上下文" },
-      { "name": "/compact", "desc": "压缩历史，只保留摘要" },
-      { "name": "/init",    "desc": "生成 CLAUDE.md" },
-      { "name": "/model",   "desc": "切换模型" }
+      { "name": "clear",   "desc": "清空当前会话上下文" },
+      { "name": "compact", "desc": "压缩历史，只保留摘要" },
+      { "name": "init",    "desc": "生成 CLAUDE.md" },
+      { "name": "model",   "desc": "切换模型" }
     ]
   }
 }
 ```
+
+`slash.list.commands[].name` 也发送裸命令名；App 展示时自行加上 `/`。
 
 ---
 

@@ -55,8 +55,8 @@ export class DaemonConnection {
             );
           }
           await this.handleIncomingMessage(parsed);
-        } catch {
-          // Keep the daemon connected even if the server sends unsupported scaffolding frames.
+        } catch (error) {
+          console.error("[daemon] incoming message error", error);
         }
       });
 

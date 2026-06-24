@@ -16,6 +16,7 @@ export const AppToDaemonMessageTypes = new Set<string>([
   "history.get",
   "templates.list",
   "slash.list",
+  "pty.input",
   "pty.resize",
   "key.ratchet",
   "key.ratchet_ack",

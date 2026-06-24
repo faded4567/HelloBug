@@ -1,21 +1,38 @@
 import { createHash } from "node:crypto";
 
-import type { AgentType, ErrorCode, Message, SessionEventBody } from "@hellobug/protocol";
+import type {
+  AgentType,
+  ErrorCode,
+  Message,
+  SessionEventBody,
+} from "@hellobug/protocol";
 
 import type { AuditLogger } from "../audit/logger.js";
 import { SessionImageUploadStore } from "../fs/image.js";
 import { WorkspaceFence } from "../guard/fence.js";
 import type { DangerApprovalInterceptor } from "../guard/interceptor.js";
+import { resolveUserPath } from "../lib/user-path.js";
 import { SessionEventEmitter } from "./events.js";
 import type { SessionRuntimeFactory } from "./runtime.js";
 import { createMemorySessionRuntime } from "./memory-runtime.js";
 
 type SessionStartMessage = Extract<Message, { type: "session.start" }>;
 type SessionInputMessage = Extract<Message, { type: "session.input" }>;
-type SessionInputImageMessage = Extract<Message, { type: "session.input.image" }>;
-type SessionInputVoiceTextMessage = Extract<Message, { type: "session.input.voice_text" }>;
-type SessionCommandSlashMessage = Extract<Message, { type: "session.command.slash" }>;
+type SessionInputImageMessage = Extract<
+  Message,
+  { type: "session.input.image" }
+>;
+type SessionInputVoiceTextMessage = Extract<
+  Message,
+  { type: "session.input.voice_text" }
+>;
+type SessionCommandSlashMessage = Extract<
+  Message,
+  { type: "session.command.slash" }
+>;
 type SessionCancelMessage = Extract<Message, { type: "session.cancel" }>;
+type PtyInputMessage = Extract<Message, { type: "pty.input" }>;
+type PtyResizeMessage = Extract<Message, { type: "pty.resize" }>;
 type DangerAllowMessage = Extract<Message, { type: "danger.allow" }>;
 type DangerDenyMessage = Extract<Message, { type: "danger.deny" }>;
 
@@ -72,21 +89,45 @@ export class DaemonSessionManager {
       ((runtimeOptions) => createMemorySessionRuntime(runtimeOptions.events));
     this.maxSessions = options.maxSessions ?? 10;
     this.workspaceFence = new WorkspaceFence(options.allowedPaths ?? []);
-    this.imageUploadStore = options.imageUploadStore ?? new SessionImageUploadStore();
+    this.imageUploadStore =
+      options.imageUploadStore ?? new SessionImageUploadStore();
     this.auditLogger = options.auditLogger;
     this.dangerInterceptor = options.dangerInterceptor;
   }
 
+  private resolveWorkspacePath(rawPath: string): string {
+    const trimmed = rawPath.trim();
+    if (trimmed.length > 0) {
+      return resolveUserPath(trimmed);
+    }
+
+    const fallback = this.options.allowedPaths?.[0];
+    if (fallback && fallback.trim().length > 0) {
+      return resolveUserPath(fallback);
+    }
+
+    return resolveUserPath("~");
+  }
+
   async startSession(message: SessionStartMessage): Promise<void> {
     const sessionId = message.payload.session_id;
-    if (!this.workspaceFence.isAllowed(message.payload.workspace_path)) {
+    const workspacePath = this.resolveWorkspacePath(
+      message.payload.workspace_path,
+    );
+    console.log(
+      `[daemon-session] start requested session=${sessionId} workspace=${workspacePath} agent=${message.payload.agent_type}`,
+    );
+    if (!this.workspaceFence.isAllowed(workspacePath)) {
       throw new DaemonSessionError(
         "WORKSPACE_FORBIDDEN",
         `Workspace is outside allowed paths: ${message.payload.workspace_path}`,
       );
     }
     if (this.sessions.has(sessionId)) {
-      throw new DaemonSessionError("PROTOCOL_VERSION", `Session already exists: ${sessionId}`);
+      throw new DaemonSessionError(
+        "PROTOCOL_VERSION",
+        `Session already exists: ${sessionId}`,
+      );
     }
     if (this.sessions.size >= this.maxSessions) {
       throw new DaemonSessionError("RATE_LIMITED", "Session limit reached");
@@ -107,7 +148,7 @@ export class DaemonSessionManager {
 
     handle = {
       sessionId,
-      workspacePath: message.payload.workspace_path,
+      workspacePath,
       agentType: message.payload.agent_type,
       seq: 0,
       createdAt: Date.now(),
@@ -117,6 +158,9 @@ export class DaemonSessionManager {
     };
 
     this.sessions.set(sessionId, handle);
+    console.log(
+      `[daemon-session] started session=${sessionId} workspace=${workspacePath} agent=${handle.agentType}`,
+    );
     await this.auditLogger?.appendAuditEntry({
       session_id: sessionId,
       event_type: "session.start",
@@ -126,18 +170,29 @@ export class DaemonSessionManager {
     try {
       await runtime.start({
         sessionId,
-        workspacePath: message.payload.workspace_path,
+        workspacePath,
         resumeSessionId: message.payload.resume_session_id,
         agentType: message.payload.agent_type,
       });
     } catch (error) {
       this.sessions.delete(sessionId);
-      throw error;
+      if (error instanceof DaemonSessionError) {
+        throw error;
+      }
+      const text =
+        error instanceof Error ? error.message : "Unknown runtime start error";
+      throw new DaemonSessionError(
+        "PROTOCOL_VERSION",
+        `Failed to start ${message.payload.agent_type} runtime: ${text}`,
+      );
     }
   }
 
   async handleInput(message: SessionInputMessage): Promise<void> {
     const handle = this.getRequiredSession(message.payload.session_id);
+    console.log(
+      `[daemon-session] input session=${handle.sessionId} length=${message.payload.text.length}`,
+    );
     await this.auditLogger?.appendAuditEntry({
       session_id: handle.sessionId,
       event_type: "session.input",
@@ -151,9 +206,12 @@ export class DaemonSessionManager {
     let completedUpload;
 
     try {
-      completedUpload = await this.imageUploadStore.appendChunk(message.payload);
+      completedUpload = await this.imageUploadStore.appendChunk(
+        message.payload,
+      );
     } catch (error) {
-      const text = error instanceof Error ? error.message : "Invalid image upload";
+      const text =
+        error instanceof Error ? error.message : "Invalid image upload";
       throw new DaemonSessionError("PROTOCOL_VERSION", text);
     }
 
@@ -166,7 +224,10 @@ export class DaemonSessionManager {
       event_type: "session.input.image",
       summary: `image_id=${completedUpload.imageId} mime=${completedUpload.mimeType}`,
     });
-    await handle.runtime.inputImage(completedUpload.filePath, completedUpload.mimeType);
+    await handle.runtime.inputImage(
+      completedUpload.filePath,
+      completedUpload.mimeType,
+    );
   }
 
   async handleVoiceText(message: SessionInputVoiceTextMessage): Promise<void> {
@@ -176,17 +237,53 @@ export class DaemonSessionManager {
       event_type: "session.input.voice_text",
       summary: `text_sha256=${sha256Hex(message.payload.text)} confidence=${message.payload.confidence.toFixed(2)}`,
     });
-    await handle.runtime.inputVoiceText(message.payload.text, message.payload.confidence);
+    await handle.runtime.inputVoiceText(
+      message.payload.text,
+      message.payload.confidence,
+    );
   }
 
   async handleSlashCommand(message: SessionCommandSlashMessage): Promise<void> {
     const handle = this.getRequiredSession(message.payload.session_id);
+    const command = normalizeSlashCommand(
+      handle.agentType,
+      message.payload.command,
+    );
+    console.log(
+      `[daemon-session] slash session=${handle.sessionId} command=${command} args=${message.payload.args.join(" ")}`,
+    );
     await this.auditLogger?.appendAuditEntry({
       session_id: handle.sessionId,
       event_type: "session.command.slash",
-      summary: `command=${message.payload.command} args=${message.payload.args.join(" ")}`,
+      summary: `command=${command} args=${message.payload.args.join(" ")}`,
     });
-    await handle.runtime.inputSlashCommand(message.payload.command, message.payload.args);
+    await handle.runtime.inputSlashCommand(
+      command,
+      message.payload.args,
+    );
+  }
+
+  async handlePtyInput(message: PtyInputMessage): Promise<void> {
+    const handle = this.getRequiredSession(message.payload.session_id);
+    await this.auditLogger?.appendAuditEntry({
+      session_id: handle.sessionId,
+      event_type: "pty.input",
+      summary: `base64_bytes=${message.payload.data.length}`,
+    });
+    await handle.runtime.inputPty(message.payload.data);
+  }
+
+  async handlePtyResize(message: PtyResizeMessage): Promise<void> {
+    const handle = this.getRequiredSession(message.payload.session_id);
+    console.log(
+      `[daemon-session] pty.resize session=${handle.sessionId} cols=${message.payload.cols} rows=${message.payload.rows}`,
+    );
+    await this.auditLogger?.appendAuditEntry({
+      session_id: handle.sessionId,
+      event_type: "pty.resize",
+      summary: `cols=${message.payload.cols} rows=${message.payload.rows}`,
+    });
+    await handle.runtime.resizePty(message.payload.cols, message.payload.rows);
   }
 
   async cancelSession(message: SessionCancelMessage): Promise<void> {
@@ -201,7 +298,10 @@ export class DaemonSessionManager {
 
   async allowDanger(message: DangerAllowMessage): Promise<void> {
     if (!this.dangerInterceptor) {
-      throw new DaemonSessionError("PROTOCOL_VERSION", "Danger interceptor is not configured");
+      throw new DaemonSessionError(
+        "PROTOCOL_VERSION",
+        "Danger interceptor is not configured",
+      );
     }
 
     const resolved = await this.dangerInterceptor.allow(
@@ -218,10 +318,15 @@ export class DaemonSessionManager {
 
   async denyDanger(message: DangerDenyMessage): Promise<void> {
     if (!this.dangerInterceptor) {
-      throw new DaemonSessionError("PROTOCOL_VERSION", "Danger interceptor is not configured");
+      throw new DaemonSessionError(
+        "PROTOCOL_VERSION",
+        "Danger interceptor is not configured",
+      );
     }
 
-    const resolved = await this.dangerInterceptor.deny(message.payload.danger_id);
+    const resolved = await this.dangerInterceptor.deny(
+      message.payload.danger_id,
+    );
     if (!resolved) {
       throw new DaemonSessionError(
         "PROTOCOL_VERSION",
@@ -245,7 +350,10 @@ export class DaemonSessionManager {
     };
   }
 
-  private enqueueRuntimeEvent(handle: InternalSessionHandle, event: SessionEventBody): Promise<void> {
+  private enqueueRuntimeEvent(
+    handle: InternalSessionHandle,
+    event: SessionEventBody,
+  ): Promise<void> {
     handle.eventQueue = handle.eventQueue.then(async () => {
       await this.processRuntimeEvent(handle, event);
     });
@@ -294,7 +402,10 @@ export class DaemonSessionManager {
       }
     }
 
-    if (event.event_type === "tool.result" && handle.suppressedToolUseIds.delete(event.tool_use_id)) {
+    if (
+      event.event_type === "tool.result" &&
+      handle.suppressedToolUseIds.delete(event.tool_use_id)
+    ) {
       return;
     }
 
@@ -348,7 +459,10 @@ export class DaemonSessionManager {
   private getRequiredSession(sessionId: string): InternalSessionHandle {
     const handle = this.sessions.get(sessionId);
     if (!handle) {
-      throw new DaemonSessionError("SESSION_NOT_FOUND", `Session not found: ${sessionId}`);
+      throw new DaemonSessionError(
+        "SESSION_NOT_FOUND",
+        `Session not found: ${sessionId}`,
+      );
     }
     return handle;
   }
@@ -356,4 +470,13 @@ export class DaemonSessionManager {
 
 function sha256Hex(value: string): string {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function normalizeSlashCommand(agentType: AgentType, command: string): string {
+  const trimmed = command.trim();
+  if (agentType === "shell" || trimmed.startsWith("/")) {
+    return trimmed;
+  }
+
+  return `/${trimmed}`;
 }

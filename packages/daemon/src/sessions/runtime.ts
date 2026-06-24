@@ -17,6 +17,8 @@ export interface SessionRuntime {
   inputImage(filePath: string, mimeType: string): Promise<void>;
   inputVoiceText(text: string, confidence: number): Promise<void>;
   inputSlashCommand(command: string, args: string[]): Promise<void>;
+  inputPty(data: string): Promise<void>;
+  resizePty(cols: number, rows: number): Promise<void>;
   cancel(): Promise<void>;
 }
 

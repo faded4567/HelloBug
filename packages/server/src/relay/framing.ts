@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { resolve } from "node:path";
 
 import {
   validateEnvelope,
@@ -60,20 +61,23 @@ export function sendRelayMessage(
   } = {},
 ): void {
   const wireFormat = socketWireFormats.get(socket) ?? "plain";
+  const wireMessage = toLegacyCompatibleWireMessage(message);
   if (wireFormat === "plain") {
-    sendJson(socket, message);
+    sendJson(socket, ensureWireMessageId(wireMessage));
     return;
   }
 
-  const inner = ensureMessageId(message);
+  const inner = ensureWireMessageId(wireMessage);
   const envelope = {
     from: options.from ?? "hellobug-server",
     to: options.to ?? "",
-    session_id: getEnvelopeSessionId(inner),
-    seq: getEnvelopeSequence(socket, inner),
+    session_id: getEnvelopeSessionId(message),
+    seq: getEnvelopeSequence(socket, message),
     ts: Date.now(),
     sig: "",
-    ciphertext: Buffer.from(JSON.stringify(inner), "utf8").toString("base64url"),
+    ciphertext: Buffer.from(JSON.stringify(inner), "utf8").toString(
+      "base64url",
+    ),
   } satisfies Envelope;
 
   sendJson(socket, envelope);
@@ -109,10 +113,31 @@ function normalizeLegacyMessage(raw: unknown): unknown {
     };
   }
 
+  if (type === "session.start") {
+    return {
+      ...record,
+      payload: normalizeLegacySessionStartPayload(record.payload),
+    };
+  }
+
+  if (type === "session.command.slash") {
+    return {
+      ...record,
+      payload: normalizeLegacySlashPayload(record.payload),
+    };
+  }
+
   if (type === "fs.read") {
     return {
       ...record,
       type: "fs.file.req",
+    };
+  }
+
+  if (type === "fs.tree.req") {
+    return {
+      ...record,
+      payload: normalizeLegacyFsTreePayload(record.payload),
     };
   }
 
@@ -125,7 +150,10 @@ function normalizeSessionResumePayload(payload: unknown): unknown {
   }
 
   const record = payload as Record<string, unknown>;
-  if (typeof record.from_seq !== "number" || typeof record.last_seq === "number") {
+  if (
+    typeof record.from_seq !== "number" ||
+    typeof record.last_seq === "number"
+  ) {
     return payload;
   }
 
@@ -136,8 +164,43 @@ function normalizeSessionResumePayload(payload: unknown): unknown {
   };
 }
 
-function ensureMessageId(message: Message): Message {
-  if (message.id) {
+function normalizeLegacySessionStartPayload(payload: unknown): unknown {
+  if (!payload || typeof payload !== "object") {
+    return payload;
+  }
+
+  const record = payload as Record<string, unknown>;
+  if ("resume_session_id" in record) {
+    return payload;
+  }
+
+  return {
+    ...record,
+    resume_session_id: null,
+  };
+}
+
+function normalizeLegacySlashPayload(payload: unknown): unknown {
+  if (!payload || typeof payload !== "object") {
+    return payload;
+  }
+
+  const record = payload as Record<string, unknown>;
+  if (Array.isArray(record.args)) {
+    return payload;
+  }
+
+  const rawArgs = typeof record.args === "string" ? record.args.trim() : "";
+  return {
+    ...record,
+    args: rawArgs.length == 0 ? [] : rawArgs.split(/\s+/),
+  };
+}
+
+function ensureWireMessageId(
+  message: Record<string, unknown>,
+): Record<string, unknown> {
+  if (typeof message.id === "string" && message.id.length > 0) {
     return message;
   }
 
@@ -172,4 +235,85 @@ function getEnvelopeSequence(socket: WebSocket, message: Message): number {
   state.nextSeq += 1;
   socketEnvelopeStates.set(socket, state);
   return state.nextSeq;
+}
+
+function normalizeLegacyFsTreePayload(payload: unknown): unknown {
+  if (!payload || typeof payload !== "object") {
+    return payload;
+  }
+
+  const record = payload as Record<string, unknown>;
+  if (
+    typeof record.path === "string" &&
+    typeof record.workspace_path !== "string" &&
+    typeof record.dir_path !== "string"
+  ) {
+    return {
+      session_id: record.session_id,
+      workspace_path: record.path,
+      dir_path: "",
+    };
+  }
+
+  return payload;
+}
+
+function toLegacyCompatibleWireMessage(
+  message: Message,
+): Record<string, unknown> {
+  if (message.type === "fs.tree") {
+    const dirPath = resolve(
+      message.payload.workspace_path,
+      message.payload.dir_path || ".",
+    );
+    return {
+      ...message,
+      payload: {
+        ...message.payload,
+        path: dirPath,
+        items: message.payload.entries.map((entry) => ({
+          name: entry.name,
+          path: resolve(message.payload.workspace_path, entry.path),
+          is_dir: entry.type === "dir",
+          modified: entry.modified,
+          size: entry.size,
+        })),
+      },
+    };
+  }
+
+  if (message.type === "fs.file") {
+    let content = "";
+    try {
+      content = Buffer.from(message.payload.data, "base64url").toString("utf8");
+    } catch {
+      content = "";
+    }
+
+    return {
+      ...message,
+      payload: {
+        ...message.payload,
+        data: content,
+        data_base64url: message.payload.data,
+        content,
+      },
+    };
+  }
+
+  if (message.type === "slash.list" && "commands" in message.payload) {
+    const { commands } = message.payload;
+    return {
+      ...message,
+      payload: {
+        ...message.payload,
+        commands: commands.map((command) => ({
+          ...command,
+          description: command.desc,
+        })),
+      },
+    };
+  }
+
+  return message as unknown as Record<string, unknown>;
 }

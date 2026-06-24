@@ -289,15 +289,32 @@ class BashFixtureRuntime implements SessionRuntime {
     });
   }
 
-  async inputImage(): Promise<void> {
+  async inputImage(filePath: string, mimeType: string): Promise<void> {
+    void filePath;
+    void mimeType;
     throw new Error("not implemented");
   }
 
-  async inputVoiceText(): Promise<void> {
+  async inputVoiceText(text: string, confidence: number): Promise<void> {
+    void text;
+    void confidence;
     throw new Error("not implemented");
   }
 
-  async inputSlashCommand(): Promise<void> {
+  async inputSlashCommand(command: string, args: string[]): Promise<void> {
+    void command;
+    void args;
+    throw new Error("not implemented");
+  }
+
+  async inputPty(data: string): Promise<void> {
+    void data;
+    throw new Error("not implemented");
+  }
+
+  async resizePty(cols: number, rows: number): Promise<void> {
+    void cols;
+    void rows;
     throw new Error("not implemented");
   }
 

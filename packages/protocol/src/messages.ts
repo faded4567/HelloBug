@@ -122,7 +122,7 @@ export const SessionStartSchema = createMessageSchema(
   z.object({
     session_id: StringIdSchema,
     agent_type: AgentTypeSchema,
-    workspace_path: z.string().min(1),
+    workspace_path: z.string(),
     resume_session_id: z.string().min(1).nullable(),
   }),
 );
@@ -284,7 +284,7 @@ export const FsFileSchema = createMessageSchema(
     mime_type: z.string().min(1),
     chunk_index: z.number().int().nonnegative(),
     total_chunks: z.number().int().positive(),
-    data: z.string().min(1),
+    data: z.string(),
     total_size: z.number().int().nonnegative(),
   }),
 );
@@ -296,6 +296,14 @@ export const DeviceStatusSchema = createMessageSchema(
     online: z.boolean(),
     machine_name: z.string().min(1),
     ts: TimestampMsSchema,
+  }),
+);
+
+export const PtyInputSchema = createMessageSchema(
+  "pty.input",
+  z.object({
+    session_id: StringIdSchema,
+    data: z.string(),
   }),
 );
 
@@ -472,6 +480,7 @@ export const messageSchemasByType = {
   "fs.file.req": FsFileReqSchema,
   "fs.file": FsFileSchema,
   "device.status": DeviceStatusSchema,
+  "pty.input": PtyInputSchema,
   "pty.resize": PtyResizeSchema,
   "history.list": z.union([HistoryListRequestSchema, HistoryListResponseSchema]),
   "history.get": z.union([HistoryGetRequestSchema, HistoryGetResponseSchema]),
@@ -511,6 +520,7 @@ export const MessageSchema = z.union([
   FsFileReqSchema,
   FsFileSchema,
   DeviceStatusSchema,
+  PtyInputSchema,
   PtyResizeSchema,
   HistoryListRequestSchema,
   HistoryListResponseSchema,
@@ -550,4 +560,3 @@ export function validateMessage(raw: unknown): Message {
 export function validateNotificationPushPayload(raw: unknown): NotificationPushPayload {
   return NotificationPushPayloadSchema.parse(raw);
 }
-

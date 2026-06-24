@@ -126,6 +126,17 @@ export class ClaudeSessionRuntime implements SessionRuntime {
     await this.writeUserMessage([command, ...args].join(" ").trim());
   }
 
+  async inputPty(data: string): Promise<void> {
+    void data;
+    throw new Error("Claude runtime does not support PTY input");
+  }
+
+  async resizePty(cols: number, rows: number): Promise<void> {
+    void cols;
+    void rows;
+    throw new Error("Claude runtime does not support PTY resize");
+  }
+
   async cancel(): Promise<void> {
     if (!this.child) {
       return;

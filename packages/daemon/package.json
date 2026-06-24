@@ -18,6 +18,7 @@
   "dependencies": {
     "@hellobug/protocol": "workspace:*",
     "libsodium-wrappers": "^0.7.15",
+    "node-pty": "^1.1.0",
     "ws": "^8.18.3",
     "zod": "^3.25.76"
   }

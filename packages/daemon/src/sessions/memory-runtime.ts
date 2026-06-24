@@ -30,6 +30,16 @@ export class MemorySessionRuntime implements SessionRuntime {
     await this.emitDelta(line, "slash");
   }
 
+  async inputPty(data: string): Promise<void> {
+    const decoded = Buffer.from(data, "base64").toString("utf8");
+    await this.emitDelta(decoded, "pty");
+  }
+
+  async resizePty(cols: number, rows: number): Promise<void> {
+    void cols;
+    void rows;
+  }
+
   async cancel(): Promise<void> {
     if (!this.active) {
       return;

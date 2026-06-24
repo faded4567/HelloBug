@@ -4,7 +4,11 @@ import { WebSocket, type RawData } from "ws";
 import type { AppDeviceRecord } from "../auth/device-registry.js";
 import type { ServerServices } from "../lib/services.js";
 import { decodeRelayFrame, sendRelayMessage } from "./framing.js";
-import { AppToDaemonMessageTypes, DaemonBroadcastMessageTypes, getSessionId } from "./message-types.js";
+import {
+  AppToDaemonMessageTypes,
+  DaemonBroadcastMessageTypes,
+  getSessionId,
+} from "./message-types.js";
 import { sendJson } from "./socket.js";
 
 export class RelayConnectionHandler {
@@ -34,7 +38,8 @@ export class RelayConnectionHandler {
       console.log(`[relay] recv <- ${parsed.type}`);
       await this.handleMessage(parsed);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Invalid message";
+      const message =
+        error instanceof Error ? error.message : "Invalid message";
       this.sendError("relay", "AUTH_INVALID", message);
     }
   }
@@ -50,7 +55,10 @@ export class RelayConnectionHandler {
       return;
     }
 
-    this.services.relayRegistry.unregisterDaemon(this.daemonDeviceId, this.socket);
+    this.services.relayRegistry.unregisterDaemon(
+      this.daemonDeviceId,
+      this.socket,
+    );
     this.services.pairing.clearDaemon(this.daemonDeviceId);
     this.services.sessionRegistry.clearDaemon(this.daemonDeviceId);
     this.services.presence.markOffline(this.daemonDeviceId);
@@ -103,7 +111,11 @@ export class RelayConnectionHandler {
       return;
     }
 
-    if (message.type === "session.event" || message.type === "danger.pending" || message.type === "replay.done") {
+    if (
+      message.type === "session.event" ||
+      message.type === "danger.pending" ||
+      message.type === "replay.done"
+    ) {
       this.handleDaemonToAppMessage(message);
       return;
     }
@@ -124,8 +136,12 @@ export class RelayConnectionHandler {
     message: Extract<Message, { type: "auth.attach" | "auth.refresh" }>,
   ): Promise<void> {
     try {
-      const verified = await this.services.jwtManager.verify(message.payload.jwt);
-      const appDevice = this.services.deviceRegistry.getAppDevice(verified.deviceId);
+      const verified = await this.services.jwtManager.verify(
+        message.payload.jwt,
+      );
+      const appDevice = this.services.deviceRegistry.getAppDevice(
+        verified.deviceId,
+      );
       if (!appDevice) {
         this.sendError(message.type, "AUTH_INVALID", "Unknown app device");
         return;
@@ -143,7 +159,9 @@ export class RelayConnectionHandler {
         this.services.relayRegistry.attachApp(appDevice.deviceId, this.socket);
       }
 
-      const refreshed = await this.services.jwtManager.issue(appDevice.deviceId);
+      const refreshed = await this.services.jwtManager.issue(
+        appDevice.deviceId,
+      );
       this.sendToSelf({
         v: 1,
         type: "auth.token",
@@ -162,8 +180,12 @@ export class RelayConnectionHandler {
     }
   }
 
-  private handleDaemonHello(message: Extract<Message, { type: "daemon.hello" }>): void {
-    const daemonDevice = this.services.deviceRegistry.getDaemonDevice(message.payload.device_id);
+  private handleDaemonHello(
+    message: Extract<Message, { type: "daemon.hello" }>,
+  ): void {
+    const daemonDevice = this.services.deviceRegistry.getDaemonDevice(
+      message.payload.device_id,
+    );
     if (!daemonDevice) {
       this.sendError(message.type, "AUTH_INVALID", "Unknown daemon device");
       this.socket.close();
@@ -176,21 +198,41 @@ export class RelayConnectionHandler {
     }
 
     this.daemonDeviceId = daemonDevice.deviceId;
-    this.services.relayRegistry.registerDaemon(daemonDevice.deviceId, this.socket);
-    this.services.presence.markOnline(daemonDevice.deviceId, daemonDevice.machineName ?? "unknown");
+    this.services.relayRegistry.registerDaemon(
+      daemonDevice.deviceId,
+      this.socket,
+    );
+    this.services.presence.markOnline(
+      daemonDevice.deviceId,
+      daemonDevice.machineName ?? "unknown",
+    );
     this.broadcastPresence(daemonDevice.deviceId);
   }
 
-  private handlePairReady(message: Extract<Message, { type: "device.pair.ready" }>): void {
+  private handlePairReady(
+    message: Extract<Message, { type: "device.pair.ready" }>,
+  ): void {
     if (!this.daemonDeviceId) {
-      this.sendError(message.type, "AUTH_INVALID", "daemon.hello required first");
+      this.sendError(
+        message.type,
+        "AUTH_INVALID",
+        "daemon.hello required first",
+      );
       return;
     }
 
+    console.log(
+      `[relay] pairing ready daemon=${this.daemonDeviceId} code=${message.payload.pairing_code} pairing_id=${message.payload.pairing_id}`,
+    );
     this.services.pairing.registerReady(this.daemonDeviceId, message.payload);
   }
 
-  private handlePairStart(message: Extract<Message, { type: "device.pair" }>): void {
+  private handlePairStart(
+    message: Extract<Message, { type: "device.pair" }>,
+  ): void {
+    console.log(
+      `[relay] pairing start code=${message.payload.pairing_code} app_device=${message.payload.app_device_name ?? "unknown"}`,
+    );
     const attempt = this.services.pairing.startAttempt({
       appSocket: this.socket,
       pairingCode: message.payload.pairing_code,
@@ -201,29 +243,54 @@ export class RelayConnectionHandler {
     });
 
     if (!attempt) {
-      this.sendError(message.type, "SESSION_NOT_FOUND", "Pairing slot not found or expired");
+      this.sendError(
+        message.type,
+        "SESSION_NOT_FOUND",
+        "Pairing slot not found or expired",
+      );
       return;
     }
+    console.log(
+      `[relay] pairing routed code=${message.payload.pairing_code} daemon=${attempt.daemonDeviceId}`,
+    );
 
-    const daemonSocket = this.services.relayRegistry.getDaemon(attempt.daemonDeviceId);
+    const daemonSocket = this.services.relayRegistry.getDaemon(
+      attempt.daemonDeviceId,
+    );
     if (!daemonSocket) {
       this.services.pairing.completeAttemptForAppSocket(this.socket);
-      this.sendError(message.type, "SESSION_NOT_FOUND", "Target daemon is offline");
+      this.sendError(
+        message.type,
+        "SESSION_NOT_FOUND",
+        "Target daemon is offline",
+      );
       return;
     }
 
     sendJson(daemonSocket, message);
   }
 
-  private handlePairSas(message: Extract<Message, { type: "device.pair.sas" }>): void {
+  private handlePairSas(
+    message: Extract<Message, { type: "device.pair.sas" }>,
+  ): void {
     if (!this.daemonDeviceId) {
-      this.sendError(message.type, "AUTH_INVALID", "Unregistered daemon connection");
+      this.sendError(
+        message.type,
+        "AUTH_INVALID",
+        "Unregistered daemon connection",
+      );
       return;
     }
 
-    const attempt = this.services.pairing.getAttemptByDaemonDeviceId(this.daemonDeviceId);
+    const attempt = this.services.pairing.getAttemptByDaemonDeviceId(
+      this.daemonDeviceId,
+    );
     if (!attempt) {
-      this.sendError(message.type, "SESSION_NOT_FOUND", "No pairing attempt waiting for SAS");
+      this.sendError(
+        message.type,
+        "SESSION_NOT_FOUND",
+        "No pairing attempt waiting for SAS",
+      );
       return;
     }
 
@@ -231,7 +298,13 @@ export class RelayConnectionHandler {
       machineName: message.payload.machine_name,
       os: message.payload.os,
     });
-    this.services.presence.markOnline(this.daemonDeviceId, message.payload.machine_name);
+    console.log(
+      `[relay] pairing sas daemon=${this.daemonDeviceId} machine=${message.payload.machine_name} os=${message.payload.os}`,
+    );
+    this.services.presence.markOnline(
+      this.daemonDeviceId,
+      message.payload.machine_name,
+    );
     void this.services.persistState();
     this.sendToSocket(attempt.appSocket, message, {
       from: this.daemonDeviceId,
@@ -241,15 +314,30 @@ export class RelayConnectionHandler {
   private async handlePairConfirm(
     message: Extract<Message, { type: "device.pair.confirm" }>,
   ): Promise<void> {
-    const attempt = this.services.pairing.completeAttemptForAppSocket(this.socket);
+    console.log(
+      `[relay] pairing confirm confirmed=${message.payload.confirmed}`,
+    );
+    const attempt = this.services.pairing.completeAttemptForAppSocket(
+      this.socket,
+    );
     if (!attempt) {
-      this.sendError(message.type, "SESSION_NOT_FOUND", "No active pairing attempt");
+      this.sendError(
+        message.type,
+        "SESSION_NOT_FOUND",
+        "No active pairing attempt",
+      );
       return;
     }
 
-    const daemonSocket = this.services.relayRegistry.getDaemon(attempt.daemonDeviceId);
+    const daemonSocket = this.services.relayRegistry.getDaemon(
+      attempt.daemonDeviceId,
+    );
     if (!daemonSocket) {
-      this.sendError(message.type, "SESSION_NOT_FOUND", "Target daemon is offline");
+      this.sendError(
+        message.type,
+        "SESSION_NOT_FOUND",
+        "Target daemon is offline",
+      );
       return;
     }
 
@@ -271,6 +359,9 @@ export class RelayConnectionHandler {
     }
     this.appDeviceId = appDevice.deviceId;
     this.services.relayRegistry.attachApp(appDevice.deviceId, this.socket);
+    console.log(
+      `[relay] pairing linked app=${appDevice.deviceId} daemon=${attempt.daemonDeviceId}`,
+    );
 
     const jwt = await this.services.jwtManager.issue(appDevice.deviceId);
     await this.services.persistState();
@@ -285,7 +376,12 @@ export class RelayConnectionHandler {
     this.sendCurrentPresence(appDevice.deviceId);
   }
 
-  private handleSessionResume(message: Extract<Message, { type: "session.resume" }>): void {
+  private handleSessionResume(
+    message: Extract<Message, { type: "session.resume" }>,
+  ): void {
+    console.log(
+      `[relay] session resume session=${message.payload.session_id} last_seq=${message.payload.last_seq}`,
+    );
     const replay = this.services.replayBuffer.replay(
       message.payload.session_id,
       message.payload.last_seq,
@@ -342,17 +438,39 @@ export class RelayConnectionHandler {
 
     const daemonId = this.resolveDaemonForAppMessage(this.appDeviceId, message);
     if (!daemonId) {
-      this.sendError(message.type, "SESSION_NOT_FOUND", "Session is not registered");
+      this.sendError(
+        message.type,
+        "SESSION_NOT_FOUND",
+        "Session is not registered",
+      );
       return;
     }
 
     if (message.type === "session.start") {
-      this.services.sessionRegistry.register(message.payload.session_id, this.appDeviceId, daemonId);
+      this.services.sessionRegistry.register(
+        message.payload.session_id,
+        this.appDeviceId,
+        daemonId,
+      );
+      console.log(
+        `[relay] session start session=${message.payload.session_id} app=${this.appDeviceId} daemon=${daemonId} workspace=${message.payload.workspace_path} agent=${message.payload.agent_type}`,
+      );
+    } else if (
+      "session_id" in message.payload &&
+      typeof message.payload.session_id === "string"
+    ) {
+      console.log(
+        `[relay] route app->daemon type=${message.type} session=${message.payload.session_id} daemon=${daemonId}`,
+      );
     }
 
     const daemonSocket = this.services.relayRegistry.getDaemon(daemonId);
     if (!daemonSocket) {
-      this.sendError(message.type, "SESSION_NOT_FOUND", "Target daemon is offline");
+      this.sendError(
+        message.type,
+        "SESSION_NOT_FOUND",
+        "Target daemon is offline",
+      );
       return;
     }
 
@@ -361,12 +479,23 @@ export class RelayConnectionHandler {
 
   private handleDaemonToAppMessage(message: Message): void {
     if (!this.daemonDeviceId) {
-      this.sendError(message.type, "AUTH_INVALID", "Unregistered daemon connection");
+      this.sendError(
+        message.type,
+        "AUTH_INVALID",
+        "Unregistered daemon connection",
+      );
       return;
     }
 
     if (message.type === "session.event") {
       this.services.replayBuffer.append(message);
+      console.log(
+        `[relay] route daemon->app type=session.event session=${message.payload.session_id} seq=${message.payload.seq} event=${message.payload.event.event_type}`,
+      );
+    } else if (message.type === "danger.pending") {
+      console.log(
+        `[relay] route daemon->app type=danger.pending session=${message.payload.session_id} danger=${message.payload.danger_id}`,
+      );
     }
 
     this.routeDaemonMessageToApp(this.daemonDeviceId, message);
@@ -374,7 +503,11 @@ export class RelayConnectionHandler {
 
   private handleDaemonBroadcast(message: Message): void {
     if (!this.daemonDeviceId) {
-      this.sendError(message.type, "AUTH_INVALID", "Unregistered daemon connection");
+      this.sendError(
+        message.type,
+        "AUTH_INVALID",
+        "Unregistered daemon connection",
+      );
       return;
     }
 
@@ -403,7 +536,8 @@ export class RelayConnectionHandler {
       return;
     }
 
-      this.sendToSelf({
+    this.sendToSelf(
+      {
         v: 1,
         type: "device.status",
         payload: {
@@ -412,7 +546,9 @@ export class RelayConnectionHandler {
           machine_name: presence.machineName,
           ts: presence.ts,
         },
-      }, { from: presence.deviceId });
+      },
+      { from: presence.deviceId },
+    );
   }
 
   private broadcastPresence(daemonDeviceId: string): void {
@@ -427,20 +563,27 @@ export class RelayConnectionHandler {
     );
 
     for (const socket of sockets) {
-      this.sendToSocket(socket, {
-        v: 1,
-        type: "device.status",
-        payload: {
-          device_id: presence.deviceId,
-          online: presence.online,
-          machine_name: presence.machineName,
-          ts: presence.ts,
+      this.sendToSocket(
+        socket,
+        {
+          v: 1,
+          type: "device.status",
+          payload: {
+            device_id: presence.deviceId,
+            online: presence.online,
+            machine_name: presence.machineName,
+            ts: presence.ts,
+          },
         },
-      }, { from: presence.deviceId });
+        { from: presence.deviceId },
+      );
     }
   }
 
-  private resolveDaemonForAppMessage(appDeviceId: string, message: Message): string | null {
+  private resolveDaemonForAppMessage(
+    appDeviceId: string,
+    message: Message,
+  ): string | null {
     const appDevice = this.getAppRecord(appDeviceId);
     if (!appDevice) {
       return null;
@@ -463,12 +606,17 @@ export class RelayConnectionHandler {
     return session.daemonDeviceId;
   }
 
-  private routeDaemonMessageToApp(daemonDeviceId: string, message: Message): void {
+  private routeDaemonMessageToApp(
+    daemonDeviceId: string,
+    message: Message,
+  ): void {
     const sessionId = getSessionId(message);
     if (sessionId) {
       const session = this.services.sessionRegistry.get(sessionId);
       if (session) {
-        for (const socket of this.services.relayRegistry.getAppSockets(session.appDeviceId)) {
+        for (const socket of this.services.relayRegistry.getAppSockets(
+          session.appDeviceId,
+        )) {
           this.sendToSocket(socket, message, {
             from: daemonDeviceId,
           });
@@ -511,7 +659,12 @@ export class RelayConnectionHandler {
 
   private sendError(
     requestId: string,
-    code: "AUTH_INVALID" | "AUTH_EXPIRED" | "DEVICE_REVOKED" | "SESSION_NOT_FOUND" | "PROTOCOL_VERSION",
+    code:
+      | "AUTH_INVALID"
+      | "AUTH_EXPIRED"
+      | "DEVICE_REVOKED"
+      | "SESSION_NOT_FOUND"
+      | "PROTOCOL_VERSION",
     message: string,
   ): void {
     this.sendToSelf({

@@ -1,10 +1,13 @@
 import { EncryptedAuditLogger } from "./audit/logger.js";
 import { createAgentRuntimeFactory } from "./agents/factory.js";
+import { DaemonCatalogService } from "./catalog/service.js";
 import { loadDaemonConfig } from "./config/load.js";
 import { resolveRegisterUrl } from "./config/schema.js";
 import { DeviceKeyStore } from "./crypto/keys.js";
+import { DaemonWorkspaceService } from "./fs/workspace.js";
 import { DangerApprovalInterceptor } from "./guard/interceptor.js";
 import { loadDangerRuleSet } from "./guard/rules.js";
+import { DaemonTranscriptService } from "./history/transcripts.js";
 import { PairingSlotManager } from "./pairing/code.js";
 import { DaemonSessionManager } from "./sessions/manager.js";
 import { DaemonConnection } from "./transport/connection.js";
@@ -59,16 +62,17 @@ export async function bootstrapDaemon(): Promise<{
     auditLogger,
     dangerInterceptor,
   });
-  let connection: DaemonConnection;
-  const announcePairingSlot = () => {
-    pairingSlotManager.pruneExpired();
-    const slot = pairingSlotManager.issuePairingSlot(
-      config.pairing_ttl_ms ?? 30_000,
-    );
-    connection.announcePairingSlot(slot);
-    logPairingSlot(config.server_url, slot);
-  };
-  connection = new DaemonConnection({
+  const workspaceService = new DaemonWorkspaceService({
+    allowedPaths: config.allowed_paths,
+    sessions: sessionManager,
+  });
+  const transcriptService = new DaemonTranscriptService({
+    allowedPaths: config.allowed_paths,
+  });
+  const catalogService = new DaemonCatalogService({
+    sessions: sessionManager,
+  });
+  const connection = new DaemonConnection({
     serverUrl: config.server_url,
     identity,
     certificates,
@@ -76,10 +80,21 @@ export async function bootstrapDaemon(): Promise<{
       onMessage: createDaemonMessageRouter({
         identity,
         sessions: sessionManager,
+        workspace: workspaceService,
+        history: transcriptService,
+        catalog: catalogService,
         onPairingConfirmed: announcePairingSlot,
       }),
     },
   });
+  function announcePairingSlot(): void {
+    pairingSlotManager.pruneExpired();
+    const slot = pairingSlotManager.issuePairingSlot(
+      config.pairing_ttl_ms ?? 30_000,
+    );
+    connection.announcePairingSlot(slot);
+    logPairingSlot(config.server_url, slot);
+  }
   sendMessage = (message) => {
     connection.sendMessage(message);
   };

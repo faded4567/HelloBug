@@ -66,6 +66,61 @@ describe("protocol message validation", () => {
     expect(message.payload.entries[0]?.modified).toBeNull();
   });
 
+  it("accepts empty fs.file chunks for zero-byte files", () => {
+    const message = validateMessage({
+      type: "fs.file",
+      payload: {
+        file_path: "README.md",
+        mime_type: "text/markdown",
+        chunk_index: 0,
+        total_chunks: 1,
+        data: "",
+        total_size: 0,
+      },
+    });
+
+    expect(message.type).toBe("fs.file");
+    if (message.type !== "fs.file") {
+      throw new Error("expected fs.file");
+    }
+    expect(message.payload.data).toBe("");
+    expect(message.payload.total_size).toBe(0);
+  });
+
+  it("accepts pty.input frames with base64 payload bytes", () => {
+    const message = validateMessage({
+      type: "pty.input",
+      payload: {
+        session_id: "sess-pty-1",
+        data: Buffer.from("ls -la\r", "utf8").toString("base64"),
+      },
+    });
+
+    expect(message.type).toBe("pty.input");
+    if (message.type !== "pty.input") {
+      throw new Error("expected pty.input");
+    }
+    expect(message.payload.session_id).toBe("sess-pty-1");
+  });
+
+  it("accepts session.start with an empty workspace to request daemon default workspace", () => {
+    const message = validateMessage({
+      type: "session.start",
+      payload: {
+        session_id: "sess-default-workspace",
+        agent_type: "claude_code",
+        workspace_path: "",
+        resume_session_id: null,
+      },
+    });
+
+    expect(message.type).toBe("session.start");
+    if (message.type !== "session.start") {
+      throw new Error("expected session.start");
+    }
+    expect(message.payload.workspace_path).toBe("");
+  });
+
   it("accepts history.list request and response variants", () => {
     const request = validateMessage({
       type: "history.list",
