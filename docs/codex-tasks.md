@@ -4,7 +4,7 @@
 > 本文件只包含 **Codex 负责的后端与基础设施任务**。
 > 整个 Flutter 客户端由 Claude 负责，见 `docs/flutter-tasks.md`。
 > 协议格式规范见 `docs/protocol.md`。
-> 更新：2026-06-23
+> 更新：2026-06-24
 
 ---
 
@@ -28,14 +28,17 @@
 - `[x]` 已完成 `packages/protocol` 基础实现：Zod schema、类型导出、基础测试
 - `[~]` 已完成 `packages/server` 第一版骨架：`/health`、`/v1/register`、JWT/证书、配对服务、在线状态广播、session 级 relay 路由骨架
 - `[~]` 已完成 `packages/daemon` 第一版骨架：配置、设备密钥、配对槽位、注册流程、WebSocket 连接、消息路由、工作区围栏、可替换的 session manager / runtime 基础闭环、图片分片临时文件组装、危险操作审批骨架、加密审计日志，以及已对齐真实 Claude Code CLI 多轮 `stream-json` 行为的子进程 runtime
-- `[x]` 当前已验证 `packages/protocol`、`packages/server`、`packages/daemon` 的单包 `build` / `test` / `lint` 通过；`packages/` 根脚本仍依赖 `pnpm`，当前 shell 无 `pnpm`
+- `[x]` 当前已验证 `packages/protocol`、`packages/server`、`packages/daemon` 以及 `packages/` 根 `build` / `test` / `lint` 通过（通过 `npm run ...` 触发各子包脚本）
 - `[ ]` 尚未完成真实 E2EE、Noise IK、mTLS 校验、完整生产级 Agent 集成、文件系统、推送与多 Agent 群组能力
+- `[x]` 2026-06-24 已补一轮跨端协议对齐：Flutter `session.event` 嵌套解析、slash args 数组、shell 路由、文件预览错误与 `data_base64url`、danger confirm race；server 补 legacy `session.start` / `session.command.slash` 兼容；daemon 补 `~` 路径展开与文件树响应对外形态保持
+- `[x]` 2026-06-24 已在局域网 relay 下验证开发态联调：`pairing/SAS/auth.token -> session.start(shell) -> pty.input/pty.resize -> terminal output`
+- `[x]` 2026-06-24 已补 daemon catalog 能力：`templates.list`、`slash.list`、`session.agent.add` 显式错误收口，以及 app-style slash command 到 Claude-like runtime 的归一化
 
 ## 后续开发顺序
 
-1. 先补完 M1 剩余核心能力：Noise IK、真正的 envelope 签名/验签、relay 路由与基础配对确认闭环。
-2. 继续推进 M2，在当前已对齐真实 CLI 行为的 Claude runtime 之上补危险操作拦截、审计、断线重放与真实录制回放。
-3. 之后按 M3 文件系统、M4 多并发/推送、M5 多 Agent 群组顺序推进，避免范围同时膨胀。
+1. 继续清理 legacy 命名/兼容漂移，并推动 Flutter 侧接入 daemon `templates.list` 默认来源。
+2. 再推进 M1 剩余核心能力：Noise IK、真正的 envelope 签名/验签、relay 安全边界与基础配对确认闭环。
+3. 再补设备管理、push backend、workspace/restore 这些会继续阻塞 Flutter 业务闭环的后端能力。
 
 ---
 
@@ -381,7 +384,7 @@ packages/protocol/src/
 
 - `node-pty` 创建 PTY（shell = `$SHELL` 或 `/bin/bash`）
 - 工作目录 = 选定的工作区路径
-- 收到 `session.input`：写入 PTY stdin（`pty.write(text)`）
+- 收到 `pty.input`：写入 PTY stdin（base64 解码后 `pty.write(bytes)`）
 - PTY 输出：监听 `data` 事件，封装为 `pty.data { bytes: base64 }` 推给 App
 - PTY resize：收到 `pty.resize { cols, rows }` 时调用 `pty.resize(cols, rows)`
 - 会话结束：监听 `exit` 事件，发 `session.done`
@@ -396,6 +399,7 @@ packages/protocol/src/
 - 会话结束后清理临时文件
 
 ### 4.5 历史 Transcript 读取（`packages/daemon/src/history/`）
+状态：`[x]` 已完成基础 transcript 扫描与分页读取；后续只剩更复杂的过滤/恢复扩展。
 
 - `finder.ts`：扫描 Claude Code 的 transcript 目录（`~/.claude/projects/<hash>/`）
   - 路径探测：先尝试默认路径，找不到打日志告警（见 Spike 说明）

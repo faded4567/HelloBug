@@ -1,6 +1,6 @@
 # HelloBug — Flutter 任务清单
 
-> 本文件只包含 **Claude 负责的整个 Flutter 客户端任务，更新：2026-06-23**。
+> 本文件只包含 **Claude 负责的整个 Flutter 客户端任务，更新：2026-06-24**。
 > 任务完成状态以 `docs/app-remaining-work.md` 为准；本文档主要用于规划与验收。
 > 后端与基础设施由 Codex 负责，见 `docs/codex-tasks.md`。
 > 协议格式规范见 `docs/protocol.md`。
@@ -16,19 +16,19 @@
 | **Spike F4** TLS Pinning + JWT 重连 | ⚠️ 骨架已落地，验证未完成 | `PinnedHttpClient`、`auth.attach`、replay 逻辑已在代码中，但 pin 与完整恢复链路未完成 |
 | **M1** 安全骨架 | ⚠️ UI 骨架已深度落地，运行时未闭环 | crypto 仍有 stub；pairing 已部分联调但未闭环；`wsClientProvider` 仍默认 `null` 但 bootstrap / pairing 已能注入真实 client；unlock / devices 仍有未接线处 |
 | **M2** 聊天闭环 | ⚠️ 第一版页面与 Provider 已存在，未形成真实闭环 | sessions / new-session / chat / history / danger rules / workspace switch 等已在代码中，但大多仍缺真实 transport 接线 |
-| **M3** Diff + 文件树 | ⚠️ 第一版实现已存在，协议与大文件能力未收口 | diff、file tree、file preview 已有代码，但仍有 `fs.read` / `content` 等协议偏差 |
+| **M3** Diff + 文件树 | ⚠️ 第一版实现已存在，大文件与状态能力未收口 | diff、file tree、file preview 已有代码，文件预览正式协议已对齐，剩余主要是大文件/二进制/权限态 |
 | **M4** 多并发 + 输入增强 + 推送 | ⚠️ 部分模块已落地，后半段仍未开始 | terminal、image input、voice input、slash palette、security、notifications、device detail、appearance、about 已存在；push wiring 与 multi-tab 仍未完成 |
 
-## 现状说明（2026-06-23）
+## 现状说明（2026-06-24）
 
 - 本文档仍是 **Flutter 侧任务规划与验收文档**，但当前 `app/` 代码已经明显超前于其中不少“M2/M3/M4 未开始”的描述。
 - 当前最需要 Claude 理解的不是“哪些页面还没写”，而是“哪些页面已经有了第一版 UI / 本地逻辑，但还没有真正接上运行时链路”。
 - Claude 当前负责的是整个 Flutter 客户端，不只是页面层；因此这里的重点同时包含 `state / transport / crypto / bootstrap / router`。
 - 核心阻塞不是 UI 数量，而是：
   1. `wsClientProvider` 默认仍为 `null`，但 `bootstrap()` 与配对成功后都已能注入真实 `WsClient`
-  2. `bootstrap()` 还没串起 local auth 生命周期、pinning、transport lifecycle observer
+  2. 前台 transport lifecycle observer 已接上，但 local auth 生命周期、pinning、超时重锁规则仍未收口
   3. 配对流程已部分打通，但缺 `device.push_token`、pin 保存与 E2EE 握手
-  4. app 与 server / daemon 在协议边界和部分消息字段上还有偏差（当前最明显是 `fs.read` / `content`）
+  4. app 与 server / daemon 当前更主要的边界问题是安全链路未完成、模板仍未切到真实后端来源，以及 `session.agent.add` 还没有真正的多 agent runtime
 
 ---
 
@@ -38,8 +38,8 @@
 当前优先收口：
   ├── Spike F1（E2EE 跨端互通）
   ├── M1 运行时接线：真实 WsClient 注入、bootstrap 初始化、pairing 联调
-  ├── App 协议对齐：`session.resume` / `fs.file.req` / `data`
-  ├── 现有页面接活：devices / danger.pending / file preview / history / reconnect
+  ├── App 与 daemon 对接面：`templates.list` / `slash.list` / `session.agent.add` / push token
+  ├── 现有页面接活：devices / danger.pending 状态收口 / file preview 补态 / history / reconnect
   └── Spike F4（pinning + JWT 恢复）
 
 完成以上收口后：
@@ -237,7 +237,7 @@ app/lib/screens/pairing/
 具体要实现：
 - `pairing_entry_page.dart`：提供“扫码”与“手动输入”两个入口
 - `qr_scan_page.dart`：用 `mobile_scanner` 扫 daemon 输出的二维码或配对链接
-- `manual_pair_page.dart`：输入配对码、服务器地址、可选高级选项；展示 30 秒有效期倒计时
+- `manual_pair_page.dart`：输入配对码、服务器地址、可选高级选项；有效期文案需跟随 daemon 当前配置，避免硬编码
 - `sas_verify_page.dart`：显示 5 个 emoji / 5 个词的 SAS，明确“不一致立即取消”
 - `pairing_controller.dart`：串起 `device.pair`、`device.pair.sas`、`device.pair.confirm`、`auth.token`、`device.push_token`、pin 保存、E2EE 握手
 - 错误态必须完整：
@@ -249,7 +249,7 @@ app/lib/screens/pairing/
 - 配对完成后立即向服务器上报推送注册信息：iOS 上报 `apns_token`，Android 上报 `manufacturer`（Xiaomi / OPPO / vivo / Other）和对应的厂商推送 token；服务器依赖这两个字段路由推送，必须在首次配对时完成，不能延迟到 M4
 
 ### ⚠️ 1.7 `app/lib/screens/unlock/` — 启动锁屏页与生命周期锁
-> **现状补充**：`UnlockPage`、`UnlockController`、`AppLifecycleObserver` 与 `UnlockGate` 都已存在，且 `HelloBugApp` 现在已经用 `UnlockGate` 包住根路由；但 `AppLifecycleObserver` 还没有在 `bootstrap()` 中 attach，当前“后台超过 5 分钟重新上锁”链路并未真正启用。
+> **现状补充**：`UnlockPage`、`UnlockController`、`UnlockGate` 都已存在，`HelloBugApp` 也已经接上前台 `TransportLifecycleObserver`；但当前 app 仍默认从“已解锁”状态启动，旧的“后台超过 5 分钟重新上锁”链路当前保持关闭，若要恢复需重新定义真实规则。
 
 - `unlock_gate.dart`：应用启动时统一拦截，未解锁前不进入 Tab 主界面
 - `unlock_page.dart`：展示 Face ID / 指纹解锁按钮和失败态
@@ -320,7 +320,7 @@ app/lib/state/
   - 后台会话继续流式更新未读数
 
 ### ⚠️ 2.3 `app/lib/screens/new_session/` — 新建会话向导（三步）
-> **现状补充**：`new_session_flow.dart` 已实现三步设备 / 工作区 / agent 选择，并会 optimistic 创建本地会话后发送 `session.start`；但当前仍保留 dev stub device 兜底，也缺少更完整的确认项与错误处理。
+> **现状补充**：`new_session_flow.dart` 已实现三步设备 / 工作区 / agent 选择，并会 optimistic 创建本地会话后发送正式 `session.start`；dev stub device 兜底已经去掉，剩余主要是更完整的确认项、失败处理与恢复语义。
 
 文件结构：
 ```
@@ -343,7 +343,7 @@ app/lib/screens/new_session/
   - 如果协议最终把工作区选择拆为单独消息，向导层要可兼容，不把协议细节写死在 widget 内
 
 ### ⚠️ 2.4 `app/lib/screens/chat/` — 聊天主页骨架
-> **现状补充**：`ChatPage`、`ChatTimeline`、`ChatInputBar`、`ChatHeader`、`ChatStatusBanner` 均已存在，并能消费第一版 provider；但全局 `danger.pending`、图片 / 语音入口与真实 transport 闭环仍未完成。
+> **现状补充**：`ChatPage`、`ChatTimeline`、`ChatInputBar`、`ChatHeader`、`ChatStatusBanner` 均已存在，并能消费第一版 provider；全局 `danger.pending` 与图片 / 语音入口已经接通，剩余主要是状态机收口、恢复语义和更多正式数据源对齐。
 
 文件结构：
 ```
@@ -392,7 +392,7 @@ app/lib/widgets/
   - `tool_input` / `tool_result` 可能很大，卡片内必须有截断和懒展开机制
 
 ### ⚠️ 2.6 输入栏、模板芯片与消息发送流
-> **现状补充**：`chat_input_bar.dart`、`template_chip_bar.dart`、`slash_palette/` 已存在，文本发送、斜杠命令发送与 optimistic echo 已有第一版逻辑；但模板仍是静态 `kDefaultTemplates`，尚未接 `templates.list` 与设置页。
+> **现状补充**：`chat_input_bar.dart`、`template_chip_bar.dart`、`slash_palette/` 已存在，文本发送、斜杠命令发送与 optimistic echo 已有第一版逻辑；daemon 已支持 `templates.list` / `slash.list`，但 Flutter 模板仍是静态 `kDefaultTemplates`，尚未切到真实来源与设置页。
 
 - `template_chip_bar.dart`：横向滚动模板芯片，至少支持 `git status`、`跑测试`、`看最近 5 个 commit`
 - `chat_input_controller.dart`：管理草稿、发送态、禁用态、多行高度
@@ -402,7 +402,7 @@ app/lib/widgets/
 - 后续 M4 的图片、语音、斜杠入口在这里扩展，M2 先把插槽和布局留好
 
 ### ⚠️ 2.7 `app/lib/widgets/danger_confirm/` 与 `workspace_switch/`
-> **现状补充**：`danger_confirm_sheet.dart`、`workspace_switch_sheet.dart` 与工作区历史持久化都已存在；但 `danger.pending` 还没有全局监听并自动弹出确认框，工作区切换也仍缺与聊天 / 文件树 / 分支上下文的完整联动。
+> **现状补充**：`danger_confirm_sheet.dart`、`workspace_switch_sheet.dart` 与工作区历史持久化都已存在；`danger.pending` 现在已经有全局监听并能自动弹出确认框，剩余主要是 timeout / 已处理 / 失败状态收口，以及工作区切换与聊天 / 文件树 / 分支上下文的完整联动。
 
 文件结构：
 ```
@@ -521,7 +521,7 @@ app/lib/screens/filetree/
   - 修改文件用橙色点或标记，不要用整行强色块压住层级结构
 
 ### ⚠️ 3.4 `app/lib/screens/filetree/file_preview_page.dart` — 单文件只读预览
-> **现状补充**：`file_preview_page.dart` 已存在并能做第一版分片拼装；但当前仍使用 `fs.read` + `content`，与 `docs/protocol.md` 的 `fs.file.req` + `data` 存在偏差，也还没有高亮与虚拟滚动。
+> **现状补充**：`file_preview_page.dart` 已存在并能做第一版分片拼装，且已切到正式 `fs.file.req` + `data/data_base64url`；当前剩余主要是高亮、虚拟滚动，以及 `large-file / binary / permission` 等状态补口。
 
 - `file_preview_page.dart`：只读内容页，支持代码高亮和文本类文件预览
 - `chunked_file_controller.dart`：处理 `fs.file` 分片拼装、base64 解码、大文件分段加载
@@ -579,7 +579,7 @@ app/lib/screens/terminal/
   - 发送前预览必须可取消，不能拍完即自动上行
 
 ### ⚠️ 4.3 `app/lib/screens/voice_input/` — 语音输入页
-> **现状补充**：`voice_input_sheet.dart` 已存在，聊天输入栏也已经接入语音入口；当前主要缺口是权限、转写状态、失败恢复与 `session.input.voice_text` 的完整客户端状态机收口。
+> **现状补充**：`voice_input_sheet.dart` 已接上 `speech_to_text`、基础权限声明、实时转写与 `session.input.voice_text` 发送；当前主要缺口是权限拒绝后的恢复路径、状态抽象拆分和更完整的失败兜底。
 
 - `voice_input_sheet.dart`：按住录音、取消、重试入口
 - `speech_session_controller.dart`：封装 `speech_to_text` 的权限、开始、停止、错误恢复
@@ -697,9 +697,9 @@ Flutter 不直连 daemon，不直接访问本地文件系统，也不假设 daem
 
 ### Flutter 调用的 WebSocket 消息（完整列表见 `docs/protocol.md`）
 
-> **当前代码偏差（待统一，2026-06-23）**：
+> **当前代码偏差（待统一，2026-06-24）**：
 > - `WsClient` 重放当前已经发送 `session.resume`
-> - 文件预览当前仍在发送 `fs.read` 并读取 `fs.file.payload.content`，后续需统一到 `fs.file.req` 与 `data`
+> - `slash.list` / `templates.list` 的 daemon 后端已补完，但 Flutter 还没把模板入口切到真实来源
 
 ```
 App → Server:

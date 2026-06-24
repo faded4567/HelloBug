@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>61 · 媒体选择抽屉</title>
+<link rel="stylesheet" href="_common.css">
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
+<div class="phone-wrap">
+  <div class="phone-label">61 · 媒体选择抽屉（点击+触发）</div>
+  <div class="phone" style="position:relative;overflow:hidden">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nav-back"><svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8,1 2,9 8,17"/></svg> 返回</div>
+      <div class="nav-title" style="font-size:15px">HelloBug · Claude Code</div>
+      <div class="nav-right">⋯</div>
+    </div>
+
+    <!-- 聊天背景（虚化） -->
+    <div style="flex:1;padding:12px 16px;display:flex;flex-direction:column;gap:10px;filter:blur(2px);pointer-events:none;overflow:hidden">
+      <div class="msg me"><div class="bubble">帮我看看 login 接口</div></div>
+      <div class="msg ai"><div class="bubble">好的，我先查看相关文件…</div></div>
+    </div>
+
+    <!-- 输入栏（虚化） -->
+    <div class="input-bar" style="filter:blur(2px);pointer-events:none">
+      <div class="input-row">
+        <div class="input-field" style="color:var(--fg3)">按住说话</div>
+        <button class="input-action">＋</button>
+      </div>
+    </div>
+
+    <!-- 媒体抽屉覆盖层 -->
+    <div class="sheet-overlay">
+      <div class="sheet" style="padding:12px 16px 48px">
+        <div class="sheet-handle"></div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <div class="media-item" onclick="alert('→ 打开相机')">
+            <div class="media-item-icon">📷</div>
+            <div class="media-item-label">相机</div>
+          </div>
+          <div class="media-item" onclick="location.href='15-image-input.html'">
+            <div class="media-item-icon">🖼</div>
+            <div class="media-item-label">相册</div>
+          </div>
+          <div class="media-item" onclick="alert('→ 选择文件')">
+            <div class="media-item-icon">📄</div>
+            <div class="media-item-label">文件</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn = document.querySelector('.theme-toggle');
+  if (html.dataset.theme === 'dark') { html.dataset.theme = 'light'; btn.textContent = '🌙 深色'; }
+  else { html.dataset.theme = 'dark'; btn.textContent = '☀ 浅色'; }
+}
+</script>
+</body>
+</html>

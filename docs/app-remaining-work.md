@@ -1,6 +1,6 @@
 # HelloBug — 全量剩余工作总表
 
-更新：2026-06-23
+更新：2026-06-24
 
 > 这份文档是当前阶段的总任务清单，覆盖 `app / server / daemon / protocol` 四块。
 > 这份文档也是当前阶段唯一的任务状态真源；其他文档只做规划、分工、规格或启动上下文，不单独维护一套完成状态。
@@ -31,16 +31,18 @@
 - `[~]` Flutter 与 wireframe 的根导航已经切到 2-tab 方向，但当前第一分支仍实际挂在 `SessionsPage`；工作区主页这层信息架构还没有完全落地。
 - `[~]` server 已能兼容 app 侧 `Envelope`，但只是 base64 包内层 `Message` 的开发态桥接，不是真正的端到端加密。
 - `[~]` daemon 仍然使用明文 `Message` WebSocket，没有正式切到 `Envelope`、签名、验签、mTLS 实链路。
-- `[~]` pairing、session.start、session.input、danger.allow/deny、replay 基础闭环已存在。
-- `[ ]` daemon 还没有补齐 `fs/history/templates/slash/pty` 这些会直接支撑 app 页面联调的能力。
+- `[~]` pairing、SAS、`auth.attach/auth.token`、`session.start`、`session.input`、`danger.allow/deny`、replay 基础闭环已存在。
+- `[x]` 已在局域网 `ws://192.168.18.8:3000/v1/relay` 验证一轮开发态联调：`pairing -> SAS -> session.start(shell) -> pty.input/pty.resize -> terminal output`，`pwd` 已返回真实工作区路径。
+- `[x]` daemon 已补上 `fs.tree.req` / `fs.file.req` / `history.list` / `history.get` / `pty.input` / `pty.resize` / `templates.list` / `slash.list`。
+- `[~]` `session.agent.add` 当前已收口为明确错误响应，避免静默失败；真实多 agent runtime 仍未实现。
 - `[~]` `device.push_token` 已补 server 持久化，但 app 自动上报和真实推送服务都还没接上。
 - `[ ]` app 侧 `noise_ik.dart`、`session_cipher.dart` 仍是 stub，无法宣称移动端到电脑端全链路已加密。
 
 ## 总执行顺序
 
-1. 先打通真正可联调的主链路：传输边界统一、daemon 能力补齐、push token 入库。
-2. 再把 app 现有页面接活：danger pending、文件预览、历史、模板、终端、工作区状态页。
-3. 再补推送、生命周期、重连恢复、设备管理闭环。
+1. 继续清理 app / daemon 间剩余的 legacy 兼容漂移，并把 Flutter 端模板数据切到真实 `templates.list`。
+2. 再打真正的安全边界：`Envelope`、Noise IK、签名/验签、pinning、relay 安全边界。
+3. 再补 push token 上报、设备管理、工作区状态与恢复闭环。
 4. 最后进入多会话、多 agent、生产化硬化。
 
 ---
@@ -58,13 +60,13 @@
 
 ### 2. Daemon 业务能力补齐
 
-- `[ ] [Codex]` 实现 `fs.tree.req -> fs.tree`。
-- `[ ] [Codex]` 实现 `fs.file.req -> fs.file`。
-- `[ ] [Codex]` 实现 `history.list` / `history.get`。
-- `[ ] [Codex]` 实现 `templates.list`。
-- `[ ] [Codex]` 实现 `slash.list`。
-- `[ ] [Codex]` 实现 `pty` 会话与 `pty.resize`。
-- `[ ] [Codex]` 明确 `session.agent.add` 的实际 runtime 语义，哪怕先只返回明确错误，也要收口协议行为。
+- `[x] [Codex]` 实现 `fs.tree.req -> fs.tree`。
+- `[x] [Codex]` 实现 `fs.file.req -> fs.file`。
+- `[x] [Codex]` 实现 `history.list` / `history.get`。
+- `[x] [Codex]` 实现 `templates.list`。
+- `[x] [Codex]` 实现 `slash.list`。
+- `[x] [Codex]` 实现 `pty` 会话与 `pty.resize`。
+- `[~] [Codex]` `session.agent.add` 当前返回明确 `PROTOCOL_VERSION` 错误，真实多 agent runtime 语义仍待实现。
 
 ### 3. Pairing / 设备注册闭环
 
@@ -103,8 +105,8 @@
 
 ### 4. 启动、解锁、生命周期
 
-- `[~] [Claude]` `UnlockGate`、`UnlockPage`、`UnlockController` 已存在。
-- `[ ] [Claude]` 在 `bootstrap()` 里接上 `AppLifecycleObserver`，让超时重锁真正生效。
+- `[~] [Claude]` `UnlockGate`、`UnlockPage`、`UnlockController` 已存在；前台 transport reconnect 已接上，但超时重锁当前保持关闭。
+- `[ ] [Claude]` 如果要恢复“后台超过阈值重新上锁”，需要先重新定义规则并重新接线，不要直接依赖旧草稿里的实现假设。
 - `[ ] [Claude]` 定义客户端侧解锁状态与敏感操作可用性的真实业务规则。
 - `[ ] [Claude]` 启动恢复中、设备吊销、重新解锁、认证失败兜底等状态页与恢复逻辑补齐。
 
@@ -112,7 +114,7 @@
 
 - `[~] [Claude]` `SessionsPage`、`NewSessionFlow` 已存在。
 - `[~] [Shared]` `session.start` 基础跨端闭环已存在。
-- `[ ] [Claude]` 去掉新建会话里的 dev fallback 设备逻辑，切到真实设备/工作区来源。
+- `[x] [Claude]` 去掉新建会话里的 dev fallback 设备逻辑，切到真实设备/工作区来源。
 - `[ ] [Shared]` 明确 `session.resume`、历史恢复、session not found 的真实恢复路径。
 - `[ ] [Claude]` 会话不存在、恢复中、空会话列表等 UI 与客户端状态收口。
 
@@ -120,23 +122,23 @@
 
 - `[~] [Claude]` chat timeline、input bar、tool card、thinking card、diff card 基本都在。
 - `[~] [Shared]` session input、cancel、image chunk upload、voice text、slash command 基础通路已存在。
-- `[ ] [Claude]` 把 `danger.pending` 接到 app 全局监听，能自动弹出确认层。
+- `[~] [Claude]` `danger.pending` 已接到 app 全局监听，能自动弹出确认层；但超时/失败/已处理状态还没完全收口。
 - `[ ] [Shared]` 收口 provider 事件模型与 daemon payload，避免继续漂移。
-- `[ ] [Claude]` 聊天页与聊天状态机补“空会话 / 等待首条回复 / 会话结束 / 连接恢复中”的最终表现。
+- `[~] [Claude]` 聊天页与聊天状态机：空会话空态 / 等待首条回复 spinner / 会话结束（已有 `done` item）/ session not found 页已接入；连接恢复中已由 `ChatStatusBanner` 覆盖，重连后会话恢复语义仍待补。
 
 ### 7. 危险操作确认
 
 - `[~] [Claude]` `DangerConfirmSheet` 已存在。
 - `[~] [Codex]` daemon `dangerInterceptor` 和 allow/deny 已接上。
-- `[ ] [Claude]` 实现 app 侧对 `danger.pending` 的全局订阅、路由与状态收口。
+- `[~] [Claude]` app 侧对 `danger.pending` 的全局订阅、弹层路由和 allow/deny 正式 payload 已接通；状态收口仍未完成。
 - `[ ] [Shared]` 明确 danger request 生命周期：超时、已处理、找不到 request 的回执。
 - `[ ] [Claude]` 补确认失败、已超时、已被其他端处理等视觉与客户端状态。
 
 ### 8. 文件树与文件预览
 
 - `[~] [Claude]` 文件树页和文件预览页已有第一版 UI。
-- `[ ] [Codex]` daemon 实现 `fs.tree.req` / `fs.file.req`。
-- `[ ] [Claude]` app 端把 `fs.read` / `content` 改到正式协议 `fs.file.req` / `data`。
+- `[x] [Codex]` daemon 已实现 `fs.tree.req` / `fs.file.req`，server 也已补当前 Flutter 所需的兼容桥接与测试。
+- `[x] [Claude]` app 已改为发送正式 `fs.tree.req { session_id, workspace_path, dir_path }`，`applyResponse` 已解析 `entries/type` 字段；文件预览已改为自行解码 `fs.file.data` base64url，移除 `content` 兼容回退。
 - `[ ] [Shared]` 定义大文件、二进制文件、不可读文件的返回语义。
 - `[~] [Claude]` 文件预览页已有 `loading / empty / error`；仍需补 `large-file / binary file / permission` 状态，并接上真实读取链路。
 - `[ ] [Claude]` 文件树页补更完整的空态、权限受限态、工作区失效态与客户端缓存行为。
@@ -151,24 +153,24 @@
 ### 10. 历史记录
 
 - `[~] [Claude]` 历史列表和详情页已有 UI。
-- `[ ] [Codex]` daemon / server 实现 `history.list` / `history.get`。
-- `[ ] [Codex]` 定义 transcript 存储来源、分页、过滤、恢复入口。
-- `[~] [Claude]` 历史页已有空态和加载态；筛选/搜索态、恢复失败态和客户端恢复入口仍待补。
+- `[x] [Codex]` daemon 已实现 `history.list` / `history.get`，按工作区映射 Claude transcript 目录并返回原始 JSONL 分页。
+- `[x] [Codex]` transcript 存储来源、分页与基础读取规则已收口到 `~/.claude/projects/<workspace-slug>/*.jsonl`。
+- `[~] [Claude]` 历史页已切到正式协议并能解析基础 Claude JSONL；筛选/搜索态、恢复失败态和客户端恢复入口仍待补。
 
 ### 11. 终端
 
 - `[~] [Claude]` terminal 页面、toolbar、status bar UI 基本存在。
-- `[ ] [Codex]` daemon 实现真实 PTY runtime、输出流转发、resize、关闭。
+- `[x] [Codex]` daemon 已实现真实 PTY runtime、输出流转发、`pty.input` / `pty.resize`、关闭。
 - `[ ] [Shared]` 处理终端权限、只读模式、会话结束后的状态回执。
-- `[ ] [Claude]` 终端页补未连接、只读、权限拒绝、退出完成等状态，并接上客户端状态管理。
+- `[~] [Claude]` 终端页已切到 `session.event -> pty.data` 正式事件形态；未连接、只读、权限拒绝、退出完成等状态仍待补。
 
 ### 12. 模板、Slash、图片、语音
 
 - `[~] [Claude]` 模板页、slash palette、图片输入、语音输入 UI 已存在。
-- `[ ] [Codex]` `templates.list`、`slash.list` 实现真实后端来源。
+- `[x] [Codex]` `templates.list`、`slash.list` 已有 daemon 默认后端来源。
 - `[ ] [Shared]` 模板 CRUD 是否落 app 本地还是 daemon/server，要正式定下来并落实现。
 - `[ ] [Shared]` 图片输入最终链路继续完善，包括上传完成确认、失败回执、服务端限制。
-- `[ ] [Claude]` 收口语音输入到 `session.input.voice_text` 的客户端链路。
+- `[~] [Claude]` 语音输入已接上真实 STT、权限声明和 `session.input.voice_text` 发送；更完整的权限拒绝恢复与状态抽象仍待收口。
 - `[~] [Claude]` 聊天输入栏图片/语音入口已完成；发送前确认、异常状态和本地交互仍待收口。
 
 ### 13. 设置
@@ -204,7 +206,7 @@
 
 ### 17. 多 Agent / 群组会话
 
-- `[ ] [Codex]` 扩展 session 数据模型，支持 `session.agent.add`、agent routing、agent 归属事件。
+- `[ ] [Codex]` 扩展 session 数据模型，落地真正的 `session.agent.add`、agent routing、agent 归属事件。
 - `[ ] [Codex]` 收口多 agent 的 replay、danger、history、audit 规则。
 - `[ ] [Claude]` 群组 agent 列表、添加 agent、@mention、agent routing、agent status、按 agent 看历史的 UI。
 - `[ ] [Shared]` 这是后置阶段，不应阻塞前面单 agent 主链路。
@@ -227,9 +229,9 @@
 - `[ ] [Claude]` app 侧 `noise_ik.dart` / `session_cipher.dart` 落地，移除开发态 base64 明文回退
 - `[ ] [Claude]` app 侧 pinning、JWT 恢复、`bootstrap()` 生命周期接线补齐
 - `[ ] [Claude]` pairing 成功后 push token 上报、本地 runtime 持久化、设备指纹 / pin / 显示名收口
-- `[ ] [Claude]` `danger.pending` 全局监听、弹层路由、状态回执处理
-- `[ ] [Claude]` `fs.read` / `content` 改到 `fs.file.req` / `data`
-- `[ ] [Claude]` 去掉 new session 的 dev fallback 设备逻辑
+- `[~] [Claude]` `danger.pending` 全局监听、弹层路由和 allow/deny 正式 payload 已接通；状态回执处理仍未完成
+- `[x] [Claude]` 文件树 / 文件预览最终切到正式 payload：`fs.tree.req { workspace_path, dir_path }`，并在客户端自行解码 `fs.file.data`
+- `[x] [Claude]` 去掉 new session 的 dev fallback 设备逻辑
 - `[ ] [Claude]` 2-tab 根导航下第一分支从“会话页过渡态”收口到真正的工作区语义
 
 ### 已完成的 Flutter 基础
@@ -285,24 +287,23 @@
 
 ### P0
 
-- `[ ] [Codex]` daemon 实现 `fs.tree.req` / `fs.file.req`
-- `[ ] [Codex]` daemon 实现 `history.list` / `history.get`
-- `[ ] [Codex]` daemon 实现 `templates.list` / `slash.list`
-- `[ ] [Codex]` daemon 实现 PTY runtime 和 `pty.resize`
+- `[x] [Codex]` daemon 实现 `fs.tree.req` / `fs.file.req`
+- `[x] [Codex]` daemon 实现 `history.list` / `history.get`
+- `[x] [Codex]` daemon 实现 `templates.list` / `slash.list`
+- `[x] [Codex]` daemon 实现 PTY runtime 和 `pty.resize`
 - `[x] [Codex]` server 持久化 `device.push_token`
 - `[ ] [Codex]` app / server / daemon 统一 envelope 正式链路
 
 ### P1
 
-- `[ ] [Codex]` app 侧文件预览协议改成 `fs.file.req` + `data`
-- `[ ] [Codex]` app 侧 `danger.pending` 全局监听与弹层接线
-- `[ ] [Codex]` app lifecycle / unlock timeout / reconnect 恢复接线
-- `[ ] [Codex]` 设置页真实数据源接线
+- `[ ] [Codex]` server 补设备重命名 / 吊销 / 元数据刷新接口或消息
+- `[ ] [Codex]` push backend：APNS / Android 厂商推送
+- `[ ] [Codex]` 工作区真实管理：来源、权限检测、路径失效与空工作区语义
 
 ### P2
 
-- `[ ] [Codex]` 推送服务
-- `[ ] [Codex]` 工作区真实管理
+- `[ ] [Codex]` relay 安全边界、签名验签、seq 与可恢复状态继续硬化
+- `[ ] [Codex]` 多 agent / 多会话后端模型扩展
 - `[ ] [Codex]` 多会话并发
 - `[ ] [Codex]` 多 agent
 

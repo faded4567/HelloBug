@@ -3,120 +3,35 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>16 · 语音输入</title>
+<title>16 · 语音输入（长按触发）</title>
 <link rel="stylesheet" href="_common.css">
 <style>
-.voice-screen {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 24px 24px 0;
-  gap: 0;
+/* 模拟底部覆盖在聊天页上的录音状态 */
+.chat-bg-blur {
+  flex: 1; padding: 12px 16px;
+  display: flex; flex-direction: column; gap: 10px;
+  filter: blur(2px); pointer-events: none; overflow: hidden;
 }
-.voice-state-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--tint);
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  margin-bottom: 20px;
+.voice-overlay-demo {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,.72);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: flex-end;
+  padding-bottom: 52px;
 }
-.voice-timer {
-  font-size: 40px;
-  font-weight: 200;
-  font-family: var(--font-mono);
-  letter-spacing: .06em;
-  margin-bottom: 20px;
-}
-.mic-button {
-  width: 80px; height: 80px;
-  border-radius: 50%;
-  background: var(--tint);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 36px;
-  cursor: pointer;
-  box-shadow: 0 0 0 8px var(--tint-bg), 0 0 0 16px rgba(10,132,255,.08);
-  position: relative;
-  margin-bottom: 16px;
-  transition: transform .1s;
-}
-.mic-button:active { transform: scale(.94); }
-.mic-pulse {
-  position: absolute; inset: -12px;
-  border-radius: 50%;
-  border: 2px solid var(--tint);
-  animation: mic-pulse 1.5s ease-out infinite;
-  opacity: 0;
-}
-@keyframes mic-pulse {
-  0% { transform: scale(.9); opacity: .6; }
-  100% { transform: scale(1.3); opacity: 0; }
-}
-.mic-hint { font-size: 13px; color: var(--fg3); margin-bottom: 24px; }
-
-/* transcript box */
-.transcript-box {
-  width: 100%;
-  background: var(--bg2);
-  border-radius: var(--r);
-  padding: 14px 16px;
-  min-height: 90px;
-  font-size: 15px;
-  line-height: 1.6;
-  color: var(--fg);
-  margin-bottom: 16px;
-  position: relative;
-}
-.transcript-cursor {
-  display: inline-block;
-  width: 2px; height: 18px;
-  background: var(--tint);
-  vertical-align: text-bottom;
-  margin-left: 2px;
-  animation: blink 1s step-end infinite;
-}
-@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
-.transcript-label {
-  font-size: 11px; font-weight: 700;
-  color: var(--fg3); text-transform: uppercase; letter-spacing: .05em;
-  position: absolute; top: -20px; left: 2px;
-}
-.confidence-bar {
-  width: 100%;
-  height: 3px;
-  background: var(--bg3);
-  border-radius: 2px;
-  margin-bottom: 16px;
-  overflow: hidden;
-}
-.confidence-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--tint), #30d158);
-  border-radius: 2px;
-  width: 88%;
-}
-
-.action-row {
-  display: flex; gap: 10px; width: 100%;
-}
-
-/* language indicator */
-.lang-badge {
-  display: flex; align-items: center; gap: 6px;
-  background: var(--bg2);
-  border-radius: var(--r-pill);
-  padding: 6px 12px;
-  font-size: 13px; color: var(--fg2);
-  cursor: pointer;
+.voice-cancel-hint {
+  font-size: 13px; color: rgba(255,255,255,.45);
+  letter-spacing: .02em; margin-top: 8px;
 }
 </style>
 </head>
 <body>
 <button class="theme-toggle" onclick="toggleTheme()">☀ 浅色</button>
 <div class="phone-wrap">
-  <div class="phone-label">16 · 语音输入（本地 STT）</div>
-  <div class="phone">
+
+  <!-- 状态A：录音中 -->
+  <div class="phone-label">16-A · 录音中（长按输入框触发）</div>
+  <div class="phone" style="position:relative;overflow:hidden">
     <div class="dynamic-island"></div>
     <div class="status-bar">
       <span class="status-time">9:41</span>
@@ -125,78 +40,88 @@
         <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
       </div>
     </div>
-
     <div class="nav">
-      <div class="nav-back" style="color:var(--tint);cursor:pointer">
-        <svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8,1 2,9 8,17"/></svg>
-        取消
-      </div>
-      <div class="nav-title">语音输入</div>
-      <div class="nav-right">
-        <div class="lang-badge">🌐 普通话</div>
+      <div class="nav-back"><svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8,1 2,9 8,17"/></svg> 返回</div>
+      <div class="nav-title" style="font-size:15px">HelloBug · Claude Code</div>
+      <div class="nav-right">⋯</div>
+    </div>
+
+    <!-- 聊天背景（虚化） -->
+    <div class="chat-bg-blur">
+      <div class="msg me"><div class="bubble">帮我看看 login 接口</div></div>
+      <div class="msg ai"><div class="bubble">我先查看相关文件…</div></div>
+    </div>
+
+    <!-- 输入栏（虚化） -->
+    <div class="input-bar" style="filter:blur(2px);pointer-events:none">
+      <div class="input-row">
+        <div class="input-field" style="color:var(--fg3)">按住说话</div>
+        <button class="input-action">＋</button>
       </div>
     </div>
 
-    <div class="voice-screen">
-      <div class="voice-state-label">● 正在录音</div>
-
-      <!-- waveform -->
-      <div class="waveform" style="width:100%;margin-bottom:20px">
-        <div class="wave-bar"></div>
-        <div class="wave-bar"></div>
-        <div class="wave-bar"></div>
-        <div class="wave-bar"></div>
-        <div class="wave-bar"></div>
-        <div class="wave-bar"></div>
-        <div class="wave-bar"></div>
-        <div class="wave-bar"></div>
-        <div class="wave-bar"></div>
-        <div class="wave-bar"></div>
-        <div class="wave-bar"></div>
-        <!-- more bars -->
-        <div class="wave-bar" style="height:22px;animation-delay:.35s"></div>
-        <div class="wave-bar" style="height:40px;animation-delay:.08s"></div>
-        <div class="wave-bar" style="height:50px;animation-delay:.22s"></div>
-        <div class="wave-bar" style="height:32px;animation-delay:.17s"></div>
-        <div class="wave-bar" style="height:14px;animation-delay:.4s"></div>
+    <!-- 录音覆盖层 -->
+    <div class="voice-overlay-demo">
+      <!-- 实时转写 -->
+      <div style="background:rgba(28,28,30,.9);border-radius:var(--r);padding:14px 18px;width:80%;margin-bottom:28px;font-size:15px;line-height:1.6;color:#fff;text-align:center">
+        帮我看一下 login 接口有没有问题<span style="display:inline-block;width:2px;height:18px;background:var(--tint);vertical-align:text-bottom;margin-left:2px;animation:blink 1s step-end infinite"></span>
       </div>
-
-      <div class="voice-timer">0:08</div>
-
-      <!-- mic button -->
-      <div class="mic-button" onclick="stopRec()">
-        <div class="mic-pulse"></div>
-        🎤
+      <!-- 波形 -->
+      <div class="waveform" style="width:70%;margin-bottom:16px">
+        <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+        <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+        <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+        <div class="wave-bar"></div><div class="wave-bar"></div>
       </div>
-      <div class="mic-hint">点击停止录音</div>
-
-      <!-- transcript -->
-      <div style="position:relative;width:100%;margin-top:8px">
-        <div class="transcript-label">实时转写</div>
-        <div class="transcript-box">
-          帮我看一下 login.ts 里的 retry 逻辑有没有问题，尤其是超时处理那一块<span class="transcript-cursor"></span>
-        </div>
-      </div>
-
-      <!-- confidence -->
-      <div style="width:100%;margin-bottom:4px">
-        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--fg3);margin-bottom:4px">
-          <span>识别置信度</span><span>88%</span>
-        </div>
-        <div class="confidence-bar"><div class="confidence-fill"></div></div>
-      </div>
-
-      <div style="font-size:12px;color:var(--fg3);margin-bottom:20px">
-        本地识别，音频不上传 · iOS Speech / Android STT
-      </div>
-
-      <div class="action-row">
-        <button class="btn btn-secondary" style="flex:1;padding:12px;font-size:14px" onclick="alert('→ 重新录制')">🔄 重录</button>
-        <button class="btn btn-primary" style="flex:2;padding:12px;font-size:14px" onclick="alert('→ 发送转写文字')">发送 ➤</button>
-      </div>
+      <!-- 计时 -->
+      <div style="font-size:40px;font-weight:200;font-family:var(--font-mono);color:#fff;letter-spacing:.05em;margin-bottom:12px">0:08</div>
+      <!-- 提示 -->
+      <div style="font-size:14px;color:rgba(255,255,255,.55);margin-bottom:32px">松开发送 · 上划取消</div>
+      <!-- 麦克风按钮 -->
+      <div style="width:72px;height:72px;border-radius:50%;background:var(--tint);display:flex;align-items:center;justify-content:center;font-size:32px;box-shadow:0 0 0 14px rgba(10,132,255,.15)">🎤</div>
     </div>
-    <div style="height:32px;flex-shrink:0"></div>
   </div>
+
+  <!-- 状态B：上划 → 取消 -->
+  <div class="phone-label">16-B · 上划取消</div>
+  <div class="phone" style="position:relative;overflow:hidden">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nav-back"><svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8,1 2,9 8,17"/></svg> 返回</div>
+      <div class="nav-title" style="font-size:15px">HelloBug · Claude Code</div>
+      <div class="nav-right">⋯</div>
+    </div>
+    <div class="chat-bg-blur">
+      <div class="msg me"><div class="bubble">帮我看看 login 接口</div></div>
+      <div class="msg ai"><div class="bubble">我先查看相关文件…</div></div>
+    </div>
+    <div class="input-bar" style="filter:blur(2px);pointer-events:none">
+      <div class="input-row">
+        <div class="input-field" style="color:var(--fg3)">按住说话</div>
+        <button class="input-action">＋</button>
+      </div>
+    </div>
+    <div class="voice-overlay-demo" style="background:rgba(0,0,0,.82)">
+      <div style="background:rgba(255,59,48,.18);border:1px solid rgba(255,59,48,.4);border-radius:var(--r);padding:10px 20px;margin-bottom:28px;font-size:14px;color:#ff453a;font-weight:600">取消发送</div>
+      <div class="waveform" style="width:70%;margin-bottom:16px;opacity:.3">
+        <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+        <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+        <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+        <div class="wave-bar"></div><div class="wave-bar"></div>
+      </div>
+      <div style="font-size:40px;font-weight:200;font-family:var(--font-mono);color:rgba(255,255,255,.4);letter-spacing:.05em;margin-bottom:12px">0:08</div>
+      <div style="font-size:14px;color:rgba(255,255,255,.4);margin-bottom:32px">松开取消</div>
+      <div style="width:72px;height:72px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:32px">✕</div>
+    </div>
+  </div>
+
 </div>
 <script>
 function toggleTheme() {
@@ -204,12 +129,6 @@ function toggleTheme() {
   const btn = document.querySelector('.theme-toggle');
   if (html.dataset.theme === 'dark') { html.dataset.theme = 'light'; btn.textContent = '🌙 深色'; }
   else { html.dataset.theme = 'dark'; btn.textContent = '☀ 浅色'; }
-}
-function stopRec() {
-  document.querySelector('.voice-state-label').textContent = '✓ 录音完成';
-  document.querySelector('.voice-state-label').style.color = 'var(--green)';
-  document.querySelector('.mic-button').style.background = 'var(--bg3)';
-  document.querySelector('.mic-hint').textContent = '确认后发送';
 }
 </script>
 </body>

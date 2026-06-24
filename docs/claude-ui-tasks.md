@@ -46,7 +46,7 @@
 ## 当前 Flutter 重点
 
 - 当前根导航方向以 2-tab 为准；旧 3-tab / 4-tab 底栏只当历史稿，不再作为根导航真源。
-- P0 运行时：app crypto、pinning、push token 上报、JWT 恢复、`danger.pending` 全局监听、`fs.file.req` 协议对齐、工作区 2-tab 语义收口
+- P0 运行时：app crypto、pinning、push token 上报、JWT 恢复、`danger.pending` 全局监听、文件树/文件预览正式 payload 收口、工作区 2-tab 语义收口
 - P0 状态/UI：启动加载、重连、设备吊销、配对过期、会话不存在、工作区状态页、push landing、聊天页关键状态、文件预览补态、设备列表刷新/失败视觉
 - P1：工作区主页/设置、终端状态、历史搜索/筛选/失败、通知权限被拒绝提示、设备详情错误/吊销承接、客户端状态持久化补口
 - P2：多会话 tab、横屏双栏

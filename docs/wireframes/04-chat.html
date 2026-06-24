@@ -158,11 +158,45 @@
         <div class="tpl-chip">⚡ 看最近 5 commit</div>
       </div>
       <div class="input-row">
-        <div class="input-field" contenteditable="true" data-placeholder="输入消息…" style="padding:10px 14px;color:var(--fg3)">输入消息…</div>
-        <button class="input-btn">📷</button>
-        <button class="input-btn">🎤</button>
-        <button class="input-btn" style="font-size:16px;color:var(--tint);font-weight:700">/</button>
-        <button class="input-send">➤</button>
+        <div class="input-field" id="chatField" contenteditable="true"
+             style="color:var(--fg3)" data-empty="true"
+             onmousedown="startLongPress()" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()"
+             ontouchstart="startLongPress()" ontouchend="cancelLongPress()">按住说话</div>
+        <button class="input-action" id="chatAction" onclick="handleAction()">＋</button>
+      </div>
+    </div>
+
+    <!-- voice recording overlay -->
+    <div id="voiceOverlay" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,.72);flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:48px;z-index:50">
+      <div class="waveform" style="width:80%;margin-bottom:16px">
+        <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+        <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+        <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+        <div class="wave-bar"></div><div class="wave-bar"></div>
+      </div>
+      <div style="font-size:40px;font-weight:200;font-family:var(--font-mono);color:#fff;letter-spacing:.05em;margin-bottom:12px" id="voiceTimer">0:00</div>
+      <div style="font-size:14px;color:rgba(255,255,255,.6);margin-bottom:32px">松开发送 · 上划取消</div>
+      <div style="width:72px;height:72px;border-radius:50%;background:var(--tint);display:flex;align-items:center;justify-content:center;font-size:32px;box-shadow:0 0 0 12px rgba(10,132,255,.15)">🎤</div>
+    </div>
+
+    <!-- media drawer overlay -->
+    <div id="mediaOverlay" onclick="if(event.target===this)closeMedia()" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,.45);flex-direction:column;justify-content:flex-end;z-index:50">
+      <div style="background:var(--bg2);border-radius:20px 20px 0 0;padding:12px 16px 40px">
+        <div style="width:36px;height:4px;background:var(--bg4);border-radius:99px;margin:0 auto 20px"></div>
+        <div style="display:flex;gap:8px">
+          <div class="media-item" onclick="alert('→ 打开相机')">
+            <div class="media-item-icon">📷</div>
+            <div class="media-item-label">相机</div>
+          </div>
+          <div class="media-item" onclick="location.href='15-image-input.html'">
+            <div class="media-item-icon">🖼</div>
+            <div class="media-item-label">相册</div>
+          </div>
+          <div class="media-item" onclick="alert('→ 选择文件')">
+            <div class="media-item-icon">📄</div>
+            <div class="media-item-label">文件</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -173,6 +207,57 @@ function toggleTheme() {
   const btn = document.querySelector('.theme-toggle');
   if (html.dataset.theme === 'dark') { html.dataset.theme = 'light'; btn.textContent = '🌙 深色'; }
   else { html.dataset.theme = 'dark'; btn.textContent = '☀ 浅色'; }
+}
+
+const field = document.getElementById('chatField');
+const action = document.getElementById('chatAction');
+
+field.addEventListener('focus', () => {
+  if (field.dataset.empty === 'true') { field.textContent = ''; field.style.color = ''; field.dataset.empty = 'false'; }
+});
+field.addEventListener('blur', () => {
+  if (!field.textContent.trim()) {
+    field.textContent = '按住说话'; field.style.color = 'var(--fg3)'; field.dataset.empty = 'true';
+    action.textContent = '＋'; action.classList.remove('send');
+  }
+});
+field.addEventListener('input', () => {
+  const hasText = !!field.textContent.trim();
+  action.textContent = hasText ? '↑' : '＋';
+  action.classList.toggle('send', hasText);
+});
+
+function handleAction() {
+  if (action.classList.contains('send')) { alert('→ 发送消息'); }
+  else { showMedia(); }
+}
+
+function showMedia() {
+  const ov = document.getElementById('mediaOverlay');
+  ov.style.display = 'flex';
+}
+function closeMedia() {
+  document.getElementById('mediaOverlay').style.display = 'none';
+}
+
+let pressTimer;
+function startLongPress() {
+  pressTimer = setTimeout(() => {
+    document.getElementById('voiceOverlay').style.display = 'flex';
+    let s = 0;
+    pressTimer = setInterval(() => {
+      s++;
+      document.getElementById('voiceTimer').textContent = Math.floor(s/60)+':'+(s%60<10?'0':'')+s%60;
+    }, 1000);
+  }, 500);
+}
+function cancelLongPress() {
+  clearTimeout(pressTimer); clearInterval(pressTimer);
+  const ov = document.getElementById('voiceOverlay');
+  if (ov.style.display !== 'none') {
+    ov.style.display = 'none';
+    document.getElementById('voiceTimer').textContent = '0:00';
+  }
 }
 </script>
 </body>

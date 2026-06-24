@@ -422,6 +422,23 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   font-size: 16px;
   flex-shrink: 0;
 }
+/* + / send toggle button */
+.input-action {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--bg3); color: var(--fg2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; font-weight: 300; flex-shrink: 0;
+  transition: background .12s, color .12s; border: none; cursor: pointer;
+}
+.input-action.send { background: var(--tint); color: #fff; font-size: 17px; font-weight: 700; }
+/* media drawer grid item */
+.media-item {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  gap: 8px; padding: 20px 0; cursor: pointer; border-radius: var(--r-sm);
+}
+.media-item:active { background: var(--bg3); }
+.media-item-icon { font-size: 32px; }
+.media-item-label { font-size: 13px; color: var(--fg2); }
 
 /* ---------- theme toggle ---------- */
 .theme-toggle {

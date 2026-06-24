@@ -1,190 +1,126 @@
 # Flutter Status
 
-Updated: 2026-06-23
+Updated: 2026-06-24
 
 ## How To Use This File
 
 - `docs/app-remaining-work.md` is the single task-status truth.
-- `docs/flutter-tasks.md` is still the milestone and acceptance-plan document.
+- `docs/flutter-tasks.md` is the milestone and acceptance-plan document.
 - `memory/claude-current.md` is the small-session startup file for Claude.
-- Claude now owns the entire Flutter client, not just the UI layer.
 - This file is the reality check for Claude Code: it reconciles `docs/flutter-tasks.md`, `docs/wireframes/index.html`, and the current `app/` code.
 - When the task touches Flutter, read this file before assuming the milestone labels in `docs/flutter-tasks.md` still match the codebase.
 
 ## High-Level Reality
 
-- `docs/wireframes/index.html` is currently valid again: 57 nodes, 70 edges, no missing files, no bad refs, no isolated nodes.
-- Flutter is no longer "mostly placeholder UI". M1 is visually far along, and large parts of M2, M3, and M4 already exist in code.
-- The root navigation direction has changed again: both HTML and Flutter now point at a 2-tab shell, not the older 3-tab root assumption.
-- That 2-tab landing is still only partially semantic:
-  - Flutter now has 2 shell branches
-  - but the first branch still mounts `SessionsPage`
-  - while `RootTabScaffold` labels that tab as `工作区`
-- The main reason the app is not truly live yet is runtime wiring and protocol alignment, not lack of screens.
-- `flutter analyze` in `app/` currently has no build-blocking errors, but it still reports 11 warning/info issues.
+- Flutter is no longer blocked by “missing pages”; the bigger blockers are runtime wiring, backend capability gaps, and the unfinished security boundary.
+- Both HTML and Flutter now point at a 2-tab root shell, not the older 3-tab assumption.
+- That 2-tab shell is still transitional:
+  - Flutter has 2 root branches
+  - the first tab is labeled `工作区`
+  - but it still mounts `SessionsPage`
+- Pairing, history, file preview, and terminal are all beyond mock-only state now.
+- Pairing-code TTL is configuration-driven; do not hardcode `30 秒` or `5 分钟` into new Flutter logic.
+
+## Verified Runtime Flow
+
+- `PairingEntryPage` supports inline manual code entry and QR path.
+- `PairingController` can complete `device.pair -> device.pair.sas -> device.pair.confirm -> auth.token`, persist runtime, and install a live `WsClient`.
+- `bootstrap()` restores persisted runtime and auto-connects when JWT/server state exists.
+- `HelloBugApp` now attaches `TransportLifecycleObserver`, so foreground resume can trigger reconnect.
+- `danger.pending` is now globally listened to in `app.dart` and opens `DangerConfirmSheet`.
+- `NewSessionFlow` sends formal `session.start { session_id, workspace_path, agent_type, resume_session_id }`.
+- Shell sessions route to `/terminal/:sessionId`.
+- Recent LAN validation already proved the dev-mode chain `pairing -> SAS -> shell session -> PTY input/output` works end to end.
 
 ## Global Blockers
 
-1. Transport is still split at the security boundary:
+1. Security boundary is still incomplete:
    - app sends `Envelope`
-   - server and daemon still work with plain `Message`
-2. App crypto is still incomplete in practice:
-   - `app/lib/crypto/noise_ik.dart` is a stub
-   - `app/lib/crypto/session_cipher.dart` is a stub
-   - `app/lib/transport/ws_client.dart` can still fall back to base64-wrapped plaintext in development mode
-3. `wsClientProvider` still defaults to `null`, but the app is no longer hard-wired to stay that way:
-   - `bootstrap()` restores persisted runtime and installs a real `WsClient` when JWT/server/device state exists
-   - pairing success also installs a live `WsClient`
-   - pinning, app lifecycle reconnect wiring, and push registration are still incomplete
-4. App-side protocol naming is mostly aligned now, but file preview is still out of sync with `docs/protocol.md`:
-   - current code still sends `fs.read`
-   - current code still reads `fs.file.payload.content`
-   - protocol standard is `fs.file.req` + `data`
-5. Security/settings/device-detail/voice-input UI now exist, but runtime wiring is still incomplete:
-   - push registration is still not wired
-   - multi-tab and dedicated workspace home/settings/state pages are still missing
-   - the new 2-tab root shell is only partially aligned with final workspace semantics
-   - several newer pages still show mock data only
+   - server bridges envelope frames in development mode
+   - daemon still talks plain `Message`
+   - `noise_ik.dart` and `session_cipher.dart` are still stubs
+2. Push/pinning/runtime persistence are only partially done:
+   - push token reporting is not wired
+   - server pin persistence/use is not wired
+   - JWT refresh exists, but the full secure reconnect story is not finished
+3. Backend capability gaps still block Flutter pages:
+   - daemon now has real `templates.list`
+   - daemon now has real `slash.list`
+   - `session.agent.add` still has no final multi-agent runtime behavior, but it now returns an explicit not-implemented error
+4. Workspace semantics and device management are still incomplete:
+   - root tab semantics are transitional
+   - workspace home/settings/state pages are still missing as live flows
+   - device rename/revoke/refresh flows are not complete
 
 ## M1 Reality
 
-- 1.1 app skeleton is present: `main.dart`, `bootstrap.dart`, `app.dart`, router, models, theme, providers.
-- Root navigation no longer matches the older `device | session | settings` assumption:
-  - app root is `CupertinoApp.router`
-  - tab shell is `GoRouter` `StatefulShellRoute.indexedStack` + custom `RootTabScaffold`
-  - current shell has 2 branches
-- 1.2 theme system is present and actively used.
-- 1.3 transport scaffold exists:
-  - `WsClient` supports connect, reconnect, `auth.attach`, message encode/decode, and `session.resume` replay bookkeeping
+- App skeleton is present: `main.dart`, `bootstrap.dart`, `app.dart`, router, models, theme, providers.
+- Transport scaffold is live enough for real development-mode pairing and session work:
+  - `WsClient` supports connect, reconnect, `auth.attach`, envelope/plain decode, and `session.resume`
+  - runtime restore and live client injection both exist
+  - resume reconnect observer is attached
   - `PinnedHttpClient` is still placeholder
-  - bootstrap/pairing now provide a basic real client injection path, but lifecycle observers are not wired
-- 1.4 crypto is only partially real:
+- Crypto is still partial:
   - `keys.dart`, `secure_store.dart`, `nonce_counter.dart`, `envelope_signer.dart` exist
   - `noise_ik.dart` and `session_cipher.dart` are still stubs
-  - `sig` is still empty in `Envelope`
-- 1.5 onboarding flow exists.
-- 1.6 pairing is partially real, not a pure stub anymore:
-  - `PairingEntryPage` supports inline manual code entry plus QR path
-  - `QrScanPage` is real and uses `mobile_scanner`
-  - `PairingController` now sends `device.pair`, waits for `device.pair.sas`, sends `device.pair.confirm`, waits for `auth.token`, persists runtime, and installs a live `WsClient`
-  - missing pieces: `device.push_token`, pin persistence/use, richer device metadata persistence, real E2EE session setup
-  - `manual_pair_page.dart` now implements the intended wireframe and has input / connecting / error visual states, but it is still a standalone visual variant and does not drive the active pairing flow
-- 1.7 unlock is only partially live:
-  - `HelloBugApp` now wraps the router with `UnlockGate`
-  - current code starts in unlocked state by default
-  - `AppLifecycleObserver` exists, but is not attached in bootstrap, so timeout-based re-lock is currently inactive
-- 1.8 device list is no longer a hardcoded stub:
+  - envelope `sig` is still empty
+- Pairing is partially real:
+  - inline manual pairing happens in `pairing_entry_page.dart`
+  - `manual_pair_page.dart` is still a standalone visual variant, not the active flow
+  - daemon metadata such as `machineName` / `os` has started to persist
+  - missing pieces are push token, pin persistence, and real E2EE session setup
+- Unlock is intentionally relaxed right now:
+  - `UnlockGate` wraps the router
+  - app currently starts unlocked by default
+  - timeout-based re-lock is effectively disabled for now
+- Devices are provider-backed:
   - `devicesProvider` listens to `device.status`
-  - `DevicesPage` renders provider-backed cards
-  - `DeviceDetailPage` and the device-detail route now exist
-  - missing pieces: revoke/rename flows, refresh/error states, and settings entry wiring
+  - persisted paired daemon metadata can be restored into the list
 
 ## M2 Reality
 
-These parts already exist in code and should not be treated as blank:
-
-- state/providers:
-  - `sessions_provider.dart`
-  - `chat_provider.dart`
-  - `devices_provider.dart`
-  - `drafts_provider.dart`
-  - `settings_provider.dart`
-- sessions UI:
+- These are real and should not be treated as blank:
   - `SessionsPage`
-  - `SessionTile`
-  - during the current 2-tab transition, `SessionsPage` is still the content mounted under the first root-shell branch
-- new-session flow:
-  - 3-step device/workspace/agent flow exists
-  - optimistic local session summary exists
-  - sends `session.start`
-  - still includes a dev-only fake device fallback when no devices exist
-- chat UI:
-  - `ChatPage`
-  - `ChatTimeline`
-  - `ChatInputBar`
-  - message bubbles, thinking cards, tool cards, diff cards
-- slash commands:
-  - slash palette UI and controller exist
-  - requests `slash.list`
-- history:
-  - `HistoryListPage`
-  - `HistoryDetailPage`
-  - paged fetch flow exists
-- session info:
-  - `SessionInfoSheet` exists and is reachable from the chat header
-- danger rules:
-  - `DangerRulesPage` exists
-  - rules are editable in app state
-- workspace switch:
-  - switch sheet exists
-  - recent/pinned workspace history persists via secure storage
-- danger confirm:
-  - `DangerConfirmSheet` exists
-  - can send `danger.allow` / `danger.deny`
-
-## M2 Gaps
-
-- `danger.pending` is not yet wired to a global listener that automatically opens `DangerConfirmSheet`.
-- Template chips are still static `kDefaultTemplates`; `TemplatesPage` and its local form sheet exist, but there is no real `templates.list` or persisted template store yet.
-- `ImageInputSheet` exists, and chat input now has image and voice entry buttons wired in.
-- Workspace switching UI exists, but actual session/filetree/diff context rerouting is still incomplete.
-- Provider event modeling is still shallow and may not match final backend payloads.
+  - `NewSessionFlow`
+  - `ChatPage` / `ChatTimeline` / `ChatInputBar`
+  - `HistoryListPage` / `HistoryDetailPage`
+  - `DangerConfirmSheet`
+  - workspace switch sheet
+  - slash palette UI
+  - settings and device detail entry pages
+- `NewSessionFlow` no longer uses a dev fake-device fallback.
+- History already uses formal `history.list` / `history.get` and can parse basic Claude transcript JSONL.
+- `danger.pending` is already globally wired; the remaining gap is timeout/handled/error state cleanup.
+- Template UI still uses local/static data even though daemon template support now exists.
+- Slash palette already has daemon backend support; remaining work is richer client behavior and multi-agent semantics.
 
 ## M3 Reality
 
-- Diff work is already real in code:
-  - `app/lib/diff/`
-  - `screens/diff/`
-  - `screens/diff_spike/`
-  - `widgets/diff_card.dart`
-- File tree work is already real in code:
-  - `FileTreePage`
-  - `FileTreeController`
-  - `TreeCache`
-  - `TreeNodeTile`
-  - `FilePreviewPage`
+- File tree is already using formal `fs.tree.req { session_id, workspace_path, dir_path }`.
+- File preview is already using formal `fs.file.req` and client-side base64url decode.
+- Diff UI/code already exists in the repo.
 
 ## M3 Gaps
 
-- File preview protocol is still out of sync with the current spec:
-  - sends `fs.read`
-  - expects `content`
-- File preview still lacks decoding/highlighting/large-file virtualization.
-- File tree is still waiting on stable backend contract and fuller workspace/session wiring.
+- File preview still needs large-file / binary / permission states, plus better highlighting/virtualization.
+- File tree still needs fuller workspace/session coupling and better empty/error handling.
+- Diff still needs final backend event/data semantics and degradation rules.
 
 ## M4 Reality
 
-- Terminal page exists and is already hooked to PTY message flow:
-  - `TerminalPage`
-  - `PtySessionController`
-  - `TerminalToolbar`
-- `TerminalStatusBar` exists as a standalone widget, though it is not mounted in `TerminalPage` yet.
-- Image input exists:
-  - picker UI
-  - compression
-  - chunked `session.input.image` upload
-- Voice input UI now exists:
-  - `VoiceInputSheet`
-- Additional settings/device UI now exist:
-  - `SecurityPage`
-  - `NotificationsPage`
-  - `TemplatesPage`
-  - `RelaySettingsPage`
-  - `DeviceDetailPage`
-  - `SessionInfoSheet`
-- Appearance page exists.
-- About page exists.
-- Slash palette exists.
-- Settings home now routes to security, notifications, templates, relay, history, appearance, about, and diff spike.
+- Terminal is already wired to the formal PTY path:
+  - app sends `pty.input`
+  - app listens to `session.event` where `event_type == pty.data`
+- Image input exists with chunked upload flow.
+- Voice input UI exists and is connected to the chat entry path.
+- Settings/security/notifications/templates/relay/device-detail/about/appearance pages all exist as first-pass routes.
 
 ## M4 Gaps
 
-- No multi-tab concurrent session UI exists yet.
 - No push-token registration flow is wired yet.
-- Terminal still lacks read-only / permission-denied / exited-state UI, and `TerminalStatusBar` is not mounted yet.
-- Notification settings page exists, but no real permission or push-token flow is wired yet.
-- Security / relay / templates / device-detail pages still mostly show mock data or local-only state.
-- Workspace home/settings/state pages are still missing as real routed screens, even though the root shell has already moved toward a 2-tab workspace/settings information architecture.
+- No multi-session concurrent tab behavior is finished yet.
+- Terminal still lacks read-only / permission-denied / exited-state UX cleanup.
+- Security / relay / templates / notifications / device-detail pages still rely heavily on mock or local-only data.
 
 ## Best Read Order For Claude
 

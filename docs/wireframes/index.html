@@ -106,9 +106,10 @@ const nodes = [
 
   // ── Chat branches col-2 (x=2560) ──
   { id:'ws_switcher', label:'工作区切换器', num:'44', url:'44-workspace-switcher.html', x:2560, y:60 },
-  { id:'slash',       label:'斜杠命令面板', num:'14', url:'14-slash-palette.html',       x:2560, y:340  },
+  { id:'slash',        label:'斜杠命令面板', num:'14', url:'14-slash-palette.html',    x:2560, y:340  },
   { id:'img_input',   label:'图片输入',     num:'15', url:'15-image-input.html',         x:2560, y:580  },
-  { id:'voice_input', label:'语音输入',     num:'16', url:'16-voice-input.html',         x:2560, y:820  },
+  { id:'voice_input', label:'长按语音覆盖', num:'16', url:'16-voice-input.html',         x:2560, y:820  },
+  { id:'media_drawer',label:'媒体选择抽屉', num:'61', url:'61-media-drawer.html',        x:2800, y:580  },
   { id:'msg_actions', label:'消息长按操作', num:'29', url:'29-message-actions-sheet.html', x:2560, y:1060 },
   { id:'sess_info',   label:'会话信息面板', num:'40', url:'40-session-info.html',        x:2560, y:1300 },
   { id:'sess_tabs',   label:'多会话Tab',    num:'35', url:'35-session-tabs.html',        x:2560, y:1540 },
@@ -197,8 +198,9 @@ const edges = [
   // Chat → col-2
   { from:'chat', to:'ws_switcher', label:'切换工作区', type:'action', fromPort:'r', toPort:'l' },
   { from:'chat', to:'slash',      label:'斜杠命令',   type:'action', fromPort:'r', toPort:'l' },
-  { from:'chat', to:'img_input',  label:'添加图片',   type:'action', fromPort:'r', toPort:'l' },
-  { from:'chat', to:'voice_input',label:'语音输入',   type:'action', fromPort:'r', toPort:'l' },
+  { from:'chat', to:'media_drawer',label:'点击+',     type:'action', fromPort:'r', toPort:'l' },
+  { from:'chat', to:'voice_input',label:'长按输入框', type:'action', fromPort:'r', toPort:'l' },
+  { from:'media_drawer', to:'img_input', label:'相机/相册', type:'ok' },
   { from:'chat', to:'msg_actions',label:'长按消息',   type:'action', fromPort:'r', toPort:'l' },
   { from:'chat', to:'sess_info',  label:'会话信息',   type:'action', fromPort:'r', toPort:'l' },
   { from:'chat', to:'sess_tabs',  label:'多会话',     type:'action', fromPort:'r', toPort:'l' },

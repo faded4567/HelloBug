@@ -1,6 +1,6 @@
 # Current Status
 
-Updated: 2026-06-23
+Updated: 2026-06-24
 
 ## What HelloBug Is
 
@@ -16,7 +16,8 @@ The app should talk to the daemon only through the relay.
 
 - `packages/` workspace exists and has protocol, server, and daemon scaffolds.
 - Flutter app already has substantial UI and transport scaffolding.
-- Pairing, sessions, and relay all have partial implementations.
+- Pairing, sessions, relay, file/history/terminal 主链路都已有第一版真实实现。
+- 最近已验证一轮局域网开发态联调：`pairing -> SAS -> auth.token -> session.start(shell) -> pty.input/pty.resize -> terminal output`。
 - The repo is in active development and `app/` currently has many user changes in progress.
 
 ## Important Reality Check
@@ -68,7 +69,8 @@ The biggest integration blockers are:
 
 - app side `Envelope` vs daemon side plain `Message`
 - incomplete app crypto
-- missing daemon capability handlers for file/history/templates/pty
-- app-side `device.push_token` reporting and real push delivery are still incomplete, even though the server now persists push tokens when it receives them
+- daemon now has `templates.list` / `slash.list`, and `session.agent.add` returns an explicit not-implemented error instead of failing silently
+- app template UI is still using static `kDefaultTemplates`; the next client-side step is wiring it to the daemon catalog
+- app-side `device.push_token` reporting, device management, and real push delivery are still incomplete, even though the server now persists push tokens when it receives them
 
 Unifying that boundary and filling those daemon/server gaps is the key step before claiming real mobile-to-daemon encrypted transport and complete app functionality.
