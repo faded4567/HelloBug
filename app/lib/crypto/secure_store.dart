@@ -14,8 +14,11 @@ class SecureStore {
   static const keyServerPin = 'server.pin';
   static const keyJwt = 'app.jwt';
   static const keyPairedDeviceId = 'paired.device_id';
+  static const keyPairedDaemonId = 'paired.daemon_id';
   static const keyServerUrl = 'server.url';
   static const keyAppInstanceId = 'app.instance_id';
+  static const keyPairedMachineName = 'paired.machine_name';
+  static const keyPairedOs = 'paired.os';
 
   static Future<void> write(String key, String value) =>
       _s.write(key: key, value: value);

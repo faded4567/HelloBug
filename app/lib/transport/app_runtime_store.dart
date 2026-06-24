@@ -12,11 +12,18 @@ class AppRuntimeState {
     required this.serverUrl,
     required this.deviceId,
     required this.jwt,
+    this.pairedDaemonId,
+    this.machineName,
+    this.os,
   });
 
   final String serverUrl;
+  // App-side device id embedded in the app JWT, used for auth.attach.
   final String deviceId;
   final String jwt;
+  final String? pairedDaemonId;
+  final String? machineName;
+  final String? os;
 
   WsClient createClient() {
     var currentJwt = jwt;
@@ -43,32 +50,77 @@ class AppRuntimeStore {
       return null;
     }
 
-    return AppRuntimeState(serverUrl: serverUrl, deviceId: deviceId, jwt: jwt);
+    final machineName = await SecureStore.read(
+      SecureStore.keyPairedMachineName,
+    );
+    final os = await SecureStore.read(SecureStore.keyPairedOs);
+    final pairedDaemonId = await SecureStore.read(
+      SecureStore.keyPairedDaemonId,
+    );
+    return AppRuntimeState(
+      serverUrl: serverUrl,
+      deviceId: deviceId,
+      jwt: jwt,
+      pairedDaemonId: pairedDaemonId,
+      machineName: machineName,
+      os: os,
+    );
   }
 
   static Future<AppRuntimeState> persist({
     required String serverUrl,
     required String jwt,
+    String? pairedDaemonId,
+    String? machineName,
+    String? os,
   }) async {
-    final deviceId = parseDeviceIdFromJwt(jwt);
-    if (deviceId == null) {
+    final appDeviceId = parseDeviceIdFromJwt(jwt);
+    if (appDeviceId == null) {
       throw const FormatException('JWT missing device_id');
     }
 
     await Future.wait([
       SecureStore.write(SecureStore.keyServerUrl, serverUrl),
-      SecureStore.write(SecureStore.keyPairedDeviceId, deviceId),
+      SecureStore.write(SecureStore.keyPairedDeviceId, appDeviceId),
       SecureStore.write(SecureStore.keyJwt, jwt),
+      if (pairedDaemonId != null)
+        SecureStore.write(SecureStore.keyPairedDaemonId, pairedDaemonId),
+      if (machineName != null)
+        SecureStore.write(SecureStore.keyPairedMachineName, machineName),
+      if (os != null) SecureStore.write(SecureStore.keyPairedOs, os),
     ]);
 
-    return AppRuntimeState(serverUrl: serverUrl, deviceId: deviceId, jwt: jwt);
+    return AppRuntimeState(
+      serverUrl: serverUrl,
+      deviceId: appDeviceId,
+      jwt: jwt,
+      pairedDaemonId: pairedDaemonId,
+      machineName: machineName,
+      os: os,
+    );
+  }
+
+  static Future<void> persistPairedDaemon({
+    required String daemonDeviceId,
+    String? machineName,
+    String? os,
+  }) async {
+    await Future.wait([
+      SecureStore.write(SecureStore.keyPairedDaemonId, daemonDeviceId),
+      if (machineName != null)
+        SecureStore.write(SecureStore.keyPairedMachineName, machineName),
+      if (os != null) SecureStore.write(SecureStore.keyPairedOs, os),
+    ]);
   }
 
   static Future<void> clear() async {
     await Future.wait([
       SecureStore.delete(SecureStore.keyServerUrl),
       SecureStore.delete(SecureStore.keyPairedDeviceId),
+      SecureStore.delete(SecureStore.keyPairedDaemonId),
       SecureStore.delete(SecureStore.keyJwt),
+      SecureStore.delete(SecureStore.keyPairedMachineName),
+      SecureStore.delete(SecureStore.keyPairedOs),
     ]);
   }
 

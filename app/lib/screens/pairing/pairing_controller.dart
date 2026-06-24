@@ -5,7 +5,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../crypto/keys.dart';
+import '../../models/device_summary.dart';
 import '../../models/inner_message.dart';
+import '../../state/devices_provider.dart';
 import '../../transport/app_runtime_store.dart';
 import '../../transport/ws_client.dart';
 import '../../transport/ws_provider.dart';
@@ -64,6 +66,7 @@ class PairingController extends StateNotifier<PairingState> {
   StreamSubscription<InnerMessage>? _pairingMessagesSub;
   Completer<Map<String, dynamic>>? _sasCompleter;
   Completer<String>? _authTokenCompleter;
+  Completer<Map<String, dynamic>>? _deviceStatusCompleter;
   String _serverUrl = '';
 
   Future<bool> startFromQr(String qrPayload) async {
@@ -101,6 +104,7 @@ class PairingController extends StateNotifier<PairingState> {
     }
 
     state = state.copyWith(step: PairingStep.confirming, errorMessage: null);
+    debugPrint('[Pairing] confirm sas confirmed=$confirmed');
 
     try {
       await client.send(
@@ -120,8 +124,43 @@ class PairingController extends StateNotifier<PairingState> {
       final jwt = await (_authTokenCompleter?.future ??
               Future<String>.error(StateError('auth.token listener missing')))
           .timeout(const Duration(seconds: 15));
+      Map<String, dynamic>? deviceStatus;
+      final deviceStatusFuture = _deviceStatusCompleter?.future;
+      if (deviceStatusFuture != null) {
+        try {
+          deviceStatus = await deviceStatusFuture.timeout(
+            const Duration(seconds: 5),
+          );
+        } catch (_) {
+          deviceStatus = null;
+        }
+      }
+      debugPrint('[Pairing] auth token received, persisting runtime');
+      final pairedDaemonId = deviceStatus?['device_id'] as String?;
 
-      await AppRuntimeStore.persist(serverUrl: _serverUrl, jwt: jwt);
+      await AppRuntimeStore.persist(
+        serverUrl: _serverUrl,
+        jwt: jwt,
+        pairedDaemonId: pairedDaemonId,
+        machineName: state.machineName,
+        os: state.os,
+      );
+      if (pairedDaemonId != null) {
+        _ref
+            .read(devicesProvider.notifier)
+            .upsert(
+              DeviceSummary(
+                deviceId: pairedDaemonId,
+                machineName:
+                    (deviceStatus?['machine_name'] as String?) ??
+                    state.machineName ??
+                    'Unknown device',
+                os: state.os ?? '',
+                online: true,
+                lastSeen: DateTime.now(),
+              ),
+            );
+      }
 
       await _pairingMessagesSub?.cancel();
       _pairingMessagesSub = null;
@@ -134,6 +173,9 @@ class PairingController extends StateNotifier<PairingState> {
       if (previous != null && !identical(previous, client)) {
         previous.dispose();
       }
+      debugPrint(
+        '[Pairing] live ws client installed paired_daemon=$pairedDaemonId',
+      );
 
       state = state.copyWith(step: PairingStep.done, errorMessage: null);
       return true;
@@ -189,6 +231,7 @@ class PairingController extends StateNotifier<PairingState> {
       _pairingClient = client;
       _sasCompleter = Completer<Map<String, dynamic>>();
       _authTokenCompleter = Completer<String>();
+      _deviceStatusCompleter = Completer<Map<String, dynamic>>();
       _pairingMessagesSub = client.messages.listen(_handlePairingMessage);
 
       await client.connect();
@@ -247,6 +290,14 @@ class PairingController extends StateNotifier<PairingState> {
       return;
     }
 
+    if (message.type == 'device.status') {
+      final completer = _deviceStatusCompleter;
+      if (completer != null && !completer.isCompleted) {
+        completer.complete(message.payload);
+      }
+      return;
+    }
+
     if (message.type == 'error') {
       final text = message.payload['message'] as String? ?? '配对失败';
       unawaited(_fail(text));
@@ -255,6 +306,7 @@ class PairingController extends StateNotifier<PairingState> {
 
   Future<void> _persistRuntimeJwt(String serverUrl, String jwt) async {
     try {
+      debugPrint('[Pairing] persist jwt server=$serverUrl');
       await AppRuntimeStore.persist(serverUrl: serverUrl, jwt: jwt);
     } catch (_) {
       // Pairing flow will surface a user-visible error if persistence fails.
@@ -262,6 +314,7 @@ class PairingController extends StateNotifier<PairingState> {
   }
 
   Future<void> _fail(String message) async {
+    debugPrint('[Pairing] error -> $message');
     _completePendingWithError(message);
     await _clearPending(disposeClient: true);
     state = PairingState(step: PairingStep.error, errorMessage: message);
@@ -284,6 +337,7 @@ class PairingController extends StateNotifier<PairingState> {
     _pairingClient = null;
     _sasCompleter = null;
     _authTokenCompleter = null;
+    _deviceStatusCompleter = null;
     if (disposeClient) {
       client?.dispose();
     }

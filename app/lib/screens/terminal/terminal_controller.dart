@@ -18,27 +18,39 @@ class PtySessionController extends ChangeNotifier {
 
   void start() {
     terminal.onOutput = (data) {
-      wsClient.send(InnerMessage.create('pty.input', {
-        'session_id': sessionId,
-        'data': base64Encode(utf8.encode(data)),
-      }));
+      wsClient.send(
+        InnerMessage.create('pty.input', {
+          'session_id': sessionId,
+          'data': base64Encode(utf8.encode(data)),
+        }),
+      );
+    };
+    terminal.onResize = (width, height, _, __) {
+      if (width > 0 && height > 0) {
+        sendResize(width, height);
+      }
     };
 
     _sub = wsClient.messages.listen((msg) {
-      if (msg.type != 'pty.data') return;
+      if (msg.type != 'session.event') return;
       if (msg.payload['session_id'] != sessionId) return;
-      final raw = msg.payload['data'] as String? ?? '';
+      final event = msg.payload['event'];
+      if (event is! Map) return;
+      if (event['event_type'] != 'pty.data') return;
+      final raw = event['bytes'] as String? ?? '';
       if (raw.isEmpty) return;
       terminal.write(utf8.decode(base64Decode(raw), allowMalformed: true));
     });
   }
 
   void sendResize(int cols, int rows) {
-    wsClient.send(InnerMessage.create('pty.resize', {
-      'session_id': sessionId,
-      'cols': cols,
-      'rows': rows,
-    }));
+    wsClient.send(
+      InnerMessage.create('pty.resize', {
+        'session_id': sessionId,
+        'cols': cols,
+        'rows': rows,
+      }),
+    );
   }
 
   @override

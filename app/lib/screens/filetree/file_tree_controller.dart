@@ -43,13 +43,15 @@ class FileTreeController extends ChangeNotifier {
   }
 
   void applyResponse(Map<String, dynamic> payload) {
-    final parentPath = payload['path'] as String? ?? '';
-    final items = (payload['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-    final children = items.map((j) => TreeNode(
+    final workspacePath = payload['workspace_path'] as String? ?? '';
+    final dirPath = payload['dir_path'] as String? ?? '';
+    final parentPath = dirPath.isEmpty ? workspacePath : '$workspacePath/$dirPath';
+    final entries = (payload['entries'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final children = entries.map((j) => TreeNode(
       name: j['name'] as String,
-      path: j['path'] as String,
-      isDir: j['is_dir'] as bool? ?? false,
-      modified: j['modified'] as bool? ?? false,
+      path: '$workspacePath/${j['path']}',
+      isDir: j['type'] == 'dir',
+      modified: j['modified'] == true,
     )).toList();
     _cache.put(parentPath, children);
     _applyToNode(root, parentPath, children);

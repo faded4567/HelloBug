@@ -32,8 +32,17 @@ import 'transport/ws_provider.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final hasClient = ref.read(wsClientProvider) != null;
+  const debugInitialRoute = String.fromEnvironment(
+    'HELLOBUG_DEBUG_INITIAL_ROUTE',
+    defaultValue: '',
+  );
   return GoRouter(
-    initialLocation: hasClient ? '/sessions' : '/onboarding',
+    initialLocation:
+        debugInitialRoute.isNotEmpty
+            ? debugInitialRoute
+            : hasClient
+            ? '/sessions'
+            : '/onboarding',
     debugLogDiagnostics: false,
     routes: [
       GoRoute(path: '/onboarding', builder: (_, __) => const OnboardingFlow()),
@@ -102,13 +111,27 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const AppearancePage(),
       ),
       GoRoute(path: '/settings/about', builder: (_, __) => const AboutPage()),
-      GoRoute(path: '/settings/security', builder: (_, __) => const SecurityPage()),
-      GoRoute(path: '/settings/notifications', builder: (_, __) => const NotificationsPage()),
-      GoRoute(path: '/settings/templates', builder: (_, __) => const TemplatesPage()),
-      GoRoute(path: '/settings/relay', builder: (_, __) => const RelaySettingsPage()),
+      GoRoute(
+        path: '/settings/security',
+        builder: (_, __) => const SecurityPage(),
+      ),
+      GoRoute(
+        path: '/settings/notifications',
+        builder: (_, __) => const NotificationsPage(),
+      ),
+      GoRoute(
+        path: '/settings/templates',
+        builder: (_, __) => const TemplatesPage(),
+      ),
+      GoRoute(
+        path: '/settings/relay',
+        builder: (_, __) => const RelaySettingsPage(),
+      ),
       GoRoute(
         path: '/device/:id',
-        builder: (_, state) => DeviceDetailPage(device: state.extra! as DeviceSummary),
+        builder:
+            (_, state) =>
+                DeviceDetailPage(device: state.extra! as DeviceSummary),
       ),
       GoRoute(path: '/history', builder: (_, __) => const HistoryListPage()),
       GoRoute(

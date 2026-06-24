@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/session_summary.dart';
@@ -22,14 +24,21 @@ class ChatPage extends ConsumerStatefulWidget {
 
 class _ChatPageState extends ConsumerState<ChatPage> {
   WsConnectionState _connState = WsConnectionState.online;
+  StreamSubscription<WsConnectionState>? _statesSub;
 
   @override
   void initState() {
     super.initState();
     final client = ref.read(wsClientProvider);
-    client?.states.listen((s) {
+    _statesSub = client?.states.listen((s) {
       if (mounted) setState(() => _connState = s);
     });
+  }
+
+  @override
+  void dispose() {
+    _statesSub?.cancel();
+    super.dispose();
   }
 
   void _handleCancel() {
@@ -40,41 +49,66 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   void _showWorkspaceSwitch(String currentPath) {
     showCupertinoModalPopup<void>(
       context: context,
-      builder: (_) => WorkspaceSwitchSheet(
-        currentPath: currentPath,
-        onSwitch: (newPath) {
-          // record visit; actual session re-routing handled by daemon side
-          // UI just reflects the new path in the header via session update
-        },
-      ),
+      builder:
+          (_) => WorkspaceSwitchSheet(
+            currentPath: currentPath,
+            onSwitch: (newPath) {
+              // record visit; actual session re-routing handled by daemon side
+              // UI just reflects the new path in the header via session update
+            },
+          ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final session = ref.watch(sessionsProvider).firstWhere(
-      (s) => s.sessionId == widget.sessionId,
-      orElse: () => widget.initialSession ?? SessionSummary(
-        sessionId: widget.sessionId,
-        deviceId: '',
-        workspacePath: '~',
-        agentType: 'shell',
-      ),
+    final sessions = ref.watch(sessionsProvider);
+    final found = sessions.cast<SessionSummary?>().firstWhere(
+      (s) => s!.sessionId == widget.sessionId,
+      orElse: () => null,
     );
+    final session = found ?? widget.initialSession;
 
     final c = context.colors;
+
+    if (session == null) {
+      return CupertinoPageScaffold(
+        backgroundColor: c.bg,
+        navigationBar: CupertinoNavigationBar(
+          backgroundColor: c.bg,
+          border: null,
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('会话不存在', style: TextStyle(fontSize: 17, color: c.fg)),
+              const SizedBox(height: 8),
+              CupertinoButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text('返回', style: TextStyle(color: c.tint)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return CupertinoPageScaffold(
       backgroundColor: c.bg,
-      child: Column(children: [
-        ChatHeader(
-          session: session,
-          onCancel: _handleCancel,
-          onWorkspaceSwitch: () => _showWorkspaceSwitch(session.workspacePath),
-        ),
-        ChatStatusBanner(state: _connState),
-        Expanded(child: ChatTimeline(sessionId: widget.sessionId)),
-        ChatInputBar(sessionId: widget.sessionId),
-      ]),
+      child: Column(
+        children: [
+          ChatHeader(
+            session: session,
+            onCancel: _handleCancel,
+            onWorkspaceSwitch:
+                () => _showWorkspaceSwitch(session.workspacePath),
+          ),
+          ChatStatusBanner(state: _connState),
+          Expanded(child: ChatTimeline(sessionId: widget.sessionId)),
+          ChatInputBar(sessionId: widget.sessionId),
+        ],
+      ),
     );
   }
 }

@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>HelloBug 需要麦克风权限来把语音转成文本指令。</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>HelloBug 需要语音识别权限来生成发送给会话的文本。</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

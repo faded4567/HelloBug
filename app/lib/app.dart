@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'router.dart';
 import 'screens/unlock/unlock_gate.dart';
+import 'state/danger_pending_provider.dart';
 import 'theme/index.dart';
+import 'transport/transport_lifecycle_observer.dart';
+import 'widgets/danger_confirm/danger_confirm_sheet.dart';
 
 class HelloBugApp extends ConsumerStatefulWidget {
   const HelloBugApp({super.key});
@@ -13,6 +16,20 @@ class HelloBugApp extends ConsumerStatefulWidget {
 }
 
 class _HelloBugAppState extends ConsumerState<HelloBugApp> {
+  late final TransportLifecycleObserver _transportObserver;
+
+  @override
+  void initState() {
+    super.initState();
+    _transportObserver = TransportLifecycleObserver(ref)..attach();
+  }
+
+  @override
+  void dispose() {
+    _transportObserver.detach();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
@@ -31,9 +48,27 @@ class _HelloBugAppState extends ConsumerState<HelloBugApp> {
         DefaultCupertinoLocalizations.delegate,
         DefaultWidgetsLocalizations.delegate,
       ],
-      builder:
-          (context, child) =>
-              UnlockGate(child: child ?? const SizedBox.shrink()),
+      builder: (context, child) => UnlockGate(
+        child: _DangerListener(child: child ?? const SizedBox.shrink()),
+      ),
     );
+  }
+}
+
+class _DangerListener extends ConsumerWidget {
+  const _DangerListener({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen(dangerPendingProvider, (_, next) {
+      next.whenData((req) {
+        showCupertinoModalPopup<void>(
+          context: context,
+          builder: (_) => DangerConfirmSheet(request: req),
+        );
+      });
+    });
+    return child;
   }
 }

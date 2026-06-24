@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/inner_message.dart';
@@ -8,7 +10,11 @@ import 'tree_node_tile.dart';
 import 'file_preview_page.dart';
 
 class FileTreePage extends ConsumerStatefulWidget {
-  const FileTreePage({super.key, required this.sessionId, required this.workspacePath});
+  const FileTreePage({
+    super.key,
+    required this.sessionId,
+    required this.workspacePath,
+  });
   final String sessionId;
   final String workspacePath;
 
@@ -18,31 +24,48 @@ class FileTreePage extends ConsumerStatefulWidget {
 
 class _FileTreePageState extends ConsumerState<FileTreePage> {
   late final FileTreeController _ctrl;
+  StreamSubscription<InnerMessage>? _messagesSub;
 
   @override
   void initState() {
     super.initState();
     _ctrl = FileTreeController(
-      onRequestChildren: (path) async {
-        await ref.read(wsClientProvider)?.send(
-          InnerMessage.create('fs.tree.req', {
-            'session_id': widget.sessionId,
-            'path': path,
-          }),
+      onRequestChildren: (absPath) async {
+        final dirPath =
+            absPath == widget.workspacePath
+                ? ''
+                : absPath.substring(widget.workspacePath.length + 1);
+        debugPrint(
+          '[FileTree] request session=${widget.sessionId} workspace=${widget.workspacePath} dir=${dirPath.isEmpty ? "." : dirPath}',
         );
+        await ref
+            .read(wsClientProvider)
+            ?.send(
+              InnerMessage.create('fs.tree.req', {
+                'session_id': widget.sessionId,
+                'workspace_path': widget.workspacePath,
+                'dir_path': dirPath,
+              }),
+            );
       },
     );
-    // Listen for fs.tree responses
-    ref.listenManual(wsClientProvider, (_, client) {
-      client?.messages.listen((msg) {
-        if (msg.type == 'fs.tree') _ctrl.applyResponse(msg.payload);
-      });
+    final client = ref.read(wsClientProvider);
+    _messagesSub = client?.messages.listen((msg) {
+      if (msg.type != 'fs.tree') return;
+      if (msg.payload['workspace_path'] != widget.workspacePath) return;
+      final dirPath = msg.payload['dir_path'] as String? ?? '';
+      final entries = (msg.payload['entries'] as List?)?.length ?? 0;
+      debugPrint(
+        '[FileTree] response session=${widget.sessionId} dir=${dirPath.isEmpty ? "." : dirPath} entries=$entries',
+      );
+      _ctrl.applyResponse(msg.payload);
     });
     _ctrl.loadRoot(widget.workspacePath);
   }
 
   @override
   void dispose() {
+    _messagesSub?.cancel();
     _ctrl.dispose();
     super.dispose();
   }
@@ -50,7 +73,9 @@ class _FileTreePageState extends ConsumerState<FileTreePage> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final wsName = widget.workspacePath.split('/').lastWhere((p) => p.isNotEmpty, orElse: () => widget.workspacePath);
+    final wsName = widget.workspacePath
+        .split('/')
+        .lastWhere((p) => p.isNotEmpty, orElse: () => widget.workspacePath);
     return CupertinoPageScaffold(
       backgroundColor: c.bg,
       navigationBar: CupertinoNavigationBar(
@@ -62,7 +87,9 @@ class _FileTreePageState extends ConsumerState<FileTreePage> {
         child: ListenableBuilder(
           listenable: _ctrl,
           builder: (ctx, _) {
-            if (_ctrl.root == null) return const Center(child: CupertinoActivityIndicator());
+            if (_ctrl.root == null) {
+              return const Center(child: CupertinoActivityIndicator());
+            }
             return ListView.builder(
               itemCount: _ctrl.flatList.length,
               itemBuilder: (ctx, i) {
@@ -74,12 +101,15 @@ class _FileTreePageState extends ConsumerState<FileTreePage> {
                     if (node.isDir) {
                       _ctrl.toggle(node);
                     } else {
-                      Navigator.of(context).push(CupertinoPageRoute(
-                        builder: (_) => FilePreviewPage(
-                          sessionId: widget.sessionId,
-                          filePath: node.path,
+                      Navigator.of(context).push(
+                        CupertinoPageRoute(
+                          builder:
+                              (_) => FilePreviewPage(
+                                sessionId: widget.sessionId,
+                                filePath: node.path,
+                              ),
                         ),
-                      ));
+                      );
                     }
                   },
                 );

@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../theme/index.dart';
+import '../../transport/app_runtime_store.dart';
+import '../../transport/ws_provider.dart';
 import 'pairing_controller.dart';
 
 class PairingEntryPage extends ConsumerStatefulWidget {
@@ -34,6 +36,7 @@ class _PairingEntryPageState extends ConsumerState<PairingEntryPage> {
   @override
   void initState() {
     super.initState();
+    unawaited(_loadServerUrl());
     if (kDebugMode && _debugPairingCode.length == 6) {
       for (var i = 0; i < 6; i++) {
         _digits[i] = _debugPairingCode[i];
@@ -52,6 +55,16 @@ class _PairingEntryPageState extends ConsumerState<PairingEntryPage> {
     setState(
       () => _digits[index] = value.isEmpty ? '' : value[value.length - 1],
     );
+  }
+
+  Future<void> _loadServerUrl() async {
+    final liveClient = ref.read(wsClientProvider);
+    final runtime = await AppRuntimeStore.load();
+    final serverUrl = liveClient?.serverUri.toString() ?? runtime?.serverUrl;
+    if (!mounted || serverUrl == null || serverUrl.isEmpty) {
+      return;
+    }
+    _serverController.text = serverUrl;
   }
 
   Future<void> _connect({String? debugCodeOverride}) async {
@@ -225,7 +238,7 @@ class _PairingEntryPageState extends ConsumerState<PairingEntryPage> {
               ),
               // PIN input label
               Text(
-                '配对码（daemon 控制台显示，30 秒有效）',
+                '配对码（daemon 控制台显示，时效以 daemon 当前配置为准）',
                 style: TextStyle(fontSize: 13, color: context.colors.fg2),
               ),
               const SizedBox(height: 8),

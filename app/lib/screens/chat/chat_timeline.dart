@@ -55,11 +55,27 @@ class _ChatTimelineState extends ConsumerState<ChatTimeline> {
       }
     });
 
+    final c = context.colors;
+    if (items.isEmpty) {
+      return Center(child: Text('暂无消息', style: TextStyle(fontSize: 15, color: c.fg3)));
+    }
+
+    final showTyping = items.last.kind == ChatItemKind.user;
+    final count = items.length + (showTyping ? 1 : 0);
+
     return ListView.builder(
       controller: _scroll,
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-      itemCount: items.length,
-      itemBuilder: (ctx, i) => _ChatItemWidget(item: items[i], isLast: i == items.length - 1),
+      itemCount: count,
+      itemBuilder: (ctx, i) {
+        if (i == items.length && showTyping) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: CupertinoActivityIndicator(),
+          );
+        }
+        return _ChatItemWidget(item: items[i], isLast: i == items.length - 1);
+      },
     );
   }
 }

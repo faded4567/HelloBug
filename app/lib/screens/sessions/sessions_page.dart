@@ -27,35 +27,61 @@ class SessionsPage extends ConsumerWidget {
         ),
       ),
       child: SafeArea(
-        child: sessions.isEmpty
-            ? Center(
-                child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Text('💬', style: const TextStyle(fontSize: 48)),
-                  const SizedBox(height: 16),
-                  Text('还没有会话', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: c.fg)),
-                  const SizedBox(height: 8),
-                  Text('连接到设备后新建一个会话', style: TextStyle(fontSize: 14, color: c.fg2)),
-                  const SizedBox(height: 24),
-                  CupertinoButton.filled(
-                    onPressed: () => context.push('/new-session'),
-                    child: const Text('新建会话'),
+        child:
+            sessions.isEmpty
+                ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('💬', style: const TextStyle(fontSize: 48)),
+                      const SizedBox(height: 16),
+                      Text(
+                        '还没有会话',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                          color: c.fg,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '连接到设备后新建一个会话',
+                        style: TextStyle(fontSize: 14, color: c.fg2),
+                      ),
+                      const SizedBox(height: 24),
+                      CupertinoButton.filled(
+                        onPressed: () => context.push('/new-session'),
+                        child: const Text('新建会话'),
+                      ),
+                    ],
                   ),
-                ]),
-              )
-            : ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                children: [
-                  _SectionHeader(label: '会话'),
-                  ...sessions.map((s) => SessionTile(
-                    session: s,
-                    onTap: () {
-                      ref.read(sessionsProvider.notifier).markRead(s.sessionId);
-                      context.push('/session/${s.sessionId}', extra: s);
-                    },
-                  )),
-                  const SizedBox(height: 20),
-                ],
-              ),
+                )
+                : ListView(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  children: [
+                    _SectionHeader(label: '会话'),
+                    ...sessions.map(
+                      (s) => SessionTile(
+                        session: s,
+                        onTap: () {
+                          ref
+                              .read(sessionsProvider.notifier)
+                              .markRead(s.sessionId);
+                          context.push(
+                            s.agentType == 'shell'
+                                ? '/terminal/${s.sessionId}'
+                                : '/session/${s.sessionId}',
+                            extra: s,
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
       ),
     );
   }
@@ -69,8 +95,15 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(top: 12, bottom: 8, left: 4),
-      child: Text(label.toUpperCase(),
-        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: context.colors.fg2, letterSpacing: .5)),
+      child: Text(
+        label.toUpperCase(),
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: context.colors.fg2,
+          letterSpacing: .5,
+        ),
+      ),
     );
   }
 }

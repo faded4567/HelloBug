@@ -20,22 +20,33 @@ class SlashPaletteController extends ChangeNotifier {
 
   Future<void> load() async {
     if (loaded) return;
-    await wsClient.send(InnerMessage.create('slash.list', {'session_id': sessionId}));
-    final msg = await wsClient.messages.firstWhere((m) => m.type == 'slash.list');
-    final items = (msg.payload['commands'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-    _all = items.map((j) => SlashCommand(
-      name: j['name'] as String,
-      description: j['description'] as String? ?? '',
-    )).toList();
+    await wsClient.send(
+      InnerMessage.create('slash.list', {'session_id': sessionId}),
+    );
+    final msg = await wsClient.messages.firstWhere(
+      (m) => m.type == 'slash.list',
+    );
+    final items =
+        (msg.payload['commands'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    _all =
+        items
+            .map(
+              (j) => SlashCommand(
+                name: j['name'] as String,
+                description: (j['desc'] ?? j['description']) as String? ?? '',
+              ),
+            )
+            .toList();
     loaded = true;
     filter('');
   }
 
   void filter(String query) {
     final q = query.toLowerCase().replaceFirst('/', '');
-    filtered = q.isEmpty
-        ? _all
-        : _all.where((c) => c.name.toLowerCase().contains(q)).toList();
+    filtered =
+        q.isEmpty
+            ? _all
+            : _all.where((c) => c.name.toLowerCase().contains(q)).toList();
     notifyListeners();
   }
 }

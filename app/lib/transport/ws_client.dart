@@ -77,7 +77,9 @@ class WsClient {
 
   Future<void> send(InnerMessage msg) async {
     if (_ch == null) return;
-    debugPrint('[WsClient] send -> ${msg.type}');
+    debugPrint(
+      '[WsClient] send -> ${msg.type} id=${msg.id} session=${msg.payload['session_id'] ?? ''}',
+    );
     final plain = jsonEncode(msg.toJson());
     final sessionId = msg.payload['session_id'] as String? ?? '';
     final ciphertext =
@@ -136,6 +138,9 @@ class WsClient {
     int? seq,
   }) {
     debugPrint('[WsClient] recv <- ${msg.type}');
+    if (msg.type == 'error') {
+      debugPrint('[WsClient] error payload <- ${jsonEncode(msg.payload)}');
+    }
     if (sessionId.isNotEmpty && seq != null) {
       _lastSeq[sessionId] = seq;
     }
