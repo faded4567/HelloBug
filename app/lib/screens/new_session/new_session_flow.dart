@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,8 +11,27 @@ import '../../theme/index.dart';
 import '../../transport/ws_provider.dart';
 import '../../models/inner_message.dart';
 
+class NewSessionFlowArgs {
+  const NewSessionFlowArgs({
+    this.preferredDeviceId,
+    this.workspacePath,
+    this.agentType,
+    this.resumeSessionId,
+  });
+
+  final String? preferredDeviceId;
+  final String? workspacePath;
+  final String? agentType;
+  final String? resumeSessionId;
+
+  bool get isResumeFlow =>
+      (resumeSessionId != null && resumeSessionId!.trim().isNotEmpty);
+}
+
 class NewSessionFlow extends ConsumerStatefulWidget {
-  const NewSessionFlow({super.key});
+  const NewSessionFlow({super.key, this.initialArgs});
+
+  final NewSessionFlowArgs? initialArgs;
 
   @override
   ConsumerState<NewSessionFlow> createState() => _NewSessionFlowState();
@@ -37,6 +57,51 @@ class _NewSessionFlowState extends ConsumerState<NewSessionFlow> {
     super.dispose();
   }
 
+  @override
+  void initState() {
+    super.initState();
+    _deviceId = widget.initialArgs?.preferredDeviceId?.trim() ?? '';
+    _workspacePath = widget.initialArgs?.workspacePath?.trim() ?? '';
+    _agentType = _resolveInitialAgentType();
+    _workspaceCtrl.text = _workspacePath;
+  }
+
+  bool get _isResumeFlow => widget.initialArgs?.isResumeFlow ?? false;
+
+  String? get _resumeSessionId {
+    final raw = widget.initialArgs?.resumeSessionId?.trim() ?? '';
+    return raw.isEmpty ? null : raw;
+  }
+
+  String _resolveInitialAgentType() {
+    if (_isResumeFlow) {
+      return 'claude_code';
+    }
+    final candidate = widget.initialArgs?.agentType?.trim() ?? '';
+    final matched = _agents.where((agent) => agent.$1 == candidate);
+    if (matched.isNotEmpty) {
+      return matched.first.$1;
+    }
+    return 'claude_code';
+  }
+
+  bool get _selectedDeviceOnline {
+    if (_deviceId.isEmpty) {
+      return false;
+    }
+    final device = ref.read(devicesProvider)[_deviceId];
+    return device?.online ?? false;
+  }
+
+  List<(String, String, String, String)> get _visibleAgents {
+    if (!_isResumeFlow) {
+      return _agents;
+    }
+    return _agents
+        .where((agent) => agent.$1 == 'claude_code')
+        .toList(growable: false);
+  }
+
   String _uuid() {
     final rng = Random.secure();
     final b = List<int>.generate(16, (_) => rng.nextInt(256));
@@ -48,46 +113,117 @@ class _NewSessionFlowState extends ConsumerState<NewSessionFlow> {
   }
 
   Future<void> _finish() async {
+    if (_busy) {
+      return;
+    }
     setState(() => _busy = true);
     final sid = _uuid();
     final workspacePath = _workspacePath.trim();
+    final agentType = _isResumeFlow ? 'claude_code' : _agentType;
     final startMessage = InnerMessage.create('session.start', {
       'session_id': sid,
       'workspace_path': workspacePath,
-      'agent_type': _agentType,
-      'resume_session_id': null,
+      'agent_type': agentType,
+      'resume_session_id': _resumeSessionId,
     });
     debugPrint(
-      '[NewSession] start session_id=$sid request_id=${startMessage.id} device=$_deviceId workspace=$workspacePath agent=$_agentType',
-    );
-    final session = SessionSummary(
-      sessionId: sid,
-      deviceId: _deviceId,
-      workspacePath: workspacePath,
-      agentType: _agentType,
-      status: SessionStatus.running,
-      startedAt: DateTime.now(),
+      '[NewSession] start session_id=$sid request_id=${startMessage.id} device=$_deviceId workspace=$workspacePath agent=$agentType resume=${_resumeSessionId ?? ''}',
     );
     final client = ref.read(wsClientProvider);
     if (client == null) {
       debugPrint('[NewSession] aborted because ws client is null');
       if (mounted) {
         setState(() => _busy = false);
+        await _showStartError('中继连接未建立，请稍后重试');
       }
       return;
     }
-    ref.read(sessionsProvider.notifier).add(session);
-    await client.send(startMessage);
-    debugPrint(
-      '[NewSession] session.start sent session_id=$sid request_id=${startMessage.id}',
-    );
-    if (mounted) {
+
+    final responseFuture = client.messages
+        .firstWhere(
+          (message) =>
+              (message.type == 'session.start.result' ||
+                  message.type == 'error') &&
+              message.payload['request_id'] == startMessage.id,
+        )
+        .timeout(const Duration(seconds: 15));
+
+    try {
+      await client.send(startMessage);
+      debugPrint(
+        '[NewSession] session.start sent session_id=$sid request_id=${startMessage.id}',
+      );
+      final response = await responseFuture;
+      if (response.type == 'error') {
+        throw StateError(response.payload['message'] as String? ?? '启动失败');
+      }
+
+      final status = response.payload['status'] as String? ?? 'rejected';
+      final resolvedWorkspacePath =
+          response.payload['workspace_path'] as String? ?? workspacePath;
+      final resolvedAgentType =
+          response.payload['agent_type'] as String? ?? agentType;
+      final resultMessage =
+          response.payload['message'] as String? ?? '会话启动失败';
+      if (status != 'started') {
+        throw StateError(resultMessage);
+      }
+
+      final session = SessionSummary(
+        sessionId: sid,
+        deviceId: _deviceId,
+        workspacePath: resolvedWorkspacePath,
+        agentType: resolvedAgentType,
+        status: SessionStatus.running,
+        startedAt: DateTime.now(),
+      );
+      ref.read(sessionsProvider.notifier).add(session);
+      debugPrint(
+        '[NewSession] session.start confirmed session_id=$sid workspace=$resolvedWorkspacePath agent=$resolvedAgentType',
+      );
+
+      if (!mounted) {
+        return;
+      }
       context.pop();
       context.push(
-        _agentType == 'shell' ? '/terminal/$sid' : '/session/$sid',
+        session.agentType == 'shell' ? '/terminal/$sid' : '/session/$sid',
         extra: session,
       );
+    } catch (error) {
+      debugPrint('[NewSession] start failed session_id=$sid error=$error');
+      if (mounted) {
+        setState(() => _busy = false);
+        await _showStartError(_friendlyStartError(error));
+      }
     }
+  }
+
+  Future<void> _showStartError(String message) {
+    return showCupertinoDialog<void>(
+      context: context,
+      builder:
+          (_) => CupertinoAlertDialog(
+            title: const Text('启动失败'),
+            content: Text(message),
+            actions: [
+              CupertinoDialogAction(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('知道了'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  String _friendlyStartError(Object error) {
+    if (error is TimeoutException) {
+      return '等待电脑端确认超时，请检查 daemon 是否在线后重试';
+    }
+    if (error is StateError) {
+      return error.message.toString();
+    }
+    return error.toString();
   }
 
   @override
@@ -146,7 +282,7 @@ class _NewSessionFlowState extends ConsumerState<NewSessionFlow> {
   }
 
   bool get _canProceed => switch (_step) {
-    0 => _deviceId.isNotEmpty,
+    0 => _selectedDeviceOnline,
     1 => true,
     _ => true,
   };
@@ -207,15 +343,26 @@ class _NewSessionFlowState extends ConsumerState<NewSessionFlow> {
             color: c.bg2,
             borderRadius: BorderRadius.circular(10),
           ),
-          onChanged: (v) => setState(() => _workspacePath = v),
+          onChanged:
+              _isResumeFlow ? null : (v) => setState(() => _workspacePath = v),
+          readOnly: _isResumeFlow,
           autocorrect: false,
           enableSuggestions: false,
         ),
         const SizedBox(height: 8),
         Text(
-          '留空则使用 daemon 默认工作区',
+          _isResumeFlow
+              ? '继续历史会话时会沿用原 transcript 的工作区路径'
+              : '留空则使用 daemon 默认工作区',
           style: TextStyle(fontSize: 13, color: c.fg3),
         ),
+        if (_isResumeFlow) ...[
+          const SizedBox(height: 8),
+          Text(
+            '历史 session: ${_resumeSessionId ?? ''}',
+            style: TextStyle(fontSize: 12, color: c.fg3),
+          ),
+        ],
       ],
     );
   }
@@ -226,15 +373,23 @@ class _NewSessionFlowState extends ConsumerState<NewSessionFlow> {
       children: [
         _StepHint(text: '选择 Agent 类型', colors: c),
         const SizedBox(height: 8),
-        ..._agents.map(
+        ..._visibleAgents.map(
           (a) => _SelectRow(
             icon: a.$2,
             title: a.$3,
             subtitle: a.$4,
             selected: _agentType == a.$1,
-            onTap: () => setState(() => _agentType = a.$1),
+            onTap:
+                _isResumeFlow ? null : () => setState(() => _agentType = a.$1),
           ),
         ),
+        if (_isResumeFlow) ...[
+          const SizedBox(height: 8),
+          Text(
+            '历史 transcript 续接当前只支持 Claude Code runtime',
+            style: TextStyle(fontSize: 13, color: c.fg3),
+          ),
+        ],
       ],
     );
   }

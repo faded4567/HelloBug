@@ -1,4 +1,4 @@
-enum SessionStatus { running, done, offline }
+enum SessionStatus { running, replaying, done, offline }
 
 class SessionSummary {
   const SessionSummary({

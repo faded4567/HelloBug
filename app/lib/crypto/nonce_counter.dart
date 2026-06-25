@@ -14,15 +14,20 @@ class NonceCounter {
   NonceCounter(this.sessionId);
 
   Future<Uint8List> next() async {
+    final nonce = await fromCounter(_counter);
+    _counter++;
+    return nonce;
+  }
+
+  Future<Uint8List> fromCounter(int counter) async {
     _prefix ??= Uint8List.fromList(
       (await Sha256().hash(utf8.encode(sessionId))).bytes.sublist(0, 4),
     );
-    final buf  = Uint8List(12);
+    final buf = Uint8List(12);
     final data = ByteData.sublistView(buf);
     buf.setRange(0, 4, _prefix!);
-    data.setUint32(4, (_counter >> 32) & 0xFFFFFFFF);
-    data.setUint32(8,  _counter       & 0xFFFFFFFF);
-    _counter++;
+    data.setUint32(4, (counter >> 32) & 0xFFFFFFFF);
+    data.setUint32(8, counter & 0xFFFFFFFF);
     return buf;
   }
 

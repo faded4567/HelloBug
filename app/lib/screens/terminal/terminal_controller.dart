@@ -15,9 +15,19 @@ class PtySessionController extends ChangeNotifier {
   final terminalCtrl = TerminalController();
 
   StreamSubscription? _sub;
+  bool _enabled = true;
+
+  bool get enabled => _enabled;
+
+  void setEnabled(bool enabled) {
+    _enabled = enabled;
+  }
 
   void start() {
     terminal.onOutput = (data) {
+      if (!_enabled) {
+        return;
+      }
       wsClient.send(
         InnerMessage.create('pty.input', {
           'session_id': sessionId,
@@ -44,6 +54,9 @@ class PtySessionController extends ChangeNotifier {
   }
 
   void sendResize(int cols, int rows) {
+    if (!_enabled) {
+      return;
+    }
     wsClient.send(
       InnerMessage.create('pty.resize', {
         'session_id': sessionId,

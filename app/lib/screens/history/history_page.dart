@@ -1,7 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../models/access_failure.dart';
 import '../../models/inner_message.dart';
 import '../../models/chat_item.dart';
+import '../../state/devices_provider.dart';
 import '../../state/sessions_provider.dart';
 import '../../state/workspace_history_provider.dart';
 import '../../theme/index.dart';
@@ -10,6 +15,7 @@ import '../../widgets/message_bubble.dart';
 import '../../widgets/tool_use_card.dart';
 import '../../widgets/thinking_card.dart';
 import '../../widgets/diff_card.dart';
+import '../new_session/new_session_flow.dart';
 import 'claude_history_parser.dart';
 
 // Lightweight summary received from history.list
@@ -53,6 +59,8 @@ class _HistoryListPageState extends ConsumerState<HistoryListPage> {
   final List<HistorySummary> _items = [];
   bool _loading = false;
   String? _workspacePath;
+  AccessFailure? _error;
+  String? _pendingRequestId;
 
   @override
   void initState() {
@@ -64,7 +72,10 @@ class _HistoryListPageState extends ConsumerState<HistoryListPage> {
     setState(() => _loading = true);
     final client = ref.read(wsClientProvider);
     if (client == null) {
-      setState(() => _loading = false);
+      setState(() {
+        _loading = false;
+        _error = const AccessFailure(message: '未连接到服务器');
+      });
       return;
     }
 
@@ -80,17 +91,37 @@ class _HistoryListPageState extends ConsumerState<HistoryListPage> {
       return;
     }
 
+    final request = InnerMessage.create('history.list', {
+      'workspace_path': workspacePath,
+    });
+    _pendingRequestId = request.id;
     final response = client.messages.firstWhere(
-      (m) => m.type == 'history.list',
+      (m) =>
+          m.type == 'history.list' ||
+          (m.type == 'error' && m.payload['request_id'] == _pendingRequestId),
     );
-    await client.send(
-      InnerMessage.create('history.list', {'workspace_path': workspacePath}),
-    );
+    await client.send(request);
     final msg = await response;
+    if (msg.type == 'error') {
+      if (mounted) {
+        setState(() {
+          _workspacePath = workspacePath;
+          _items.clear();
+          _loading = false;
+          _error = resolveAccessFailure(
+            surface: AccessFailureSurface.historyList,
+            code: msg.payload['code'] as String? ?? '',
+            fallback: msg.payload['message'] as String? ?? '历史记录读取失败',
+          );
+        });
+      }
+      return;
+    }
     final list = _decodeObjectList(msg.payload['items']);
     if (mounted) {
       setState(() {
         _workspacePath = workspacePath;
+        _error = null;
         _items
           ..clear()
           ..addAll(
@@ -105,12 +136,16 @@ class _HistoryListPageState extends ConsumerState<HistoryListPage> {
   }
 
   Future<String?> _resolveWorkspacePath() async {
+    final history = await ref.read(workspaceHistoryProvider.future);
+    if (history.currentPath != null && history.currentPath!.isNotEmpty) {
+      return history.currentPath;
+    }
+
     final sessions = ref.read(sessionsProvider);
     if (sessions.isNotEmpty && sessions.first.workspacePath.isNotEmpty) {
       return sessions.first.workspacePath;
     }
 
-    final history = await ref.read(workspaceHistoryProvider.future);
     if (history.recents.isNotEmpty) {
       return history.recents.first;
     }
@@ -132,6 +167,16 @@ class _HistoryListPageState extends ConsumerState<HistoryListPage> {
         child:
             _loading
                 ? const Center(child: CupertinoActivityIndicator())
+                : _error != null
+                ? Center(
+                  child: _FailureView(
+                    failure: _error!,
+                    onPressed:
+                        _error!.retryable
+                            ? _load
+                            : () => _closeHistorySurface(context),
+                  ),
+                )
                 : _items.isEmpty
                 ? Center(
                   child: Text(
@@ -225,10 +270,13 @@ class HistoryDetailPage extends ConsumerStatefulWidget {
 class _HistoryDetailPageState extends ConsumerState<HistoryDetailPage> {
   final List<ChatItem> _items = [];
   bool _loading = false;
+  bool _continueBusy = false;
   int _offset = 0;
   int _total = 0;
   bool _hasMore = true;
   final _scroll = ScrollController();
+  AccessFailure? _error;
+  String? _pendingRequestId;
 
   @override
   void initState() {
@@ -252,19 +300,40 @@ class _HistoryDetailPageState extends ConsumerState<HistoryDetailPage> {
     setState(() => _loading = true);
     final client = ref.read(wsClientProvider);
     if (client != null) {
+      final request = InnerMessage.create('history.get', {
+        'session_id': widget.sessionId,
+        'offset': _offset,
+        'limit': 100,
+      });
+      _pendingRequestId = request.id;
       final response = client.messages.firstWhere(
         (m) =>
-            m.type == 'history.get' &&
-            m.payload['session_id'] == widget.sessionId,
+            (m.type == 'history.get' &&
+                m.payload['session_id'] == widget.sessionId) ||
+            (m.type == 'error' &&
+                m.payload['request_id'] == _pendingRequestId &&
+                (m.payload['session_id'] == widget.sessionId ||
+                    m.payload['session_id'] == null)),
       );
-      await client.send(
-        InnerMessage.create('history.get', {
-          'session_id': widget.sessionId,
-          'offset': _offset,
-          'limit': 100,
-        }),
-      );
+      await client.send(request);
       final msg = await response;
+      if (msg.type == 'error') {
+        final failure = resolveAccessFailure(
+          surface: AccessFailureSurface.historyDetail,
+          code: msg.payload['code'] as String? ?? '',
+          fallback: msg.payload['message'] as String? ?? '历史详情读取失败',
+        );
+        if (mounted) {
+          setState(() {
+            _loading = false;
+            _error = failure;
+            if (!failure.retryable) {
+              _hasMore = false;
+            }
+          });
+        }
+        return;
+      }
       final raw =
           (msg.payload['lines'] as List? ?? const [])
               .whereType<String>()
@@ -277,11 +346,83 @@ class _HistoryDetailPageState extends ConsumerState<HistoryDetailPage> {
           _total = total;
           _hasMore = _offset < _total;
           _loading = false;
+          _error = null;
         });
       }
     } else {
-      setState(() => _loading = false);
+      setState(() {
+        _loading = false;
+        _error = const AccessFailure(message: '未连接到服务器');
+      });
     }
+  }
+
+  void _retryLoadPage() {
+    if (_loading) {
+      return;
+    }
+    _loadPage();
+  }
+
+  Future<void> _continueSession() async {
+    if (_continueBusy) {
+      return;
+    }
+    final onlineDevices = ref
+        .read(devicesProvider)
+        .values
+        .where((device) => device.online)
+        .toList(growable: false);
+    if (onlineDevices.isEmpty) {
+      await _showContinueError('当前没有在线电脑，先启动 daemon 再继续该历史会话');
+      return;
+    }
+
+    setState(() => _continueBusy = true);
+    try {
+      unawaited(
+        ref.read(workspaceHistoryProvider.notifier).visit(widget.workspacePath),
+      );
+      final preferredDeviceId =
+          onlineDevices.length == 1 ? onlineDevices.first.deviceId : null;
+      if (!mounted) {
+        return;
+      }
+      await Navigator.of(context).push(
+        CupertinoPageRoute(
+          builder:
+              (_) => NewSessionFlow(
+                initialArgs: NewSessionFlowArgs(
+                  preferredDeviceId: preferredDeviceId,
+                  workspacePath: widget.workspacePath,
+                  agentType: 'claude_code',
+                  resumeSessionId: widget.sessionId,
+                ),
+              ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _continueBusy = false);
+      }
+    }
+  }
+
+  Future<void> _showContinueError(String message) {
+    return showCupertinoDialog<void>(
+      context: context,
+      builder:
+          (_) => CupertinoAlertDialog(
+            title: const Text('无法继续'),
+            content: Text(message),
+            actions: [
+              CupertinoDialogAction(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('知道了'),
+              ),
+            ],
+          ),
+    );
   }
 
   @override
@@ -296,27 +437,64 @@ class _HistoryDetailPageState extends ConsumerState<HistoryDetailPage> {
         backgroundColor: c.bg,
         border: null,
         middle: Text(name, style: TextStyle(color: c.fg)),
+        trailing: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: _continueBusy ? null : _continueSession,
+          child:
+              _continueBusy
+                  ? CupertinoActivityIndicator(color: c.tint)
+                  : Text('继续', style: TextStyle(color: c.tint)),
+        ),
       ),
       child: SafeArea(
         child:
             _items.isEmpty && _loading
                 ? const Center(child: CupertinoActivityIndicator())
+                : _items.isEmpty && _error != null
+                ? Center(
+                  child: _FailureView(
+                    failure: _error!,
+                    onPressed:
+                        _error!.retryable
+                            ? _retryLoadPage
+                            : () => _closeHistorySurface(context),
+                  ),
+                )
                 : ListView.builder(
                   controller: _scroll,
                   padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-                  itemCount: _items.length + (_hasMore ? 1 : 0),
+                  itemCount:
+                      _items.length +
+                      (_hasMore || _loading || _error != null ? 1 : 0),
                   itemBuilder: (ctx, i) {
                     if (i == _items.length) {
-                      return const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(16),
-                          child: CupertinoActivityIndicator(),
-                        ),
-                      );
+                      if (_loading) {
+                        return const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(16),
+                            child: CupertinoActivityIndicator(),
+                          ),
+                        );
+                      }
+                      if (_error != null) {
+                        return Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: _HistoryFooterFailure(
+                            failure: _error!,
+                            onPressed:
+                                _error!.retryable
+                                    ? _retryLoadPage
+                                    : () => _closeHistorySurface(context),
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
                     }
                     return _HistoryItem(
                       item: _items[i],
                       isLast: i == _items.length - 1,
+                      sessionId: widget.sessionId,
+                      workspacePath: widget.workspacePath,
                     );
                   },
                 ),
@@ -325,10 +503,94 @@ class _HistoryDetailPageState extends ConsumerState<HistoryDetailPage> {
   }
 }
 
+void _closeHistorySurface(BuildContext context) {
+  if (context.canPop()) {
+    context.pop();
+    return;
+  }
+  context.go('/sessions');
+}
+
+class _FailureView extends StatelessWidget {
+  const _FailureView({required this.failure, required this.onPressed});
+
+  final AccessFailure failure;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            failure.message,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 15, color: context.colors.fg2),
+          ),
+          const SizedBox(height: 16),
+          CupertinoButton(
+            onPressed: onPressed,
+            child: Text(
+              failure.retryable ? '重试' : '返回',
+              style: TextStyle(color: context.colors.tint),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HistoryFooterFailure extends StatelessWidget {
+  const _HistoryFooterFailure({required this.failure, required this.onPressed});
+
+  final AccessFailure failure;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: c.bg2,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Text(
+            failure.message,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: c.fg2),
+          ),
+          const SizedBox(height: 8),
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: onPressed,
+            child: Text(
+              failure.retryable ? '重试加载' : '返回',
+              style: TextStyle(color: c.tint),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _HistoryItem extends StatelessWidget {
-  const _HistoryItem({required this.item, required this.isLast});
+  const _HistoryItem({
+    required this.item,
+    required this.isLast,
+    required this.sessionId,
+    required this.workspacePath,
+  });
   final ChatItem item;
   final bool isLast;
+  final String sessionId;
+  final String workspacePath;
 
   @override
   Widget build(BuildContext context) {
@@ -352,7 +614,12 @@ class _HistoryItem extends StatelessWidget {
       ),
       ChatItemKind.fileChanged => Padding(
         padding: const EdgeInsets.only(left: 4),
-        child: DiffCard(filePath: item.filePath ?? '', diff: item.diff ?? ''),
+        child: DiffCard(
+          filePath: item.filePath ?? '',
+          diff: item.diff ?? '',
+          sessionId: sessionId,
+          workspacePath: workspacePath,
+        ),
       ),
       ChatItemKind.done => Center(
         child: Padding(

@@ -2,12 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../models/session_summary.dart';
 import '../../state/sessions_provider.dart';
 import '../../theme/index.dart';
 import '../../transport/connection_state.dart';
 import '../../transport/ws_provider.dart';
 import '../../widgets/workspace_switch/workspace_switch_sheet.dart';
+import '../new_session/new_session_flow.dart';
 import 'chat_header.dart';
 import 'chat_input_bar.dart';
 import 'chat_status_banner.dart';
@@ -46,15 +48,25 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     Navigator.of(context).pop();
   }
 
-  void _showWorkspaceSwitch(String currentPath) {
+  void _showWorkspaceSwitch(SessionSummary session) {
     showCupertinoModalPopup<void>(
       context: context,
       builder:
           (_) => WorkspaceSwitchSheet(
-            currentPath: currentPath,
+            currentPath: session.workspacePath,
             onSwitch: (newPath) {
-              // record visit; actual session re-routing handled by daemon side
-              // UI just reflects the new path in the header via session update
+              final normalized = newPath.trim();
+              if (normalized.isEmpty || normalized == session.workspacePath) {
+                return;
+              }
+              context.push(
+                '/new-session',
+                extra: NewSessionFlowArgs(
+                  preferredDeviceId: session.deviceId,
+                  workspacePath: normalized,
+                  agentType: session.agentType,
+                ),
+              );
             },
           ),
     );
@@ -94,6 +106,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       );
     }
 
+    final inputEnabled =
+        session.status == SessionStatus.running &&
+        _connState == WsConnectionState.online;
+
     return CupertinoPageScaffold(
       backgroundColor: c.bg,
       child: Column(
@@ -101,14 +117,42 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           ChatHeader(
             session: session,
             onCancel: _handleCancel,
-            onWorkspaceSwitch:
-                () => _showWorkspaceSwitch(session.workspacePath),
+            onWorkspaceSwitch: () => _showWorkspaceSwitch(session),
           ),
-          ChatStatusBanner(state: _connState),
-          Expanded(child: ChatTimeline(sessionId: widget.sessionId)),
-          ChatInputBar(sessionId: widget.sessionId),
+          ChatStatusBanner(state: _connState, sessionStatus: session.status),
+          Expanded(
+            child: ChatTimeline(
+              sessionId: widget.sessionId,
+              workspacePath: session.workspacePath,
+            ),
+          ),
+          ChatInputBar(
+            sessionId: widget.sessionId,
+            enabled: inputEnabled,
+            disabledPlaceholder: _disabledPlaceholder(session.status),
+          ),
         ],
       ),
     );
+  }
+
+  String _disabledPlaceholder(SessionStatus sessionStatus) {
+    switch (sessionStatus) {
+      case SessionStatus.offline:
+        return '该会话已失效';
+      case SessionStatus.done:
+        return '该会话已结束';
+      case SessionStatus.replaying:
+        return '同步消息中…';
+      case SessionStatus.running:
+        break;
+    }
+    return switch (_connState) {
+      WsConnectionState.connecting => '连接中…',
+      WsConnectionState.replaying => '同步消息中…',
+      WsConnectionState.offline => '已断线，正在重连',
+      WsConnectionState.authExpired => '会话已过期，请重新配对',
+      _ => '该会话暂时不可发送',
+    };
   }
 }

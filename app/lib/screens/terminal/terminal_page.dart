@@ -1,14 +1,22 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:xterm/xterm.dart';
+import '../../models/session_summary.dart';
+import '../../state/sessions_provider.dart';
+import '../../state/workspace_history_provider.dart';
 import '../../theme/index.dart';
+import '../../transport/connection_state.dart';
 import '../../transport/ws_provider.dart';
+import '../../widgets/session_activity_banner.dart';
 import 'terminal_controller.dart';
 import 'terminal_toolbar.dart';
 
 class TerminalPage extends ConsumerStatefulWidget {
-  const TerminalPage({super.key, required this.sessionId});
+  const TerminalPage({super.key, required this.sessionId, this.initialSession});
   final String sessionId;
+  final SessionSummary? initialSession;
 
   @override
   ConsumerState<TerminalPage> createState() => _TerminalPageState();
@@ -16,6 +24,9 @@ class TerminalPage extends ConsumerStatefulWidget {
 
 class _TerminalPageState extends ConsumerState<TerminalPage> {
   PtySessionController? _ctrl;
+  WsConnectionState _connState = WsConnectionState.online;
+  StreamSubscription<WsConnectionState>? _statesSub;
+  String? _lastSyncedWorkspacePath;
 
   @override
   void initState() {
@@ -24,11 +35,17 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     if (ws != null) {
       _ctrl = PtySessionController(sessionId: widget.sessionId, wsClient: ws);
       _ctrl!.start();
+      _statesSub = ws.states.listen((state) {
+        if (mounted) {
+          setState(() => _connState = state);
+        }
+      });
     }
   }
 
   @override
   void dispose() {
+    _statesSub?.cancel();
     _ctrl?.dispose();
     super.dispose();
   }
@@ -36,7 +53,43 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final sessions = ref.watch(sessionsProvider);
+    final found = sessions.cast<SessionSummary?>().firstWhere(
+      (session) => session!.sessionId == widget.sessionId,
+      orElse: () => null,
+    );
+    final session = found ?? widget.initialSession;
+    if (session == null) {
+      return CupertinoPageScaffold(
+        backgroundColor: CupertinoColors.black,
+        navigationBar: CupertinoNavigationBar(
+          backgroundColor: c.bg,
+          border: null,
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('会话不存在', style: TextStyle(fontSize: 17, color: c.fg)),
+              const SizedBox(height: 8),
+              CupertinoButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text('返回', style: TextStyle(color: c.tint)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final terminalEnabled =
+        session.status == SessionStatus.running &&
+        _connState == WsConnectionState.online;
     final ctrl = _ctrl;
+    if (ctrl != null && ctrl.enabled != terminalEnabled) {
+      ctrl.setEnabled(terminalEnabled);
+    }
+    _scheduleWorkspaceSync(session.workspacePath);
     return CupertinoPageScaffold(
       backgroundColor: CupertinoColors.black,
       navigationBar: CupertinoNavigationBar(
@@ -55,11 +108,18 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 )
                 : Column(
                   children: [
+                    SessionActivityBanner(
+                      connectionState: _connState,
+                      sessionStatus: session.status,
+                      offlineMessage: '该终端会话已失效，无法继续输入命令',
+                      doneMessage: '该终端会话已结束，无法继续输入命令',
+                    ),
                     Expanded(
                       child: TerminalView(
                         ctrl.terminal,
                         controller: ctrl.terminalCtrl,
-                        autofocus: true,
+                        autofocus: terminalEnabled,
+                        readOnly: !terminalEnabled,
                         keyboardType: TextInputType.visiblePassword,
                         keyboardAppearance: Brightness.dark,
                         theme: const TerminalTheme(
@@ -90,10 +150,27 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                         onKeyEvent: (node, event) => KeyEventResult.ignored,
                       ),
                     ),
-                    TerminalToolbar(terminal: ctrl.terminal),
+                    TerminalToolbar(
+                      terminal: ctrl.terminal,
+                      enabled: terminalEnabled,
+                    ),
                   ],
                 ),
       ),
     );
+  }
+
+  void _scheduleWorkspaceSync(String workspacePath) {
+    final normalized = workspacePath.trim();
+    if (normalized.isEmpty || normalized == _lastSyncedWorkspacePath) {
+      return;
+    }
+    _lastSyncedWorkspacePath = normalized;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(ref.read(workspaceHistoryProvider.notifier).visit(normalized));
+    });
   }
 }

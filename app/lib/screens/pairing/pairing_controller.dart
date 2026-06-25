@@ -4,7 +4,10 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../crypto/envelope_signer.dart';
 import '../../crypto/keys.dart';
+import '../../crypto/noise_ik.dart';
+import '../../crypto/pairing_sas.dart';
 import '../../models/device_summary.dart';
 import '../../models/inner_message.dart';
 import '../../state/devices_provider.dart';
@@ -61,6 +64,7 @@ class PairingController extends StateNotifier<PairingState> {
   PairingController(this._ref) : super(const PairingState());
 
   final Ref _ref;
+  final NoiseIk _noise = NoiseIk();
 
   WsClient? _pairingClient;
   StreamSubscription<InnerMessage>? _pairingMessagesSub;
@@ -68,6 +72,11 @@ class PairingController extends StateNotifier<PairingState> {
   Completer<String>? _authTokenCompleter;
   Completer<Map<String, dynamic>>? _deviceStatusCompleter;
   String _serverUrl = '';
+  String? _pendingDaemonPubKey;
+  String? _pendingDaemonEd25519PubKey;
+  String? _pendingNoiseHandshake;
+  String? _pendingInitialTransportSendKey;
+  String? _pendingInitialTransportRecvKey;
 
   Future<bool> startFromQr(String qrPayload) async {
     try {
@@ -107,9 +116,16 @@ class PairingController extends StateNotifier<PairingState> {
     debugPrint('[Pairing] confirm sas confirmed=$confirmed');
 
     try {
-      await client.send(
-        InnerMessage.create('device.pair.confirm', {'confirmed': confirmed}),
-      );
+      final payload = <String, dynamic>{'confirmed': confirmed};
+      if (confirmed) {
+        final noiseHandshake = _pendingNoiseHandshake;
+        if (noiseHandshake == null || noiseHandshake.isEmpty) {
+          throw StateError('配对握手未完成，请重新获取配对码后再试');
+        }
+        payload['noise_handshake'] = noiseHandshake;
+      }
+
+      await client.send(InnerMessage.create('device.pair.confirm', payload));
 
       if (!confirmed) {
         await Future<void>.delayed(const Duration(milliseconds: 150));
@@ -137,14 +153,30 @@ class PairingController extends StateNotifier<PairingState> {
       }
       debugPrint('[Pairing] auth token received, persisting runtime');
       final pairedDaemonId = deviceStatus?['device_id'] as String?;
+      final appDeviceId = AppRuntimeStore.parseDeviceIdFromJwt(jwt);
+      if (appDeviceId != null) {
+        client.updateDeviceId(appDeviceId);
+      }
 
       await AppRuntimeStore.persist(
         serverUrl: _serverUrl,
         jwt: jwt,
         pairedDaemonId: pairedDaemonId,
+        pairedDaemonPubKey: _pendingDaemonPubKey,
+        pairedDaemonEd25519PubKey: _pendingDaemonEd25519PubKey,
+        initialTransportSendKey: _pendingInitialTransportSendKey,
+        initialTransportRecvKey: _pendingInitialTransportRecvKey,
         machineName: state.machineName,
         os: state.os,
       );
+      if (_pendingDaemonPubKey != null && _pendingDaemonPubKey!.isNotEmpty) {
+        AppRuntimeStore.configureClientCrypto(
+          client,
+          pairedDaemonPubKey: _pendingDaemonPubKey!,
+          initialTransportSendKey: _pendingInitialTransportSendKey,
+          initialTransportRecvKey: _pendingInitialTransportRecvKey,
+        );
+      }
       if (pairedDaemonId != null) {
         _ref
             .read(devicesProvider.notifier)
@@ -166,7 +198,13 @@ class PairingController extends StateNotifier<PairingState> {
       _pairingMessagesSub = null;
       _sasCompleter = null;
       _authTokenCompleter = null;
+      _deviceStatusCompleter = null;
       _pairingClient = null;
+      _pendingDaemonPubKey = null;
+      _pendingDaemonEd25519PubKey = null;
+      _pendingNoiseHandshake = null;
+      _pendingInitialTransportSendKey = null;
+      _pendingInitialTransportRecvKey = null;
 
       final previous = _ref.read(wsClientProvider);
       _ref.read(wsClientProvider.notifier).state = client;
@@ -216,7 +254,8 @@ class PairingController extends StateNotifier<PairingState> {
     debugPrint('[Pairing] start code=$trimmedCode server=$trimmedUrl');
 
     try {
-      final keys = await DeviceKeys.generate();
+      final keys = await DeviceKeys.loadOrCreate();
+      final signer = EnvelopeSigner(keys.ed25519);
       final jwtHolder = _JwtHolder('');
       final client = WsClient(
         serverUri: uri,
@@ -226,6 +265,7 @@ class PairingController extends StateNotifier<PairingState> {
           jwtHolder.value = nextJwt;
           unawaited(_persistRuntimeJwt(trimmedUrl, nextJwt));
         },
+        signEnvelope: signer.sign,
       );
 
       _pairingClient = client;
@@ -256,6 +296,40 @@ class PairingController extends StateNotifier<PairingState> {
       if (sasValues.length != 5) {
         throw const FormatException('invalid SAS payload');
       }
+      _pendingDaemonPubKey = _extractString(sasPayload, 'daemon_pubkey');
+      _pendingDaemonEd25519PubKey = _extractString(
+        sasPayload,
+        'daemon_ed25519_pubkey',
+      );
+      final noiseHandshake = _extractString(sasPayload, 'noise_handshake');
+      if (_pendingDaemonPubKey == null || _pendingDaemonEd25519PubKey == null) {
+        throw const FormatException('pairing payload missing daemon keys');
+      }
+      if (noiseHandshake == null) {
+        throw StateError('电脑端版本过旧，缺少配对握手数据');
+      }
+
+      final responded = await _noise.respondHandshake(
+        localStaticPriv: Uint8List.fromList(
+          await keys.x25519.extractPrivateKeyBytes(),
+        ),
+        localStaticPub: Uint8List.fromList(
+          (await keys.x25519.extractPublicKey()).bytes,
+        ),
+        remoteStaticPub: NoiseIk.decodePublicKeyBase64Url(
+          _pendingDaemonPubKey!,
+        ),
+        message: _decodeBase64Url(noiseHandshake),
+      );
+      final expectedSas = await derivePairingSas(
+        responded.pairingHandshakeHash,
+      );
+      if (!listEquals(expectedSas, sasValues)) {
+        throw StateError('SAS 校验失败，请重新开始配对');
+      }
+      _pendingNoiseHandshake = _encodeBase64Url(responded.message);
+      _pendingInitialTransportSendKey = _encodeBase64Url(responded.sendKey);
+      _pendingInitialTransportRecvKey = _encodeBase64Url(responded.recvKey);
 
       state = PairingState(
         step: PairingStep.waitingSas,
@@ -338,9 +412,19 @@ class PairingController extends StateNotifier<PairingState> {
     _sasCompleter = null;
     _authTokenCompleter = null;
     _deviceStatusCompleter = null;
+    _pendingDaemonPubKey = null;
+    _pendingDaemonEd25519PubKey = null;
+    _pendingNoiseHandshake = null;
+    _pendingInitialTransportSendKey = null;
+    _pendingInitialTransportRecvKey = null;
     if (disposeClient) {
       client?.dispose();
     }
+  }
+
+  String? _extractString(Map<String, dynamic> payload, String key) {
+    final value = payload[key];
+    return value is String && value.isNotEmpty ? value : null;
   }
 
   List<String> _extractSasValues(Map<String, dynamic> payload) {
@@ -350,6 +434,12 @@ class PairingController extends StateNotifier<PairingState> {
     }
     return raw.whereType<String>().toList(growable: false);
   }
+
+  Uint8List _decodeBase64Url(String encoded) =>
+      Uint8List.fromList(base64Url.decode(base64Url.normalize(encoded)));
+
+  String _encodeBase64Url(List<int> bytes) =>
+      base64Url.encode(bytes).replaceAll('=', '');
 
   String _friendlyError(Object error) {
     if (error is TimeoutException) {

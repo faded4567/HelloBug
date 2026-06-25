@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../state/workspace_history_provider.dart';
 import '../../state/sessions_provider.dart';
 import '../../theme/index.dart';
+import '../new_session/new_session_flow.dart';
 import 'session_tile.dart';
 
 class SessionsPage extends ConsumerWidget {
@@ -12,7 +16,23 @@ class SessionsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sessions = ref.watch(sessionsProvider);
+    final workspaceHistory = ref.watch(workspaceHistoryProvider).valueOrNull;
     final c = context.colors;
+    final initialWorkspacePath =
+        workspaceHistory?.currentPath ??
+        (workspaceHistory?.recents.isNotEmpty ?? false
+            ? workspaceHistory!.recents.first
+            : null);
+
+    void openNewSession() {
+      context.push(
+        '/new-session',
+        extra:
+            initialWorkspacePath == null
+                ? null
+                : NewSessionFlowArgs(workspacePath: initialWorkspacePath),
+      );
+    }
 
     return CupertinoPageScaffold(
       backgroundColor: c.bg,
@@ -22,7 +42,7 @@ class SessionsPage extends ConsumerWidget {
         middle: Text('会话', style: TextStyle(color: c.fg)),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
-          onPressed: () => context.push('/new-session'),
+          onPressed: openNewSession,
           child: Icon(CupertinoIcons.add, color: c.tint),
         ),
       ),
@@ -50,7 +70,7 @@ class SessionsPage extends ConsumerWidget {
                       ),
                       const SizedBox(height: 24),
                       CupertinoButton.filled(
-                        onPressed: () => context.push('/new-session'),
+                        onPressed: openNewSession,
                         child: const Text('新建会话'),
                       ),
                     ],
@@ -67,6 +87,11 @@ class SessionsPage extends ConsumerWidget {
                       (s) => SessionTile(
                         session: s,
                         onTap: () {
+                          unawaited(
+                            ref
+                                .read(workspaceHistoryProvider.notifier)
+                                .visit(s.workspacePath),
+                          );
                           ref
                               .read(sessionsProvider.notifier)
                               .markRead(s.sessionId);

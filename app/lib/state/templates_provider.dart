@@ -50,10 +50,21 @@ class TemplatesNotifier extends Notifier<List<TemplateSummary>> {
 
     _loading = true;
     try {
-      await client.send(InnerMessage.create('templates.list', const {}));
-      final msg = await client.messages
-          .firstWhere((message) => message.type == 'templates.list')
+      final request = InnerMessage.create('templates.list', const {});
+      final response = client.messages
+          .firstWhere(
+            (message) =>
+                (message.type == 'templates.list' &&
+                    message.id == request.id) ||
+                (message.type == 'error' &&
+                    message.payload['request_id'] == request.id),
+          )
           .timeout(const Duration(seconds: 5));
+      await client.send(request);
+      final msg = await response;
+      if (msg.type == 'error') {
+        throw StateError(msg.payload['message'] as String? ?? '模板列表读取失败');
+      }
       final templates = TemplateSummary.listFromPayload(
         msg.payload['templates'],
       );

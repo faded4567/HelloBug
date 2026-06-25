@@ -3,8 +3,13 @@ import 'package:xterm/xterm.dart';
 import '../../theme/index.dart';
 
 class TerminalToolbar extends StatelessWidget {
-  const TerminalToolbar({super.key, required this.terminal});
+  const TerminalToolbar({
+    super.key,
+    required this.terminal,
+    this.enabled = true,
+  });
   final Terminal terminal;
+  final bool enabled;
 
   void _send(String seq) => terminal.paste(seq);
 
@@ -35,8 +40,15 @@ class TerminalToolbar extends StatelessWidget {
           return CupertinoButton(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             minimumSize: const Size(36, 36),
-            onPressed: seq != null ? () => _send(seq) : null,
-            child: Text(label, style: TextStyle(fontSize: 13, fontFamily: 'Menlo', color: c.fg)),
+            onPressed: enabled && seq != null ? () => _send(seq) : null,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontFamily: 'Menlo',
+                color: enabled ? c.fg : c.fg3,
+              ),
+            ),
           );
         },
       ),

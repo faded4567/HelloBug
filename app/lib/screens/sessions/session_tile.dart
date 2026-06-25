@@ -17,6 +17,9 @@ class SessionTile extends StatelessWidget {
     };
     final parts = session.workspacePath.split('/');
     final name = parts.lastWhere((p) => p.isNotEmpty, orElse: () => session.workspacePath);
+    final isRunning = session.status == SessionStatus.running;
+    final isReplaying = session.status == SessionStatus.replaying;
+    final isOffline = session.status == SessionStatus.offline;
 
     return GestureDetector(
       onTap: onTap,
@@ -43,10 +46,22 @@ class SessionTile extends StatelessWidget {
             ]),
           ),
           const SizedBox(width: 8),
-          if (session.status == SessionStatus.running)
+          if (isRunning || isReplaying)
             Padding(
               padding: const EdgeInsets.only(right: 6),
-              child: CupertinoActivityIndicator(radius: 7, color: c.tint),
+              child: CupertinoActivityIndicator(
+                radius: 7,
+                color: isReplaying ? CupertinoColors.activeOrange : c.tint,
+              ),
+            ),
+          if (isOffline)
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: Icon(
+                CupertinoIcons.exclamationmark_circle,
+                size: 16,
+                color: CupertinoColors.systemOrange,
+              ),
             ),
           Icon(CupertinoIcons.chevron_right, size: 14, color: c.fg3),
         ]),

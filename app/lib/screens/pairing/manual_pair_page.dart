@@ -16,7 +16,6 @@ class _ManualPairPageState extends State<ManualPairPage> {
   final _seg2 = TextEditingController();
   final _urlCtrl = TextEditingController();
   _PairState _state = _PairState.input;
-  String? _errorMsg;
 
   bool get _canConnect =>
       (_seg1.text.length == 4 && _seg2.text.length == 4) ||
@@ -24,11 +23,11 @@ class _ManualPairPageState extends State<ManualPairPage> {
 
   void _connect() {
     if (!_canConnect) return;
-    setState(() { _state = _PairState.connecting; _errorMsg = null; });
+    setState(() { _state = _PairState.connecting; });
     // UI-only: simulate progress, real logic wired by Codex
   }
 
-  void _reset() => setState(() { _state = _PairState.input; _errorMsg = null; });
+  void _reset() => setState(() { _state = _PairState.input; });
 
   @override
   void dispose() {

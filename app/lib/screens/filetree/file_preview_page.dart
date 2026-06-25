@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../models/access_failure.dart';
 import '../../models/inner_message.dart';
+import '../../state/workspace_history_provider.dart';
 import '../../theme/index.dart';
 import '../../transport/ws_provider.dart';
 
@@ -11,9 +13,11 @@ class FilePreviewPage extends ConsumerStatefulWidget {
     super.key,
     required this.sessionId,
     required this.filePath,
+    this.workspacePath,
   });
   final String sessionId;
   final String filePath;
+  final String? workspacePath;
 
   @override
   ConsumerState<FilePreviewPage> createState() => _FilePreviewPageState();
@@ -23,13 +27,19 @@ class _FilePreviewPageState extends ConsumerState<FilePreviewPage> {
   final _chunks = <int, String>{};
   int? _totalChunks;
   bool _loading = true;
-  String? _error;
+  AccessFailure? _error;
   StreamSubscription? _sub;
   String? _requestId;
 
   @override
   void initState() {
     super.initState();
+    final workspacePath = widget.workspacePath?.trim();
+    if (workspacePath != null && workspacePath.isNotEmpty) {
+      unawaited(
+        ref.read(workspaceHistoryProvider.notifier).visit(workspacePath),
+      );
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) => _request());
   }
 
@@ -38,7 +48,7 @@ class _FilePreviewPageState extends ConsumerState<FilePreviewPage> {
     if (client == null) {
       setState(() {
         _loading = false;
-        _error = '未连接';
+        _error = const AccessFailure(message: '未连接');
       });
       return;
     }
@@ -54,18 +64,24 @@ class _FilePreviewPageState extends ConsumerState<FilePreviewPage> {
     _sub = client.messages.listen((msg) {
       if (msg.type == 'error') {
         if (msg.payload['request_id'] != _requestId) return;
+        final code = msg.payload['code'] as String? ?? '';
         if (mounted) {
           setState(() {
             _loading = false;
-            _error = msg.payload['message'] as String? ?? '读取失败';
+            _error = resolveAccessFailure(
+              surface: AccessFailureSurface.filePreview,
+              code: code,
+              fallback: msg.payload['message'] as String? ?? '读取失败',
+            );
           });
         }
         debugPrint(
-          '[FilePreview] error request_id=$_requestId message=$_error',
+          '[FilePreview] error request_id=$_requestId code=$code message=${_error?.message}',
         );
         return;
       }
       if (msg.type != 'fs.file') return;
+      if (msg.payload['session_id'] != widget.sessionId) return;
       if (msg.payload['file_path'] != widget.filePath) return;
       final p = msg.payload;
       final idx = (p['chunk_index'] as int?) ?? 0;
@@ -79,7 +95,7 @@ class _FilePreviewPageState extends ConsumerState<FilePreviewPage> {
         if (mounted) {
           setState(() {
             _loading = false;
-            _error = '不支持的文件格式';
+            _error = const AccessFailure(message: '不支持的文件格式', retryable: false);
           });
         }
         debugPrint('[FilePreview] decode failed file=${widget.filePath}');
@@ -125,6 +141,16 @@ class _FilePreviewPageState extends ConsumerState<FilePreviewPage> {
     return List.generate(_totalChunks!, (i) => _chunks[i] ?? '').join();
   }
 
+  void _retry() {
+    setState(() {
+      _loading = true;
+      _error = null;
+      _totalChunks = null;
+      _chunks.clear();
+    });
+    _request();
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
@@ -146,20 +172,19 @@ class _FilePreviewPageState extends ConsumerState<FilePreviewPage> {
                       Text('⚠️', style: const TextStyle(fontSize: 36)),
                       const SizedBox(height: 12),
                       Text(
-                        _error!,
+                        _error!.message,
                         style: TextStyle(fontSize: 15, color: c.fg2),
                       ),
                       const SizedBox(height: 16),
                       CupertinoButton(
-                        onPressed: () {
-                          setState(() {
-                            _loading = true;
-                            _error = null;
-                            _chunks.clear();
-                          });
-                          _request();
-                        },
-                        child: Text('重试', style: TextStyle(color: c.tint)),
+                        onPressed:
+                            _error!.retryable
+                                ? _retry
+                                : () => Navigator.of(context).maybePop(),
+                        child: Text(
+                          _error!.retryable ? '重试' : '返回',
+                          style: TextStyle(color: c.tint),
+                        ),
                       ),
                     ],
                   ),

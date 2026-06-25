@@ -15,8 +15,15 @@ import '../image_input/image_input_sheet.dart';
 import '../voice_input/voice_input_sheet.dart';
 
 class ChatInputBar extends ConsumerStatefulWidget {
-  const ChatInputBar({super.key, required this.sessionId});
+  const ChatInputBar({
+    super.key,
+    required this.sessionId,
+    this.enabled = true,
+    this.disabledPlaceholder = '该会话暂时不可发送',
+  });
   final String sessionId;
+  final bool enabled;
+  final String disabledPlaceholder;
 
   @override
   ConsumerState<ChatInputBar> createState() => _ChatInputBarState();
@@ -27,11 +34,13 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
   final _focus = FocusNode();
   bool _hasText = false;
   bool _showSlash = false;
+  bool _hasFocus = false;
   SlashPaletteController? _slashCtrl;
 
   @override
   void initState() {
     super.initState();
+    _focus.addListener(() => setState(() => _hasFocus = _focus.hasFocus));
     final ws = ref.read(wsClientProvider);
     unawaited(ref.read(templatesProvider.notifier).load());
     if (ws != null) {
@@ -73,6 +82,9 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
   }
 
   Future<void> _send() async {
+    if (!widget.enabled) {
+      return;
+    }
     final text = _ctrl.text.trim();
     if (text.isEmpty) return;
     final slash = text.startsWith('/') ? _parseSlashCommand(text) : null;
@@ -105,6 +117,9 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
   }
 
   Future<void> _sendVoiceText(VoiceInputResult result) async {
+    if (!widget.enabled) {
+      return;
+    }
     final text = result.text.trim();
     if (text.isEmpty) {
       return;
@@ -135,6 +150,22 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
     _focus.requestFocus();
   }
 
+  void _showMediaSheet() {
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder:
+          (ctx) => _MediaDrawer(
+            onAlbum: () {
+              Navigator.pop(ctx);
+              showCupertinoModalPopup<void>(
+                context: context,
+                builder: (_) => ImageInputSheet(sessionId: widget.sessionId),
+              );
+            },
+          ),
+    );
+  }
+
   _ParsedSlashCommand? _parseSlashCommand(String text) {
     final body = text.substring(1).trim();
     if (body.isEmpty) {
@@ -154,7 +185,13 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final templates = ref.watch(templatesProvider);
-    final canSend = _hasText && ref.watch(wsClientProvider) != null;
+    final canSend =
+        widget.enabled && _hasText && ref.watch(wsClientProvider) != null;
+    final voiceHoldEnabled = widget.enabled && !_hasFocus && !_hasText;
+    final inputPlaceholder =
+        widget.enabled
+            ? (voiceHoldEnabled ? '按住说话' : '发消息给 Agent…')
+            : widget.disabledPlaceholder;
 
     return Container(
       color: c.bg,
@@ -162,70 +199,104 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(height: 1, color: c.separator),
-          TemplateChipBar(templates: templates, onSelect: _insertTemplate),
+          TemplateChipBar(
+            templates: widget.enabled ? templates : const [],
+            onSelect: _insertTemplate,
+          ),
           Container(height: 1, color: c.separator),
-          if (_showSlash && _slashCtrl != null)
-            SlashPalette(controller: _slashCtrl!, onSelect: _selectCommand),
+          if (widget.enabled && _showSlash && _slashCtrl != null)
+            SlashPalette(
+              controller: _slashCtrl!,
+              onSelect: _selectCommand,
+              onQueryTap: _focus.requestFocus,
+            ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(4, 8, 8, 8),
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                CupertinoButton(
-                  padding: const EdgeInsets.all(6),
-                  onPressed:
-                      () => showCupertinoModalPopup<void>(
-                        context: context,
-                        builder:
-                            (_) => ImageInputSheet(sessionId: widget.sessionId),
-                      ),
-                  child: Icon(CupertinoIcons.photo, size: 22, color: c.fg2),
-                ),
-                CupertinoButton(
-                  padding: const EdgeInsets.all(6),
-                  onPressed:
-                      () => VoiceInputSheet.show(context, _sendVoiceText),
-                  child: Icon(CupertinoIcons.mic, size: 22, color: c.fg2),
-                ),
                 Expanded(
-                  child: CupertinoTextField(
-                    controller: _ctrl,
-                    focusNode: _focus,
-                    placeholder: '发消息给 Agent…',
-                    placeholderStyle: TextStyle(color: c.fg3),
-                    style: TextStyle(color: c.fg, fontSize: 15),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
+                  child: GestureDetector(
+                    onLongPress:
+                        voiceHoldEnabled
+                            ? () =>
+                                VoiceInputSheet.show(context, _sendVoiceText)
+                            : null,
+                    child: CupertinoTextField(
+                      controller: _ctrl,
+                      focusNode: _focus,
+                      enabled: widget.enabled,
+                      placeholder: inputPlaceholder,
+                      placeholderStyle: TextStyle(color: c.fg3),
+                      style: TextStyle(color: c.fg, fontSize: 15),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: c.bg2,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      maxLines: 6,
+                      minLines: 1,
+                      onChanged: _onChanged,
+                      textInputAction: TextInputAction.newline,
                     ),
-                    decoration: BoxDecoration(
-                      color: c.bg2,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    maxLines: 6,
-                    minLines: 1,
-                    onChanged: _onChanged,
-                    textInputAction: TextInputAction.newline,
                   ),
                 ),
                 const SizedBox(width: 6),
+                if (_hasFocus) ...[
+                  CupertinoButton(
+                    padding: const EdgeInsets.all(4),
+                    onPressed:
+                        widget.enabled
+                            ? () =>
+                                VoiceInputSheet.show(context, _sendVoiceText)
+                            : null,
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: c.bg3,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(CupertinoIcons.mic, size: 18, color: c.fg2),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                ],
                 CupertinoButton(
                   padding: const EdgeInsets.all(4),
-                  onPressed: canSend ? _send : null,
+                  onPressed: widget.enabled ? _showMediaSheet : null,
                   child: Container(
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: canSend ? c.tint : c.bg3,
+                      color: c.bg3,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(
-                      CupertinoIcons.arrow_up,
-                      size: 18,
-                      color: canSend ? const Color(0xFFFFFFFF) : c.fg3,
-                    ),
+                    child: Icon(CupertinoIcons.plus, size: 18, color: c.fg2),
                   ),
                 ),
+                if (_hasText) const SizedBox(width: 4),
+                if (_hasText)
+                  CupertinoButton(
+                    padding: const EdgeInsets.all(4),
+                    onPressed: canSend ? _send : null,
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: canSend ? c.tint : c.bg3,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        CupertinoIcons.arrow_up,
+                        size: 18,
+                        color: canSend ? const Color(0xFFFFFFFF) : c.fg3,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -241,4 +312,92 @@ class _ParsedSlashCommand {
 
   final String command;
   final List<String> args;
+}
+
+class _MediaDrawer extends StatelessWidget {
+  const _MediaDrawer({required this.onAlbum});
+  final VoidCallback onAlbum;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return SafeArea(
+      top: false,
+      child: Container(
+        color: c.bg,
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: c.fg3,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Row(
+              children: [
+                _MediaItem(
+                  icon: CupertinoIcons.camera,
+                  label: '相机',
+                  onTap: () => Navigator.pop(context),
+                ),
+                const SizedBox(width: 8),
+                _MediaItem(
+                  icon: CupertinoIcons.photo,
+                  label: '相册',
+                  onTap: onAlbum,
+                ),
+                const SizedBox(width: 8),
+                _MediaItem(
+                  icon: CupertinoIcons.doc,
+                  label: '文件',
+                  onTap: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MediaItem extends StatelessWidget {
+  const _MediaItem({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Expanded(
+      child: CupertinoButton(
+        padding: EdgeInsets.zero,
+        onPressed: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            color: c.bg2,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, size: 28, color: c.fg),
+              const SizedBox(height: 6),
+              Text(label, style: TextStyle(fontSize: 13, color: c.fg)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

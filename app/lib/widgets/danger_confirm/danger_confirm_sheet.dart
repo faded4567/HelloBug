@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
 import '../../../models/danger_request.dart';
+import '../../../models/danger_result.dart';
 import '../../../theme/index.dart';
 import '../../../transport/ws_provider.dart';
 import '../../../models/inner_message.dart';
@@ -20,6 +21,9 @@ class _DangerConfirmSheetState extends ConsumerState<DangerConfirmSheet> {
   late int _remaining;
   bool _authing = false;
   bool _resolved = false;
+  bool _submitting = false;
+  String? _statusMessage;
+  StreamSubscription? _resultSub;
 
   @override
   void initState() {
@@ -31,6 +35,7 @@ class _DangerConfirmSheetState extends ConsumerState<DangerConfirmSheet> {
   @override
   void dispose() {
     _timer?.cancel();
+    _resultSub?.cancel();
     super.dispose();
   }
 
@@ -65,33 +70,32 @@ class _DangerConfirmSheetState extends ConsumerState<DangerConfirmSheet> {
       return;
     }
     if (!ok) {
+      if (mounted) {
+        setState(() {
+          _statusMessage = '生物验证未通过';
+        });
+      }
       _startTimer();
       return;
     }
-    _resolved = true;
-    await ref
-        .read(wsClientProvider)
-        ?.send(
-          InnerMessage.create('danger.allow', {
-            'danger_id': widget.request.dangerId,
-            'biometric_verified': true,
-          }),
-        );
-    if (mounted) Navigator.of(context).pop();
+    await _submitDecision(
+      InnerMessage.create('danger.allow', {
+        'session_id': widget.request.sessionId,
+        'danger_id': widget.request.dangerId,
+        'biometric_verified': true,
+      }),
+    );
   }
 
   Future<void> _deny() async {
     if (_resolved) return;
-    _resolved = true;
     _stopTimer();
-    await ref
-        .read(wsClientProvider)
-        ?.send(
-          InnerMessage.create('danger.deny', {
-            'danger_id': widget.request.dangerId,
-          }),
-        );
-    if (mounted) Navigator.of(context).pop();
+    await _submitDecision(
+      InnerMessage.create('danger.deny', {
+        'session_id': widget.request.sessionId,
+        'danger_id': widget.request.dangerId,
+      }),
+    );
   }
 
   int _computeRemainingSeconds() {
@@ -120,6 +124,77 @@ class _DangerConfirmSheetState extends ConsumerState<DangerConfirmSheet> {
   void _stopTimer() {
     _timer?.cancel();
     _timer = null;
+  }
+
+  Future<void> _submitDecision(InnerMessage message) async {
+    if (_resolved || _submitting) {
+      return;
+    }
+    final client = ref.read(wsClientProvider);
+    if (client == null) {
+      if (mounted) {
+        setState(() {
+          _statusMessage = '当前未连接到服务器';
+        });
+      }
+      return;
+    }
+
+    _resultSub?.cancel();
+    final completer = Completer<DangerResult>();
+    _resultSub = client.messages.listen((incoming) {
+      if (incoming.type != 'danger.result') {
+        return;
+      }
+      final result = DangerResult.fromPayload(incoming.payload);
+      if (result.dangerId != widget.request.dangerId) {
+        return;
+      }
+      if (!completer.isCompleted) {
+        completer.complete(result);
+      }
+    });
+
+    if (mounted) {
+      setState(() {
+        _submitting = true;
+        _statusMessage = null;
+      });
+    }
+
+    await client.send(message);
+    final result = await completer.future.timeout(
+      const Duration(seconds: 5),
+      onTimeout: () => DangerResult(
+        dangerId: widget.request.dangerId,
+        sessionId: widget.request.sessionId,
+        status: 'not_found',
+        message: '未收到危险操作结果，请稍后重试',
+      ),
+    );
+    await _resultSub?.cancel();
+    _resultSub = null;
+
+    if (!mounted) {
+      return;
+    }
+
+    if (result.status == 'approved' || result.status == 'denied') {
+      _resolved = true;
+      Navigator.of(context).pop();
+      return;
+    }
+
+    setState(() {
+      _submitting = false;
+      _resolved = false;
+      _statusMessage = result.message;
+      _remaining = _computeRemainingSeconds();
+    });
+
+    if (_remaining > 0) {
+      _startTimer();
+    }
   }
 
   @override
@@ -196,6 +271,16 @@ class _DangerConfirmSheetState extends ConsumerState<DangerConfirmSheet> {
             mono: true,
             colors: c,
           ),
+          if (_statusMessage != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              _statusMessage!,
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.red,
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           Row(
             children: [
@@ -204,7 +289,8 @@ class _DangerConfirmSheetState extends ConsumerState<DangerConfirmSheet> {
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   color: c.bg3,
                   borderRadius: BorderRadius.circular(12),
-                  onPressed: _resolved || _authing ? null : _deny,
+                  onPressed:
+                      _resolved || _authing || _submitting ? null : _deny,
                   child: Text(
                     '拒绝',
                     style: TextStyle(
@@ -219,14 +305,19 @@ class _DangerConfirmSheetState extends ConsumerState<DangerConfirmSheet> {
                 child: CupertinoButton.filled(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   borderRadius: BorderRadius.circular(12),
-                  onPressed: _resolved || _authing ? null : _allow,
+                  onPressed:
+                      _resolved || _authing || _submitting ? null : _allow,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Icon(CupertinoIcons.lock_open, size: 16),
                       const SizedBox(width: 6),
                       Text(
-                        _authing ? '验证中…' : '验证并允许',
+                        _authing
+                            ? '验证中…'
+                            : _submitting
+                            ? '提交中…'
+                            : '验证并允许',
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                     ],

@@ -56,7 +56,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
       GoRoute(path: '/unlock', builder: (_, __) => const UnlockPage()),
-      GoRoute(path: '/new-session', builder: (_, __) => const NewSessionFlow()),
+      GoRoute(
+        path: '/new-session',
+        builder:
+            (_, state) => NewSessionFlow(
+              initialArgs:
+                  state.extra is NewSessionFlowArgs
+                      ? state.extra! as NewSessionFlowArgs
+                      : null,
+            ),
+      ),
       GoRoute(
         path: '/session/:id',
         builder:
@@ -137,8 +146,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/terminal/:sessionId',
         builder:
-            (_, state) =>
-                TerminalPage(sessionId: state.pathParameters['sessionId']!),
+            (_, state) => TerminalPage(
+              sessionId: state.pathParameters['sessionId']!,
+              initialSession:
+                  state.extra is SessionSummary
+                      ? state.extra! as SessionSummary
+                      : null,
+            ),
       ),
     ],
   );
