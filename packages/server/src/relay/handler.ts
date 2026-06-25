@@ -1,4 +1,11 @@
-import type { Message } from "@hellobug/protocol";
+import { createPublicKey, type KeyObject, verify } from "node:crypto";
+
+import {
+  createEnvelopeSigningPayload,
+  type ErrorCode,
+  type Envelope,
+  type Message,
+} from "@hellobug/protocol";
 import { WebSocket, type RawData } from "ws";
 
 import type { AppDeviceRecord } from "../auth/device-registry.js";
@@ -14,6 +21,7 @@ import { sendJson } from "./socket.js";
 export class RelayConnectionHandler {
   private daemonDeviceId: string | null = null;
   private appDeviceId: string | null = null;
+  private receiveQueue: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly socket: WebSocket,
@@ -33,10 +41,21 @@ export class RelayConnectionHandler {
   }
 
   async handleRawMessage(raw: RawData): Promise<void> {
+    this.receiveQueue = this.receiveQueue
+      .then(() => this.processRawMessage(raw))
+      .catch((error) => {
+        console.error("[relay] inbound message error", error);
+      });
+    await this.receiveQueue;
+  }
+
+  private async processRawMessage(raw: RawData): Promise<void> {
     try {
-      const { message: parsed } = decodeRelayFrame(this.socket, raw);
+      const decoded = decodeRelayFrame(this.socket, raw);
+      await this.assertEnvelopeSignature(decoded.message, decoded.envelope);
+      const parsed = decoded.message;
       console.log(`[relay] recv <- ${parsed.type}`);
-      await this.handleMessage(parsed);
+      await this.handleMessage(parsed, decoded.forwardEnvelope);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Invalid message";
@@ -59,13 +78,17 @@ export class RelayConnectionHandler {
       this.daemonDeviceId,
       this.socket,
     );
+    this.services.pendingDangers.removeForDaemon(this.daemonDeviceId);
     this.services.pairing.clearDaemon(this.daemonDeviceId);
     this.services.sessionRegistry.clearDaemon(this.daemonDeviceId);
     this.services.presence.markOffline(this.daemonDeviceId);
     this.broadcastPresence(this.daemonDeviceId);
   }
 
-  private async handleMessage(message: Message): Promise<void> {
+  private async handleMessage(
+    message: Message,
+    forwardEnvelope?: Envelope,
+  ): Promise<void> {
     if (message.type === "auth.attach" || message.type === "auth.refresh") {
       await this.handleAuthMessage(message);
       return;
@@ -82,17 +105,17 @@ export class RelayConnectionHandler {
     }
 
     if (message.type === "device.pair") {
-      this.handlePairStart(message);
+      this.handlePairStart(message, forwardEnvelope);
       return;
     }
 
     if (message.type === "device.pair.sas") {
-      this.handlePairSas(message);
+      this.handlePairSas(message, forwardEnvelope);
       return;
     }
 
     if (message.type === "device.pair.confirm") {
-      await this.handlePairConfirm(message);
+      await this.handlePairConfirm(message, forwardEnvelope);
       return;
     }
 
@@ -106,22 +129,49 @@ export class RelayConnectionHandler {
       return;
     }
 
+    if (this.isDaemonRelayResponse(message)) {
+      if (DaemonBroadcastMessageTypes.has(message.type) && !getSessionId(message)) {
+        this.handleDaemonBroadcast(message, forwardEnvelope);
+        return;
+      }
+
+      this.handleDaemonToAppMessage(message, forwardEnvelope);
+      return;
+    }
+
+    if (message.type === "key.ratchet" || message.type === "key.ratchet_ack") {
+      if (this.daemonDeviceId && !this.appDeviceId) {
+        this.handleDaemonToAppMessage(message, forwardEnvelope);
+        return;
+      }
+
+      this.handleAppToDaemonMessage(message, forwardEnvelope);
+      return;
+    }
+
     if (AppToDaemonMessageTypes.has(message.type)) {
-      this.handleAppToDaemonMessage(message);
+      this.handleAppToDaemonMessage(message, forwardEnvelope);
       return;
     }
 
     if (
+      message.type === "session.start.result" ||
       message.type === "session.event" ||
       message.type === "danger.pending" ||
+      message.type === "danger.result" ||
       message.type === "replay.done"
     ) {
-      this.handleDaemonToAppMessage(message);
+      this.handleDaemonToAppMessage(message, forwardEnvelope);
       return;
     }
 
     if (DaemonBroadcastMessageTypes.has(message.type)) {
-      this.handleDaemonBroadcast(message);
+      const sessionId = getSessionId(message);
+      if (sessionId) {
+        this.handleDaemonToAppMessage(message, forwardEnvelope);
+        return;
+      }
+      this.handleDaemonBroadcast(message, forwardEnvelope);
       return;
     }
 
@@ -173,6 +223,7 @@ export class RelayConnectionHandler {
 
       if (message.type === "auth.attach") {
         this.sendCurrentPresence(appDevice.deviceId);
+        this.replayPendingDangers(appDevice.deviceId);
       }
     } catch (error) {
       const text = error instanceof Error ? error.message : "Invalid JWT";
@@ -229,6 +280,7 @@ export class RelayConnectionHandler {
 
   private handlePairStart(
     message: Extract<Message, { type: "device.pair" }>,
+    forwardEnvelope?: Envelope,
   ): void {
     console.log(
       `[relay] pairing start code=${message.payload.pairing_code} app_device=${message.payload.app_device_name ?? "unknown"}`,
@@ -267,11 +319,15 @@ export class RelayConnectionHandler {
       return;
     }
 
-    sendJson(daemonSocket, message);
+    this.sendToSocket(daemonSocket, message, {
+      to: attempt.daemonDeviceId,
+      sourceEnvelope: forwardEnvelope,
+    });
   }
 
   private handlePairSas(
     message: Extract<Message, { type: "device.pair.sas" }>,
+    forwardEnvelope?: Envelope,
   ): void {
     if (!this.daemonDeviceId) {
       this.sendError(
@@ -308,23 +364,31 @@ export class RelayConnectionHandler {
     void this.services.persistState();
     this.sendToSocket(attempt.appSocket, message, {
       from: this.daemonDeviceId,
+      sourceEnvelope: forwardEnvelope,
     });
   }
 
   private async handlePairConfirm(
     message: Extract<Message, { type: "device.pair.confirm" }>,
+    forwardEnvelope?: Envelope,
   ): Promise<void> {
     console.log(
       `[relay] pairing confirm confirmed=${message.payload.confirmed}`,
     );
-    const attempt = this.services.pairing.completeAttemptForAppSocket(
-      this.socket,
-    );
+    const attempt = this.services.pairing.getAttemptByAppSocket(this.socket);
     if (!attempt) {
       this.sendError(
         message.type,
         "SESSION_NOT_FOUND",
         "No active pairing attempt",
+      );
+      return;
+    }
+    if (message.payload.confirmed && !message.payload.noise_handshake) {
+      this.sendError(
+        message.type,
+        "PROTOCOL_VERSION",
+        "device.pair.confirm requires noise_handshake when confirmed=true",
       );
       return;
     }
@@ -341,7 +405,11 @@ export class RelayConnectionHandler {
       return;
     }
 
-    sendJson(daemonSocket, message);
+    this.sendToSocket(daemonSocket, message, {
+      to: attempt.daemonDeviceId,
+      sourceEnvelope: forwardEnvelope,
+    });
+    this.services.pairing.completeAttemptForAppSocket(this.socket);
 
     if (!message.payload.confirmed) {
       return;
@@ -379,16 +447,39 @@ export class RelayConnectionHandler {
   private handleSessionResume(
     message: Extract<Message, { type: "session.resume" }>,
   ): void {
+    if (!this.appDeviceId) {
+      this.sendError(message.type, "AUTH_INVALID", "App is not authenticated");
+      return;
+    }
+
     console.log(
       `[relay] session resume session=${message.payload.session_id} last_seq=${message.payload.last_seq}`,
     );
+    const session = this.services.sessionRegistry.get(message.payload.session_id);
+    if (!session || session.appDeviceId !== this.appDeviceId) {
+      this.sendToSelf({
+        v: 1,
+        type: "replay.done",
+        payload: {
+          session_id: message.payload.session_id,
+          replayed_count: 0,
+          current_seq: message.payload.last_seq,
+          status: "session_not_found",
+          message: "Session not found for replay",
+        },
+      });
+      return;
+    }
+
     const replay = this.services.replayBuffer.replay(
       message.payload.session_id,
       message.payload.last_seq,
     );
 
-    for (const replayMessage of replay.messages) {
-      this.sendToSelf(replayMessage);
+    for (const replayEntry of replay.entries) {
+      this.sendToSelf(replayEntry.message, {
+        sourceEnvelope: replayEntry.envelope,
+      });
     }
 
     this.sendToSelf({
@@ -398,6 +489,8 @@ export class RelayConnectionHandler {
         session_id: message.payload.session_id,
         replayed_count: replay.replayedCount,
         current_seq: replay.currentSeq,
+        status: "ok",
+        message: "Replay complete",
       },
     });
   }
@@ -430,14 +523,33 @@ export class RelayConnectionHandler {
     await this.services.persistState();
   }
 
-  private handleAppToDaemonMessage(message: Message): void {
+  private handleAppToDaemonMessage(
+    message: Message,
+    forwardEnvelope?: Envelope,
+  ): void {
     if (!this.appDeviceId) {
+      if (message.type === "session.start") {
+        this.sendSessionStartRejected(
+          message,
+          "AUTH_INVALID",
+          "App is not authenticated",
+        );
+        return;
+      }
       this.sendError(message.type, "AUTH_INVALID", "App is not authenticated");
       return;
     }
 
     const daemonId = this.resolveDaemonForAppMessage(this.appDeviceId, message);
     if (!daemonId) {
+      if (message.type === "session.start") {
+        this.sendSessionStartRejected(
+          message,
+          "SESSION_NOT_FOUND",
+          "Session is not registered",
+        );
+        return;
+      }
       this.sendError(
         message.type,
         "SESSION_NOT_FOUND",
@@ -446,14 +558,33 @@ export class RelayConnectionHandler {
       return;
     }
 
+    const daemonSocket = this.services.relayRegistry.getDaemon(daemonId);
+    if (!daemonSocket) {
+      if (message.type === "session.start") {
+        this.sendSessionStartRejected(
+          message,
+          "SESSION_NOT_FOUND",
+          "Target daemon is offline",
+        );
+        return;
+      }
+      this.sendError(
+        message.type,
+        "SESSION_NOT_FOUND",
+        "Target daemon is offline",
+      );
+      return;
+    }
+
     if (message.type === "session.start") {
-      this.services.sessionRegistry.register(
+      this.services.sessionRegistry.beginPendingStart(
         message.payload.session_id,
         this.appDeviceId,
         daemonId,
+        message.id ?? `${message.type}:${Date.now()}`,
       );
       console.log(
-        `[relay] session start session=${message.payload.session_id} app=${this.appDeviceId} daemon=${daemonId} workspace=${message.payload.workspace_path} agent=${message.payload.agent_type}`,
+        `[relay] session start pending session=${message.payload.session_id} app=${this.appDeviceId} daemon=${daemonId} workspace=${message.payload.workspace_path} agent=${message.payload.agent_type}`,
       );
     } else if (
       "session_id" in message.payload &&
@@ -464,20 +595,20 @@ export class RelayConnectionHandler {
       );
     }
 
-    const daemonSocket = this.services.relayRegistry.getDaemon(daemonId);
-    if (!daemonSocket) {
-      this.sendError(
-        message.type,
-        "SESSION_NOT_FOUND",
-        "Target daemon is offline",
-      );
-      return;
+    if (message.type === "danger.allow" || message.type === "danger.deny") {
+      this.services.pendingDangers.remove(message.payload.danger_id);
     }
 
-    sendJson(daemonSocket, message);
+    this.sendToSocket(daemonSocket, message, {
+      to: daemonId,
+      sourceEnvelope: forwardEnvelope,
+    });
   }
 
-  private handleDaemonToAppMessage(message: Message): void {
+  private handleDaemonToAppMessage(
+    message: Message,
+    forwardEnvelope?: Envelope,
+  ): void {
     if (!this.daemonDeviceId) {
       this.sendError(
         message.type,
@@ -487,21 +618,77 @@ export class RelayConnectionHandler {
       return;
     }
 
+    if (message.type === "session.start.result") {
+      const pending = this.services.sessionRegistry.getPending(
+        message.payload.session_id,
+      );
+      const targetAppDeviceId =
+        pending?.appDeviceId ??
+        this.resolveAppOwnerForSession(message.payload.session_id);
+      if (message.payload.status === "started") {
+        this.services.sessionRegistry.confirmPendingStart(
+          message.payload.session_id,
+        );
+      } else {
+        this.services.sessionRegistry.discardPendingStart(
+          message.payload.session_id,
+        );
+      }
+      console.log(
+        `[relay] route daemon->app type=session.start.result session=${message.payload.session_id} status=${message.payload.status}`,
+      );
+      this.routeDaemonMessageToApp(
+        this.daemonDeviceId,
+        message,
+        forwardEnvelope,
+        targetAppDeviceId ?? undefined,
+      );
+      return;
+    }
+
     if (message.type === "session.event") {
-      this.services.replayBuffer.append(message);
+      this.services.replayBuffer.append(message, forwardEnvelope);
       console.log(
         `[relay] route daemon->app type=session.event session=${message.payload.session_id} seq=${message.payload.seq} event=${message.payload.event.event_type}`,
       );
     } else if (message.type === "danger.pending") {
+      const appDeviceId = this.resolveAppOwnerForSession(message.payload.session_id);
+      if (appDeviceId) {
+        this.services.pendingDangers.upsert(
+          appDeviceId,
+          this.daemonDeviceId,
+          message,
+          forwardEnvelope,
+        );
+      }
       console.log(
         `[relay] route daemon->app type=danger.pending session=${message.payload.session_id} danger=${message.payload.danger_id}`,
       );
+    } else if (message.type === "danger.result") {
+      this.services.pendingDangers.remove(message.payload.danger_id);
+      console.log(
+        `[relay] route daemon->app type=danger.result session=${message.payload.session_id} danger=${message.payload.danger_id} status=${message.payload.status}`,
+      );
+    } else if (
+      message.type === "key.ratchet" ||
+      message.type === "key.ratchet_ack"
+    ) {
+      console.log(
+        `[relay] route daemon->app type=${message.type} session=${message.payload.session_id}`,
+      );
+    } else if (getSessionId(message)) {
+      console.log(
+        `[relay] route daemon->app type=${message.type} session=${getSessionId(message)}`,
+      );
     }
 
-    this.routeDaemonMessageToApp(this.daemonDeviceId, message);
+    this.routeDaemonMessageToApp(this.daemonDeviceId, message, forwardEnvelope);
   }
 
-  private handleDaemonBroadcast(message: Message): void {
+  private handleDaemonBroadcast(
+    message: Message,
+    forwardEnvelope?: Envelope,
+  ): void {
     if (!this.daemonDeviceId) {
       this.sendError(
         message.type,
@@ -517,6 +704,7 @@ export class RelayConnectionHandler {
     )) {
       this.sendToSocket(appSocket, message, {
         from: this.daemonDeviceId,
+        sourceEnvelope: forwardEnvelope,
       });
     }
   }
@@ -606,10 +794,80 @@ export class RelayConnectionHandler {
     return session.daemonDeviceId;
   }
 
+  private resolveAppOwnerForSession(sessionId: string): string | null {
+    return this.services.sessionRegistry.get(sessionId)?.appDeviceId ?? null;
+  }
+
+  private isDaemonRelayResponse(message: Message): boolean {
+    if (!this.daemonDeviceId || this.appDeviceId) {
+      return false;
+    }
+
+    if (
+      message.type === "session.start.result" ||
+      message.type === "session.event" ||
+      message.type === "danger.pending" ||
+      message.type === "danger.result" ||
+      message.type === "replay.done" ||
+      message.type === "key.ratchet" ||
+      message.type === "key.ratchet_ack" ||
+      message.type === "fs.tree" ||
+      message.type === "fs.file" ||
+      message.type === "error"
+    ) {
+      return true;
+    }
+
+    if (
+      message.type === "history.list" &&
+      "items" in message.payload
+    ) {
+      return true;
+    }
+
+    if (
+      message.type === "history.get" &&
+      "lines" in message.payload &&
+      "total" in message.payload
+    ) {
+      return true;
+    }
+
+    if (
+      message.type === "templates.list" &&
+      "templates" in message.payload
+    ) {
+      return true;
+    }
+
+    if (
+      message.type === "slash.list" &&
+      "commands" in message.payload
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
   private routeDaemonMessageToApp(
     daemonDeviceId: string,
     message: Message,
+    forwardEnvelope?: Envelope,
+    targetAppDeviceId?: string,
   ): void {
+    if (targetAppDeviceId) {
+      for (const socket of this.services.relayRegistry.getAppSockets(
+        targetAppDeviceId,
+      )) {
+        this.sendToSocket(socket, message, {
+          from: daemonDeviceId,
+          sourceEnvelope: forwardEnvelope,
+        });
+      }
+      return;
+    }
+
     const sessionId = getSessionId(message);
     if (sessionId) {
       const session = this.services.sessionRegistry.get(sessionId);
@@ -619,6 +877,20 @@ export class RelayConnectionHandler {
         )) {
           this.sendToSocket(socket, message, {
             from: daemonDeviceId,
+            sourceEnvelope: forwardEnvelope,
+          });
+        }
+        return;
+      }
+
+      const pending = this.services.sessionRegistry.getPending(sessionId);
+      if (pending) {
+        for (const socket of this.services.relayRegistry.getAppSockets(
+          pending.appDeviceId,
+        )) {
+          this.sendToSocket(socket, message, {
+            from: daemonDeviceId,
+            sourceEnvelope: forwardEnvelope,
           });
         }
         return;
@@ -631,6 +903,17 @@ export class RelayConnectionHandler {
     )) {
       this.sendToSocket(socket, message, {
         from: daemonDeviceId,
+        sourceEnvelope: forwardEnvelope,
+      });
+    }
+  }
+
+  private replayPendingDangers(appDeviceId: string): void {
+    const pendingEntries = this.services.pendingDangers.listForApp(appDeviceId);
+    for (const entry of pendingEntries) {
+      this.sendToSelf(entry.message, {
+        from: entry.daemonDeviceId,
+        sourceEnvelope: entry.envelope,
       });
     }
   }
@@ -640,6 +923,7 @@ export class RelayConnectionHandler {
     options?: {
       from?: string;
       to?: string;
+      sourceEnvelope?: Envelope;
     },
   ): void {
     this.sendToSocket(this.socket, message, options);
@@ -651,6 +935,7 @@ export class RelayConnectionHandler {
     options?: {
       from?: string;
       to?: string;
+      sourceEnvelope?: Envelope;
     },
   ): void {
     console.log(`[relay] send -> ${message.type}`);
@@ -672,9 +957,155 @@ export class RelayConnectionHandler {
       type: "error",
       payload: {
         request_id: requestId,
+        session_id: null,
         code,
         message,
       },
     });
+  }
+
+  private sendSessionStartRejected(
+    message: Extract<Message, { type: "session.start" }>,
+    code: ErrorCode,
+    errorMessage: string,
+  ): void {
+    this.sendToSelf({
+      v: 1,
+      type: "session.start.result",
+      payload: {
+        request_id: message.id ?? `${message.type}:${Date.now()}`,
+        session_id: message.payload.session_id,
+        agent_type: message.payload.agent_type,
+        workspace_path: message.payload.workspace_path,
+        status: "rejected",
+        code,
+        message: errorMessage,
+      },
+    });
+  }
+
+  private async assertEnvelopeSignature(
+    message: Message,
+    envelope?: Envelope,
+  ): Promise<void> {
+    if (!envelope) {
+      return;
+    }
+    if (envelope.sig.length === 0) {
+      throw new Error("Missing envelope signature");
+    }
+
+    const publicKey = await this.resolveEnvelopePublicKey(message, envelope);
+    if (!publicKey) {
+      throw new Error("Missing signing key for envelope sender");
+    }
+
+    const verified = verify(
+      null,
+      createEnvelopeSigningPayload(envelope),
+      publicKey,
+      Buffer.from(envelope.sig, "base64url"),
+    );
+    if (!verified) {
+      throw new Error("Invalid envelope signature");
+    }
+  }
+
+  private async resolveEnvelopePublicKey(
+    message: Message,
+    envelope: Envelope,
+  ): Promise<KeyObject | null> {
+    if (message.type === "daemon.hello") {
+      if (envelope.from !== message.payload.device_id) {
+        return null;
+      }
+      const daemonDevice = this.services.deviceRegistry.getDaemonDevice(
+        message.payload.device_id,
+      );
+      return daemonDevice
+        ? this.importDaemonEd25519Key(daemonDevice.devicePubKey)
+        : null;
+    }
+
+    if (this.daemonDeviceId) {
+      const daemonDevice = this.services.deviceRegistry.getDaemonDevice(
+        this.daemonDeviceId,
+      );
+      if (!daemonDevice || envelope.from !== daemonDevice.deviceId) {
+        return null;
+      }
+      return this.importDaemonEd25519Key(daemonDevice.devicePubKey);
+    }
+
+    if (message.type === "device.pair") {
+      return this.importAppEd25519Key(message.payload.app_ed25519_pubkey);
+    }
+
+    if (message.type === "device.pair.confirm") {
+      const attempt = this.services.pairing.getAttemptByAppSocket(this.socket);
+      if (!attempt) {
+        return null;
+      }
+      return this.importAppEd25519Key(attempt.appEd25519PubKey);
+    }
+
+    if (message.type === "auth.attach" || message.type === "auth.refresh") {
+      const verified = await this.services.jwtManager.verify(
+        message.payload.jwt,
+      );
+      const appDevice = this.services.deviceRegistry.getAppDevice(
+        verified.deviceId,
+      );
+      if (!appDevice || envelope.from !== appDevice.deviceId) {
+        return null;
+      }
+      return this.importAppEd25519Key(appDevice.appEd25519PubKey);
+    }
+
+    if (this.appDeviceId) {
+      const appDevice = this.services.deviceRegistry.getAppDevice(
+        this.appDeviceId,
+      );
+      if (!appDevice) {
+        return null;
+      }
+      if (envelope.from !== appDevice.deviceId) {
+        return null;
+      }
+      return this.importAppEd25519Key(appDevice.appEd25519PubKey);
+    }
+
+    return null;
+  }
+
+  private importAppEd25519Key(keyBase64Url: string) {
+    return createPublicKey({
+      key: {
+        kty: "OKP",
+        crv: "Ed25519",
+        x: this.normalizeBase64Url(keyBase64Url),
+      },
+      format: "jwk",
+    });
+  }
+
+  private importDaemonEd25519Key(keyBase64Url: string) {
+    try {
+      return createPublicKey({
+        key: {
+          kty: "OKP",
+          crv: "Ed25519",
+          x: this.normalizeBase64Url(keyBase64Url),
+        },
+        format: "jwk",
+      });
+    } catch {
+      const pem = Buffer.from(keyBase64Url, "base64url").toString("utf8");
+      return createPublicKey(pem);
+    }
+  }
+
+  private normalizeBase64Url(value: string): string {
+    return Buffer.from(value, "base64url").toString("base64url");
   }
 }

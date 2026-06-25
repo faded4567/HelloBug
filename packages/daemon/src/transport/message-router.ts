@@ -6,11 +6,14 @@ import type { DaemonWorkspaceService } from "../fs/workspace.js";
 import type { DaemonTranscriptService } from "../history/transcripts.js";
 import {
   buildPairingSasMessage,
+  completePairingSasHandshake,
   formatPairingSasLine,
+  type PendingPairingHandshake,
 } from "../pairing/responder.js";
 import { DaemonSessionError } from "../sessions/manager.js";
 import type { DaemonSessionManager } from "../sessions/manager.js";
 import type { DaemonConnection } from "./connection.js";
+import type { PairingTransportKeyStore } from "./pairing-key-store.js";
 
 type DevicePairMessage = Extract<Message, { type: "device.pair" }>;
 type DevicePairConfirmMessage = Extract<
@@ -24,6 +27,7 @@ export interface DaemonMessageRouterOptions {
   sessions?: DaemonSessionManager;
   workspace?: DaemonWorkspaceService;
   history?: DaemonTranscriptService;
+  pairingTransportKeys?: PairingTransportKeyStore;
   onPairingRequest?: (
     payload: DevicePairMessage["payload"],
   ) => void | Promise<void>;
@@ -34,6 +38,8 @@ export interface DaemonMessageRouterOptions {
 }
 
 export function createDaemonMessageRouter(options: DaemonMessageRouterOptions) {
+  let pendingPairingHandshake: PendingPairingHandshake | null = null;
+
   return async (
     message: Message,
     connection: DaemonConnection,
@@ -62,7 +68,25 @@ export function createDaemonMessageRouter(options: DaemonMessageRouterOptions) {
           console.log(
             `[daemon-router] session.start session=${message.payload.session_id} workspace=${message.payload.workspace_path} agent=${message.payload.agent_type}`,
           );
-          await options.sessions?.startSession(message);
+          const started = await options.sessions?.startSession(message);
+          if (!started) {
+            throw new DaemonSessionError(
+              "PROTOCOL_VERSION",
+              "Session service is not configured",
+            );
+          }
+          connection.sendMessage({
+            v: 1,
+            type: "session.start.result",
+            payload: {
+              request_id: message.id ?? `${message.type}:${Date.now()}`,
+              session_id: started.sessionId,
+              agent_type: started.agentType,
+              workspace_path: started.workspacePath,
+              status: "started",
+              message: "Session started",
+            },
+          });
           return;
         }
 
@@ -255,11 +279,33 @@ export function createDaemonMessageRouter(options: DaemonMessageRouterOptions) {
         }
       } catch (error) {
         if (error instanceof DaemonSessionError) {
+          if (message.type === "session.start") {
+            connection.sendMessage({
+              v: 1,
+              type: "session.start.result",
+              payload: {
+                request_id: message.id ?? `${message.type}:${Date.now()}`,
+                session_id: message.payload.session_id,
+                agent_type: message.payload.agent_type,
+                workspace_path: message.payload.workspace_path,
+                status: "rejected",
+                code: error.code,
+                message: error.message,
+              },
+            });
+            return;
+          }
+
           connection.sendMessage({
             v: 1,
             type: "error",
             payload: {
               request_id: message.id ?? `${message.type}:${Date.now()}`,
+              session_id:
+                "session_id" in message.payload &&
+                typeof message.payload.session_id === "string"
+                  ? message.payload.session_id
+                  : null,
               code: error.code,
               message: error.message,
             },
@@ -275,14 +321,12 @@ export function createDaemonMessageRouter(options: DaemonMessageRouterOptions) {
 
     if (message.type === "device.pair") {
       await options.onPairingRequest?.(message.payload);
-      const sasMessage = buildPairingSasMessage(
-        options.identity,
-        message.payload,
-      );
+      const pairing = buildPairingSasMessage(options.identity, message.payload);
+      pendingPairingHandshake = pairing.pending;
       console.log(
-        `[pairing] sas: ${formatPairingSasLine(sasMessage)}${message.payload.app_device_name ? ` <- ${message.payload.app_device_name}` : ""}`,
+        `[pairing] sas: ${formatPairingSasLine(pairing.message)}${message.payload.app_device_name ? ` <- ${message.payload.app_device_name}` : ""}`,
       );
-      connection.sendMessage(sasMessage);
+      connection.sendMessage(pairing.message);
       return;
     }
 
@@ -290,6 +334,21 @@ export function createDaemonMessageRouter(options: DaemonMessageRouterOptions) {
       console.log(
         `[pairing] ${message.payload.confirmed ? "confirmed" : "cancelled"} by app`,
       );
+      if (message.payload.confirmed) {
+        if (!pendingPairingHandshake) {
+          throw new Error("no pending pairing handshake");
+        }
+        const completed = completePairingSasHandshake(
+          options.identity,
+          pendingPairingHandshake,
+          message.payload,
+        );
+        await options.pairingTransportKeys?.set(
+          pendingPairingHandshake.appPublicKeyBase64Url,
+          completed,
+        );
+      }
+      pendingPairingHandshake = null;
       await options.onPairingConfirmed?.(message.payload);
       return;
     }

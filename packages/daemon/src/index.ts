@@ -12,6 +12,7 @@ import { PairingSlotManager } from "./pairing/code.js";
 import { DaemonSessionManager } from "./sessions/manager.js";
 import { DaemonConnection } from "./transport/connection.js";
 import { createDaemonMessageRouter } from "./transport/message-router.js";
+import { PairingTransportKeyStore } from "./transport/pairing-key-store.js";
 import { CertificateStore, registerDaemon } from "./transport/register.js";
 
 export async function bootstrapDaemon(): Promise<{
@@ -22,6 +23,8 @@ export async function bootstrapDaemon(): Promise<{
   const config = await loadDaemonConfig();
   const identity = await new DeviceKeyStore().loadOrCreate();
   const certificateStore = new CertificateStore();
+  const pairingTransportKeys = new PairingTransportKeyStore();
+  await pairingTransportKeys.load();
 
   let certificates = await certificateStore.load();
   if (!certificates) {
@@ -76,6 +79,7 @@ export async function bootstrapDaemon(): Promise<{
     serverUrl: config.server_url,
     identity,
     certificates,
+    pairingTransportKeys,
     handlers: {
       onMessage: createDaemonMessageRouter({
         identity,
@@ -83,6 +87,7 @@ export async function bootstrapDaemon(): Promise<{
         workspace: workspaceService,
         history: transcriptService,
         catalog: catalogService,
+        pairingTransportKeys,
         onPairingConfirmed: announcePairingSlot,
       }),
     },

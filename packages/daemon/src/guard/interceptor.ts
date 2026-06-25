@@ -18,6 +18,20 @@ export interface DangerApprovalDecision {
   ruleMatched: string;
 }
 
+export type DangerResolutionStatus =
+  | "approved"
+  | "denied"
+  | "timed_out"
+  | "not_found"
+  | "biometric_required";
+
+export interface DangerResolutionResult {
+  found: boolean;
+  sessionId: string | null;
+  status: DangerResolutionStatus;
+  message: string;
+}
+
 export interface DangerApprovalInterceptorOptions {
   sendMessage: (message: Message) => void;
   rules?: DangerRuleSet;
@@ -119,21 +133,48 @@ export class DangerApprovalInterceptor {
 
   async allow(dangerId: string, biometricVerified: boolean): Promise<boolean> {
     if (!biometricVerified) {
-      return this.resolvePendingDanger(dangerId, {
+      return (await this.resolvePendingDanger(dangerId, {
         allowed: false,
         reason: "Biometric verification required",
         ruleMatched: "biometric verification required",
-      });
+      })).found;
     }
 
-    return this.resolvePendingDanger(dangerId, {
+    return (await this.resolvePendingDanger(dangerId, {
       allowed: true,
       reason: "approved",
       ruleMatched: "user approved",
-    });
+    })).found;
   }
 
   async deny(dangerId: string): Promise<boolean> {
+    return (await this.resolvePendingDanger(dangerId, {
+      allowed: false,
+      reason: "Operation denied by user approval policy",
+      ruleMatched: "user denied",
+    })).found;
+  }
+
+  async resolveFromApp(
+    dangerId: string,
+    biometricVerified: boolean | null,
+    allowed: boolean,
+  ): Promise<DangerResolutionResult> {
+    if (allowed) {
+      if (!biometricVerified) {
+        return this.resolvePendingDanger(dangerId, {
+          allowed: false,
+          reason: "Biometric verification required",
+          ruleMatched: "biometric verification required",
+        });
+      }
+      return this.resolvePendingDanger(dangerId, {
+        allowed: true,
+        reason: "approved",
+        ruleMatched: "user approved",
+      });
+    }
+
     return this.resolvePendingDanger(dangerId, {
       allowed: false,
       reason: "Operation denied by user approval policy",
@@ -161,10 +202,15 @@ export class DangerApprovalInterceptor {
   private async resolvePendingDanger(
     dangerId: string,
     decision: DangerApprovalDecision,
-  ): Promise<boolean> {
+  ): Promise<DangerResolutionResult> {
     const pending = this.pendingById.get(dangerId);
     if (!pending) {
-      return false;
+      return {
+        found: false,
+        sessionId: null,
+        status: "not_found",
+        message: `Danger request not found: ${dangerId}`,
+      };
     }
 
     clearTimeout(pending.timer);
@@ -185,6 +231,29 @@ export class DangerApprovalInterceptor {
       summary: `tool=${pending.toolName} rule=${pending.ruleMatched} command=${pending.command}`,
     });
 
-    return true;
+    return {
+      found: true,
+      sessionId: pending.sessionId,
+      status: this.mapDecisionStatus(decision),
+      message: decision.reason,
+    };
+  }
+
+  private mapDecisionStatus(
+    decision: DangerApprovalDecision,
+  ): DangerResolutionStatus {
+    if (decision.allowed) {
+      return "approved";
+    }
+
+    if (decision.reason === "Danger approval timed out") {
+      return "timed_out";
+    }
+
+    if (decision.reason === "Biometric verification required") {
+      return "biometric_required";
+    }
+
+    return "denied";
   }
 }

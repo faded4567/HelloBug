@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 
 import {
   validateEnvelope,
@@ -20,10 +21,37 @@ interface RelayEnvelopeState {
 interface DecodeRelayFrameResult {
   message: Message;
   wireFormat: RelayWireFormat;
+  envelope?: Envelope;
+  forwardEnvelope?: Envelope;
 }
 
 const socketWireFormats = new WeakMap<WebSocket, RelayWireFormat>();
 const socketEnvelopeStates = new WeakMap<WebSocket, RelayEnvelopeState>();
+const EncryptedRoutableMessageTypes = new Set<string>([
+  "session.start",
+  "session.agent.add",
+  "session.input",
+  "session.input.image",
+  "session.input.voice_text",
+  "session.command.slash",
+  "session.cancel",
+  "danger.allow",
+  "danger.deny",
+  "fs.tree.req",
+  "fs.file.req",
+  "history.get",
+  "slash.list",
+  "pty.input",
+  "pty.resize",
+  "session.start.result",
+  "session.event",
+  "danger.pending",
+  "danger.result",
+  "fs.tree",
+  "fs.file",
+  "slash.list",
+  "error",
+]);
 
 export function decodeRelayFrame(
   socket: WebSocket,
@@ -34,14 +62,29 @@ export function decodeRelayFrame(
 
   if (envelope) {
     socketWireFormats.set(socket, "envelope");
+    const cipherMode = envelope.cipher_mode ?? "plain";
+
+    if (cipherMode === "noise_static_v1") {
+      return {
+        envelope,
+        forwardEnvelope: canForwardSourceEnvelope(envelope) ? envelope : undefined,
+        wireFormat: "envelope",
+        message: createEncryptedEnvelopePlaceholder(envelope),
+      };
+    }
 
     const innerRaw = JSON.parse(
       Buffer.from(envelope.ciphertext, "base64url").toString("utf8"),
     ) as unknown;
+    const normalizedInner = normalizeLegacyMessage(innerRaw);
 
     return {
+      envelope,
+      forwardEnvelope: canForwardSourceEnvelope(envelope, innerRaw)
+        ? envelope
+        : undefined,
       wireFormat: "envelope",
-      message: validateMessage(normalizeLegacyMessage(innerRaw)),
+      message: validateMessage(normalizedInner),
     };
   }
 
@@ -58,12 +101,21 @@ export function sendRelayMessage(
   options: {
     from?: string;
     to?: string;
+    sourceEnvelope?: Envelope;
   } = {},
 ): void {
   const wireFormat = socketWireFormats.get(socket) ?? "plain";
   const wireMessage = toLegacyCompatibleWireMessage(message);
   if (wireFormat === "plain") {
     sendJson(socket, ensureWireMessageId(wireMessage));
+    return;
+  }
+
+  if (
+    options.sourceEnvelope &&
+    canReuseSourceEnvelope(options.sourceEnvelope, message, wireMessage, options)
+  ) {
+    sendJson(socket, options.sourceEnvelope);
     return;
   }
 
@@ -78,9 +130,62 @@ export function sendRelayMessage(
     ciphertext: Buffer.from(JSON.stringify(inner), "utf8").toString(
       "base64url",
     ),
+    message_type: message.type,
+    cipher_mode: "plain",
   } satisfies Envelope;
 
   sendJson(socket, envelope);
+}
+
+function canForwardSourceEnvelope(
+  envelope: Envelope,
+  innerRaw?: unknown,
+): boolean {
+  if ((envelope.cipher_mode ?? "plain") === "noise_static_v1") {
+    return canRouteEncryptedEnvelope(envelope);
+  }
+
+  return isDeepStrictEqual(normalizeLegacyMessage(innerRaw), innerRaw);
+}
+
+function canReuseSourceEnvelope(
+  envelope: Envelope,
+  message: Message,
+  wireMessage: Record<string, unknown>,
+  options: {
+    from?: string;
+    to?: string;
+  },
+): boolean {
+  if (options.from && options.from !== envelope.from) {
+    return false;
+  }
+
+  if (options.to && envelope.to.length > 0 && options.to !== envelope.to) {
+    return false;
+  }
+
+  if ((envelope.cipher_mode ?? "plain") === "noise_static_v1") {
+    if (!canRouteEncryptedEnvelope(envelope)) {
+      return false;
+    }
+    if (message.type !== envelope.message_type) {
+      return false;
+    }
+    if (getEnvelopeSessionId(message) !== envelope.session_id) {
+      return false;
+    }
+    if (message.type === "session.event" && message.payload.seq !== envelope.seq) {
+      return false;
+    }
+    return true;
+  }
+
+  if (!isDeepStrictEqual(wireMessage, message)) {
+    return false;
+  }
+
+  return true;
 }
 
 function tryValidateEnvelope(raw: unknown): Envelope | null {
@@ -88,6 +193,186 @@ function tryValidateEnvelope(raw: unknown): Envelope | null {
     return validateEnvelope(raw);
   } catch {
     return null;
+  }
+}
+
+function canRouteEncryptedEnvelope(envelope: Envelope): boolean {
+  return (
+    (envelope.cipher_mode ?? "plain") === "noise_static_v1" &&
+    typeof envelope.message_type === "string" &&
+    EncryptedRoutableMessageTypes.has(envelope.message_type)
+  );
+}
+
+function createEncryptedEnvelopePlaceholder(envelope: Envelope): Message {
+  if (!canRouteEncryptedEnvelope(envelope) || !envelope.message_type) {
+    throw new Error("Encrypted envelope is missing routable metadata");
+  }
+
+  const message = {
+    v: 1,
+    type: envelope.message_type,
+    payload: createEncryptedPayload(envelope),
+  };
+  return validateMessage(message);
+}
+
+function createEncryptedPayload(envelope: Envelope): Record<string, unknown> {
+  switch (envelope.message_type) {
+    case "session.start":
+      return {
+        session_id: envelope.session_id,
+        agent_type: "claude_code",
+        workspace_path: "",
+        resume_session_id: null,
+      };
+    case "session.agent.add":
+      return {
+        session_id: envelope.session_id,
+        agent_id: "encrypted-agent",
+        agent_type: "claude_code",
+      };
+    case "session.input":
+      return {
+        session_id: envelope.session_id,
+        text: "",
+      };
+    case "session.input.image":
+      return {
+        session_id: envelope.session_id,
+        image_id: "encrypted-image",
+        chunk_index: 0,
+        total_chunks: 1,
+        mime_type: "application/octet-stream",
+        data: "encrypted",
+      };
+    case "session.input.voice_text":
+      return {
+        session_id: envelope.session_id,
+        text: "",
+        confidence: 1,
+      };
+    case "session.command.slash":
+      return {
+        session_id: envelope.session_id,
+        command: "/encrypted",
+        args: [],
+      };
+    case "session.cancel":
+      return {
+        session_id: envelope.session_id,
+      };
+    case "danger.allow":
+      return {
+        session_id: envelope.session_id,
+        danger_id: "encrypted-danger",
+        biometric_verified: true,
+      };
+    case "danger.deny":
+      return {
+        session_id: envelope.session_id,
+        danger_id: "encrypted-danger",
+      };
+    case "fs.tree.req":
+      return {
+        session_id: envelope.session_id,
+        workspace_path: "/encrypted",
+        dir_path: "",
+      };
+    case "fs.file.req":
+      return {
+        session_id: envelope.session_id,
+        file_path: "encrypted",
+        chunk_index: 0,
+      };
+    case "history.get":
+      return {
+        session_id: envelope.session_id,
+        offset: 0,
+        total: 0,
+        lines: [],
+      };
+    case "slash.list":
+      return {
+        session_id: envelope.session_id,
+        commands: [],
+      };
+    case "pty.input":
+      return {
+        session_id: envelope.session_id,
+        data: "",
+      };
+    case "pty.resize":
+      return {
+        session_id: envelope.session_id,
+        cols: 1,
+        rows: 1,
+      };
+    case "session.start.result":
+      return {
+        request_id: "encrypted-request",
+        session_id: envelope.session_id,
+        agent_type: "claude_code",
+        workspace_path: "",
+        status: "started",
+        message: "encrypted",
+      };
+    case "session.event":
+      return {
+        session_id: envelope.session_id,
+        agent_id: null,
+        agent_type: null,
+        seq: envelope.seq,
+        event: {
+          event_type: "assistant.delta",
+          text: "",
+        },
+      };
+    case "danger.pending":
+      return {
+        danger_id: "encrypted-danger",
+        session_id: envelope.session_id,
+        agent_id: null,
+        agent_type: null,
+        command: "encrypted",
+        tool_name: "encrypted",
+        rule_matched: "encrypted",
+        workspace: "encrypted",
+        timeout_at: envelope.ts,
+      };
+    case "danger.result":
+      return {
+        danger_id: "encrypted-danger",
+        session_id: envelope.session_id,
+        status: "approved",
+        message: "encrypted",
+      };
+    case "fs.tree":
+      return {
+        session_id: envelope.session_id,
+        workspace_path: "/encrypted",
+        dir_path: "",
+        entries: [],
+      };
+    case "fs.file":
+      return {
+        session_id: envelope.session_id,
+        file_path: "encrypted",
+        mime_type: "application/octet-stream",
+        chunk_index: 0,
+        total_chunks: 1,
+        data: "",
+        total_size: 0,
+      };
+    case "error":
+      return {
+        request_id: "encrypted-request",
+        session_id: envelope.session_id,
+        code: "PROTOCOL_VERSION",
+        message: "encrypted",
+      };
+    default:
+      throw new Error(`Encrypted envelope type is not supported: ${envelope.message_type}`);
   }
 }
 
@@ -211,11 +496,12 @@ function ensureWireMessageId(
 }
 
 function getEnvelopeSessionId(message: Message): string {
-  if (message.type === "session.event") {
-    return message.payload.session_id;
-  }
-
-  if (message.type === "replay.done") {
+  if (
+    typeof message.payload === "object" &&
+    message.payload !== null &&
+    "session_id" in message.payload &&
+    typeof message.payload.session_id === "string"
+  ) {
     return message.payload.session_id;
   }
 

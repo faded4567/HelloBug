@@ -109,7 +109,7 @@ export class DaemonSessionManager {
     return resolveUserPath("~");
   }
 
-  async startSession(message: SessionStartMessage): Promise<void> {
+  async startSession(message: SessionStartMessage): Promise<SessionHandle> {
     const sessionId = message.payload.session_id;
     const workspacePath = this.resolveWorkspacePath(
       message.payload.workspace_path,
@@ -158,14 +158,6 @@ export class DaemonSessionManager {
     };
 
     this.sessions.set(sessionId, handle);
-    console.log(
-      `[daemon-session] started session=${sessionId} workspace=${workspacePath} agent=${handle.agentType}`,
-    );
-    await this.auditLogger?.appendAuditEntry({
-      session_id: sessionId,
-      event_type: "session.start",
-      summary: `agent=${handle.agentType} workspace=${handle.workspacePath}`,
-    });
 
     try {
       await runtime.start({
@@ -186,6 +178,22 @@ export class DaemonSessionManager {
         `Failed to start ${message.payload.agent_type} runtime: ${text}`,
       );
     }
+
+    console.log(
+      `[daemon-session] started session=${sessionId} workspace=${workspacePath} agent=${handle.agentType}`,
+    );
+    await this.auditLogger?.appendAuditEntry({
+      session_id: sessionId,
+      event_type: "session.start",
+      summary: `agent=${handle.agentType} workspace=${handle.workspacePath}`,
+    });
+    return {
+      sessionId: handle.sessionId,
+      workspacePath: handle.workspacePath,
+      agentType: handle.agentType,
+      seq: handle.seq,
+      createdAt: handle.createdAt,
+    };
   }
 
   async handleInput(message: SessionInputMessage): Promise<void> {
@@ -304,16 +312,17 @@ export class DaemonSessionManager {
       );
     }
 
-    const resolved = await this.dangerInterceptor.allow(
+    const resolution = await this.dangerInterceptor.resolveFromApp(
       message.payload.danger_id,
       message.payload.biometric_verified,
+      true,
     );
-    if (!resolved) {
-      throw new DaemonSessionError(
-        "PROTOCOL_VERSION",
-        `Danger request not found: ${message.payload.danger_id}`,
-      );
-    }
+    this.emitDangerResult(
+      message.payload.session_id,
+      message.payload.danger_id,
+      resolution.status,
+      resolution.message,
+    );
   }
 
   async denyDanger(message: DangerDenyMessage): Promise<void> {
@@ -324,15 +333,17 @@ export class DaemonSessionManager {
       );
     }
 
-    const resolved = await this.dangerInterceptor.deny(
+    const resolution = await this.dangerInterceptor.resolveFromApp(
       message.payload.danger_id,
+      null,
+      false,
     );
-    if (!resolved) {
-      throw new DaemonSessionError(
-        "PROTOCOL_VERSION",
-        `Danger request not found: ${message.payload.danger_id}`,
-      );
-    }
+    this.emitDangerResult(
+      message.payload.session_id,
+      message.payload.danger_id,
+      resolution.status,
+      resolution.message,
+    );
   }
 
   get(sessionId: string): SessionHandle | undefined {
@@ -454,6 +465,24 @@ export class DaemonSessionManager {
   private nextSeq(handle: InternalSessionHandle): number {
     handle.seq += 1;
     return handle.seq;
+  }
+
+  private emitDangerResult(
+    sessionId: string,
+    dangerId: string,
+    status: "approved" | "denied" | "timed_out" | "not_found" | "biometric_required",
+    message: string,
+  ): void {
+    this.options.sendMessage({
+      v: 1,
+      type: "danger.result",
+      payload: {
+        danger_id: dangerId,
+        session_id: sessionId,
+        status,
+        message,
+      },
+    });
   }
 
   private getRequiredSession(sessionId: string): InternalSessionHandle {

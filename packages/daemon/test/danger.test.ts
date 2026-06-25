@@ -162,12 +162,27 @@ describe("daemon session danger flow", () => {
       v: 1,
       type: "danger.allow",
       payload: {
+        session_id: "session-allow",
         danger_id: pendingMessage!.payload.danger_id,
         biometric_verified: true,
       },
     });
 
     await inputPromise;
+
+    const allowResult = sent.find(
+      (message): message is Extract<Message, { type: "danger.result" }> =>
+        message.type === "danger.result",
+    );
+    expect(allowResult).toEqual(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          danger_id: pendingMessage!.payload.danger_id,
+          session_id: "session-allow",
+          status: "approved",
+        }),
+      }),
+    );
 
     const events = sent.filter(
       (message): message is Extract<Message, { type: "session.event" }> =>
@@ -235,11 +250,26 @@ describe("daemon session danger flow", () => {
       v: 1,
       type: "danger.deny",
       payload: {
+        session_id: "session-deny",
         danger_id: pendingMessage!.payload.danger_id,
       },
     });
 
     await inputPromise;
+
+    const denyResult = sent.find(
+      (message): message is Extract<Message, { type: "danger.result" }> =>
+        message.type === "danger.result",
+    );
+    expect(denyResult).toEqual(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          danger_id: pendingMessage!.payload.danger_id,
+          session_id: "session-deny",
+          status: "denied",
+        }),
+      }),
+    );
 
     const events = sent.filter(
       (message): message is Extract<Message, { type: "session.event" }> =>
@@ -256,6 +286,49 @@ describe("daemon session danger flow", () => {
       is_error: true,
       content: "Operation denied by user approval policy",
     });
+  });
+
+  it("reports structured danger result when request is already gone", async () => {
+    const sent: Message[] = [];
+    const manager = new DaemonSessionManager({
+      sendMessage: (message) => {
+        sent.push(message);
+      },
+      allowedPaths: ["/tmp/workspace"],
+      runtimeFactory: createBashFixtureRuntimeFactory(),
+      dangerInterceptor: new DangerApprovalInterceptor({
+        sendMessage: (message) => {
+          sent.push(message);
+        },
+        rules: new DangerRuleSet(),
+      }),
+    });
+
+    await manager.allowDanger({
+      v: 1,
+      type: "danger.allow",
+      payload: {
+        session_id: "session-missing-danger",
+        danger_id: "danger-missing",
+        biometric_verified: true,
+      },
+    });
+
+    expect(
+      sent.find(
+        (message): message is Extract<Message, { type: "danger.result" }> =>
+          message.type === "danger.result",
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        payload: {
+          danger_id: "danger-missing",
+          session_id: "session-missing-danger",
+          status: "not_found",
+          message: "Danger request not found: danger-missing",
+        },
+      }),
+    );
   });
 });
 

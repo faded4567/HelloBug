@@ -103,6 +103,7 @@ export class DaemonWorkspaceService {
       v: 1,
       type: "fs.tree",
       payload: {
+        session_id: message.payload.session_id,
         workspace_path: message.payload.workspace_path,
         dir_path: toPortableRelativePath(workspaceRoot, requestedDir),
         entries: sortedEntries,
@@ -154,6 +155,7 @@ export class DaemonWorkspaceService {
         v: 1,
         type: "fs.file",
         payload: {
+          session_id: message.payload.session_id,
           file_path: filePath,
           mime_type: mimeType,
           chunk_index: chunkIndex,

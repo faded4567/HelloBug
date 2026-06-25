@@ -6,6 +6,7 @@ import { DeviceRegistry } from "../auth/device-registry.js";
 import { JwtManager } from "../auth/jwt.js";
 import { PairingService } from "../auth/pairing.js";
 import { RelayReplayBuffer } from "../relay/buffer.js";
+import { RelayPendingDangerRegistry } from "../relay/pending-danger.js";
 import { RelayRegistry } from "../relay/registry.js";
 import { RelaySessionRegistry } from "../relay/sessions.js";
 import { PresenceService } from "../state/presence.js";
@@ -19,6 +20,7 @@ export interface ServerServices {
   pairing: PairingService;
   relayRegistry: RelayRegistry;
   replayBuffer: RelayReplayBuffer;
+  pendingDangers: RelayPendingDangerRegistry;
   sessionRegistry: RelaySessionRegistry;
   presence: PresenceService;
   persistState: () => Promise<void>;
@@ -42,6 +44,7 @@ export async function createServerServices(
     pairing: new PairingService(),
     relayRegistry: new RelayRegistry(),
     replayBuffer: new RelayReplayBuffer(),
+    pendingDangers: new RelayPendingDangerRegistry(),
     sessionRegistry: new RelaySessionRegistry(),
     presence: new PresenceService(),
     persistState: async () => {

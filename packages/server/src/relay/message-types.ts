@@ -29,9 +29,8 @@ export const DaemonBroadcastMessageTypes = new Set<string>([
   "history.get",
   "templates.list",
   "slash.list",
+  "danger.result",
   "error",
-  "key.ratchet",
-  "key.ratchet_ack",
 ]);
 
 export function getSessionId(message: Message): string | null {

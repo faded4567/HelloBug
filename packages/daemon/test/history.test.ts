@@ -143,6 +143,7 @@ describe("daemon transcript service", () => {
         type: "error",
         payload: {
           request_id: "history-get-missing",
+          session_id: "missing-session",
           code: "SESSION_NOT_FOUND",
           message: expect.stringContaining("missing-session"),
         },

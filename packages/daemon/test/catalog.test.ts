@@ -124,6 +124,7 @@ describe("daemon catalog service", () => {
         id: "slash-list-1",
         type: "slash.list",
         payload: {
+          session_id: "sess-1",
           commands: [
             {
               name: "clear",
@@ -178,6 +179,7 @@ describe("daemon catalog service", () => {
         type: "error",
         payload: {
           request_id: "slash-list-missing",
+          session_id: "missing-session",
           code: "SESSION_NOT_FOUND",
           message: "Session not found: missing-session",
         },
@@ -215,6 +217,7 @@ describe("daemon catalog service", () => {
         type: "error",
         payload: {
           request_id: "agent-add-1",
+          session_id: "sess-1",
           code: "PROTOCOL_VERSION",
           message: "session.agent.add is not implemented yet",
         },

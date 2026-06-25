@@ -50,6 +50,7 @@ type SlashListResponseMessage = {
   id?: string;
   type: "slash.list";
   payload: {
+    session_id: string;
     commands: DaemonSlashCommand[];
   };
 };
@@ -173,6 +174,7 @@ export class DaemonCatalogService {
       id: message.id,
       type: "slash.list",
       payload: {
+        session_id: message.payload.session_id,
         commands: cloneSlashCommands(
           this.options.slashCommandsByAgent?.[session.agentType] ??
             DEFAULT_SLASH_COMMANDS[session.agentType],

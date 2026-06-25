@@ -25,9 +25,16 @@ const ErrorCodeSchema = z.enum([
 ]);
 
 const ManufacturerSchema = z.enum(["Xiaomi", "OPPO", "vivo", "Other"]);
-const PushEventTypeSchema = z.enum(["task_done", "danger_pending", "session_error"]);
+const PushEventTypeSchema = z.enum([
+  "task_done",
+  "danger_pending",
+  "session_error",
+]);
 
-const createMessageSchema = <TType extends string, TPayload extends z.ZodTypeAny>(
+const createMessageSchema = <
+  TType extends string,
+  TPayload extends z.ZodTypeAny,
+>(
   type: TType,
   payload: TPayload,
 ) =>
@@ -103,6 +110,7 @@ export const DevicePairSasSchema = createMessageSchema(
   "device.pair.sas",
   z.object({
     sas: z.array(z.string().min(1)).length(5),
+    noise_handshake: z.string().min(1).optional(),
     daemon_pubkey: z.string().min(1),
     daemon_ed25519_pubkey: z.string().min(1),
     machine_name: z.string().min(1),
@@ -114,6 +122,7 @@ export const DevicePairConfirmSchema = createMessageSchema(
   "device.pair.confirm",
   z.object({
     confirmed: z.boolean(),
+    noise_handshake: z.string().min(1).optional(),
   }),
 );
 
@@ -125,6 +134,31 @@ export const SessionStartSchema = createMessageSchema(
     workspace_path: z.string(),
     resume_session_id: z.string().min(1).nullable(),
   }),
+);
+
+const SessionStartResultStatusSchema = z.enum(["started", "rejected"]);
+
+export const SessionStartResultSchema = createMessageSchema(
+  "session.start.result",
+  z.discriminatedUnion("status", [
+    z.object({
+      request_id: z.string().min(1),
+      session_id: StringIdSchema,
+      agent_type: AgentTypeSchema,
+      workspace_path: z.string(),
+      status: z.literal("started"),
+      message: z.string().min(1),
+    }),
+    z.object({
+      request_id: z.string().min(1),
+      session_id: StringIdSchema,
+      agent_type: AgentTypeSchema,
+      workspace_path: z.string(),
+      status: z.literal("rejected"),
+      code: ErrorCodeSchema,
+      message: z.string().min(1),
+    }),
+  ]),
 );
 
 export const SessionAgentAddSchema = createMessageSchema(
@@ -204,6 +238,7 @@ export const SessionCancelSchema = createMessageSchema(
 export const DangerAllowSchema = createMessageSchema(
   "danger.allow",
   z.object({
+    session_id: StringIdSchema,
     danger_id: StringIdSchema,
     biometric_verified: z.boolean(),
   }),
@@ -212,6 +247,7 @@ export const DangerAllowSchema = createMessageSchema(
 export const DangerDenySchema = createMessageSchema(
   "danger.deny",
   z.object({
+    session_id: StringIdSchema,
     danger_id: StringIdSchema,
   }),
 );
@@ -228,6 +264,26 @@ export const DangerPendingSchema = createMessageSchema(
     rule_matched: z.string().min(1),
     workspace: z.string().min(1),
     timeout_at: TimestampMsSchema,
+  }),
+);
+
+const DangerResultStatusSchema = z.enum([
+  "approved",
+  "denied",
+  "timed_out",
+  "not_found",
+  "biometric_required",
+]);
+
+const ReplayDoneStatusSchema = z.enum(["ok", "session_not_found"]);
+
+export const DangerResultSchema = createMessageSchema(
+  "danger.result",
+  z.object({
+    danger_id: StringIdSchema,
+    session_id: StringIdSchema,
+    status: DangerResultStatusSchema,
+    message: z.string().min(1),
   }),
 );
 
@@ -262,6 +318,7 @@ export const FsTreeEntrySchema = z.object({
 export const FsTreeSchema = createMessageSchema(
   "fs.tree",
   z.object({
+    session_id: StringIdSchema,
     workspace_path: z.string().min(1),
     dir_path: z.string(),
     entries: z.array(FsTreeEntrySchema),
@@ -280,6 +337,7 @@ export const FsFileReqSchema = createMessageSchema(
 export const FsFileSchema = createMessageSchema(
   "fs.file",
   z.object({
+    session_id: StringIdSchema,
     file_path: z.string().min(1),
     mime_type: z.string().min(1),
     chunk_index: z.number().int().nonnegative(),
@@ -384,6 +442,7 @@ export const SlashListRequestSchema = createMessageSchema(
 export const SlashListResponseSchema = createMessageSchema(
   "slash.list",
   z.object({
+    session_id: StringIdSchema,
     commands: z.array(
       z.object({
         name: z.string().min(1),
@@ -399,6 +458,8 @@ export const ReplayDoneSchema = createMessageSchema(
     session_id: StringIdSchema,
     replayed_count: z.number().int().nonnegative(),
     current_seq: SequenceSchema,
+    status: ReplayDoneStatusSchema,
+    message: z.string().min(1),
   }),
 );
 
@@ -423,19 +484,23 @@ export const DevicePushTokenSchema = createMessageSchema(
 export const KeyRatchetSchema = createMessageSchema(
   "key.ratchet",
   z.object({
+    session_id: StringIdSchema,
     next_pubkey: z.string().min(1),
   }),
 );
 
 export const KeyRatchetAckSchema = createMessageSchema(
   "key.ratchet_ack",
-  z.object({}),
+  z.object({
+    session_id: StringIdSchema,
+  }),
 );
 
 export const ErrorSchema = createMessageSchema(
   "error",
   z.object({
     request_id: z.string().min(1),
+    session_id: OptionalNullableStringSchema,
     code: ErrorCodeSchema,
     message: z.string().min(1),
   }),
@@ -464,6 +529,7 @@ export const messageSchemasByType = {
   "device.pair.sas": DevicePairSasSchema,
   "device.pair.confirm": DevicePairConfirmSchema,
   "session.start": SessionStartSchema,
+  "session.start.result": SessionStartResultSchema,
   "session.agent.add": SessionAgentAddSchema,
   "session.resume": SessionResumeSchema,
   "session.input": SessionInputSchema,
@@ -474,6 +540,7 @@ export const messageSchemasByType = {
   "danger.allow": DangerAllowSchema,
   "danger.deny": DangerDenySchema,
   "danger.pending": DangerPendingSchema,
+  "danger.result": DangerResultSchema,
   "session.event": SessionEventSchema,
   "fs.tree.req": FsTreeReqSchema,
   "fs.tree": FsTreeSchema,
@@ -482,10 +549,16 @@ export const messageSchemasByType = {
   "device.status": DeviceStatusSchema,
   "pty.input": PtyInputSchema,
   "pty.resize": PtyResizeSchema,
-  "history.list": z.union([HistoryListRequestSchema, HistoryListResponseSchema]),
+  "history.list": z.union([
+    HistoryListResponseSchema,
+    HistoryListRequestSchema,
+  ]),
   "history.get": z.union([HistoryGetRequestSchema, HistoryGetResponseSchema]),
-  "templates.list": z.union([TemplatesListRequestSchema, TemplatesListResponseSchema]),
-  "slash.list": z.union([SlashListRequestSchema, SlashListResponseSchema]),
+  "templates.list": z.union([
+    TemplatesListResponseSchema,
+    TemplatesListRequestSchema,
+  ]),
+  "slash.list": z.union([SlashListResponseSchema, SlashListRequestSchema]),
   "replay.done": ReplayDoneSchema,
   "device.push_token": DevicePushTokenSchema,
   "key.ratchet": KeyRatchetSchema,
@@ -504,6 +577,7 @@ export const MessageSchema = z.union([
   DevicePairSasSchema,
   DevicePairConfirmSchema,
   SessionStartSchema,
+  SessionStartResultSchema,
   SessionAgentAddSchema,
   SessionResumeSchema,
   SessionInputSchema,
@@ -514,6 +588,7 @@ export const MessageSchema = z.union([
   DangerAllowSchema,
   DangerDenySchema,
   DangerPendingSchema,
+  DangerResultSchema,
   SessionEventSchema,
   FsTreeReqSchema,
   FsTreeSchema,
@@ -539,7 +614,9 @@ export const MessageSchema = z.union([
 
 export type Message = z.infer<typeof MessageSchema>;
 export type ErrorCode = z.infer<typeof ErrorCodeSchema>;
-export type NotificationPushPayload = z.infer<typeof NotificationPushPayloadSchema>;
+export type NotificationPushPayload = z.infer<
+  typeof NotificationPushPayloadSchema
+>;
 export type SessionEventMessage = z.infer<typeof SessionEventSchema>;
 
 export function validateMessage(raw: unknown): Message {
@@ -549,7 +626,8 @@ export function validateMessage(raw: unknown): Message {
     })
     .parse(raw);
 
-  const schema = messageSchemasByType[value.type as keyof typeof messageSchemasByType];
+  const schema =
+    messageSchemasByType[value.type as keyof typeof messageSchemasByType];
   if (!schema) {
     throw new Error(`Unknown message type: ${value.type}`);
   }
@@ -557,6 +635,8 @@ export function validateMessage(raw: unknown): Message {
   return schema.parse(raw) as Message;
 }
 
-export function validateNotificationPushPayload(raw: unknown): NotificationPushPayload {
+export function validateNotificationPushPayload(
+  raw: unknown,
+): NotificationPushPayload {
   return NotificationPushPayloadSchema.parse(raw);
 }

@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "handshake": {
+    "initiator_static_seed": "WFmnmRclR2TpF10DX4Rc9MDsDIR3KicEHdMtvVIX4Ws",
+    "initiator_static_pub": "cCQZzFpNw8Gy6y5b7Z7CwPYf-pF01f5su1x9ocQM0io",
+    "responder_static_seed": "4I3CU0m6yk7GzSmF-x7LkGviwLVrOkVHpwb6LSHBN0E",
+    "responder_static_pub": "lzCdWlCP4AqmzZb8PytngZycgW43fdfAbkFHBRWx3l0",
+    "initiator_ephemeral_seed": "ILG39ffsBiP73P6uu_2_v6SyfZDLoP_02zLtVVbgqGU",
+    "initiator_ephemeral_pub": "06MWu2_7MaXLcdYg2KQXfX0VWkIRhxqycqNfOCjKBV4",
+    "responder_ephemeral_seed": "aJx5czK9aICH48Z9GfQPQXCSpoe_rtg6H4av9-T-wEE",
+    "responder_ephemeral_pub": "GxD-9ehaQSorzyajT7kud9zhZW2xYHItoBu5Wldr6FY",
+    "message_1": "06MWu2_7MaXLcdYg2KQXfX0VWkIRhxqycqNfOCjKBV4KrjP2S86UDKJ9cpUA2FbA-4sr4yQqQZTijnjU4rF3m-rBmtwWQvGTMcA0PYaei2c",
+    "message_2": "GxD-9ehaQSorzyajT7kud9zhZW2xYHItoBu5Wldr6FY",
+    "initiator_handshake_hash": "a88fbd7d2a3c9dd5e28725a3538e32494755cbad171854362f14d1c9708f84a5",
+    "responder_handshake_hash": "b9f173654bc4b56ca73c3711aa928c088c2291229fef48983f1ac5c2460c1eca",
+    "final_handshake_hash": "b9f173654bc4b56ca73c3711aa928c088c2291229fef48983f1ac5c2460c1eca",
+    "initiator_send_key": "191e05831e9d176fc74c9897eed49e724a5fc452ad7b2abc6df2eeb280448934",
+    "initiator_recv_key": "b5b8c195a7f3f7e9aa8eb737a87219abb6e3ed61f11389161b0de8208bc37082",
+    "responder_send_key": "b5b8c195a7f3f7e9aa8eb737a87219abb6e3ed61f11389161b0de8208bc37082",
+    "responder_recv_key": "191e05831e9d176fc74c9897eed49e724a5fc452ad7b2abc6df2eeb280448934"
+  },
+  "aead": {
+    "nonce": "0102030405060708090a0b0c",
+    "plaintext_utf8": "hello daemon",
+    "ciphertext_hex": "a91f983eb817fd149030c2de435df3079a80efbaf1e8aa8bba0092ac"
+  },
+  "ratchet": {
+    "session_id": "sess-noise-fixture",
+    "counter": 0,
+    "nonce_hex": "b677b93c0000000000000000",
+    "initiator_next_seed": "sMoV5shccYsu3qa20kf2ax0Gj3ZmSCCXGHFGGC2Eo0E",
+    "initiator_next_pub": "ZjJ_EYlP1JUQJ7VZ2ibayV08W3jmjcGRVpwL8iNc8S0",
+    "initiator_send_key": "5a7afceb20ec321851452cb86d5a92a5dbe0f35691fc94bed19a82da05f21504",
+    "initiator_recv_key": "057709f2ead63b0cd347a10e7b3711fe8457d4056d1b6e1055644b01155492ea"
+  },
+  "staged_static": {
+    "initiator_send_key": "d3f0eb32ed2c8a81ad903330e883fb0a42df13b275b8ef9c85bdfab2aff2aaeb",
+    "initiator_recv_key": "25c766262b2a8ad420dcffeb88bc563bc605a7a3b69d309e921802d56e46c359",
+    "responder_send_key": "25c766262b2a8ad420dcffeb88bc563bc605a7a3b69d309e921802d56e46c359",
+    "responder_recv_key": "d3f0eb32ed2c8a81ad903330e883fb0a42df13b275b8ef9c85bdfab2aff2aaeb"
+  }
+}

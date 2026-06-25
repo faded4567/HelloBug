@@ -1,4 +1,4 @@
-import { generateKeyPairSync, randomUUID } from "node:crypto";
+import { createPublicKey, generateKeyPairSync, randomUUID } from "node:crypto";
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, resolve } from "node:path";
@@ -28,7 +28,9 @@ export class DeviceKeyStore {
     await mkdir(dirname(this.filePath), { recursive: true });
 
     try {
-      const existing = JSON.parse(await readFile(this.filePath, "utf8")) as StoredIdentity;
+      const existing = JSON.parse(
+        await readFile(this.filePath, "utf8"),
+      ) as StoredIdentity;
       return this.toIdentity(existing);
     } catch {
       const generated = this.generateIdentity();
@@ -48,19 +50,50 @@ export class DeviceKeyStore {
     return {
       deviceId: randomUUID(),
       createdAt: Date.now(),
-      ed25519PrivateKeyPem: ed25519.privateKey.export({ type: "pkcs8", format: "pem" }).toString(),
-      ed25519PublicKeyPem: ed25519.publicKey.export({ type: "spki", format: "pem" }).toString(),
-      x25519PrivateKeyPem: x25519.privateKey.export({ type: "pkcs8", format: "pem" }).toString(),
-      x25519PublicKeyPem: x25519.publicKey.export({ type: "spki", format: "pem" }).toString(),
+      ed25519PrivateKeyPem: ed25519.privateKey
+        .export({ type: "pkcs8", format: "pem" })
+        .toString(),
+      ed25519PublicKeyPem: ed25519.publicKey
+        .export({ type: "spki", format: "pem" })
+        .toString(),
+      x25519PrivateKeyPem: x25519.privateKey
+        .export({ type: "pkcs8", format: "pem" })
+        .toString(),
+      x25519PublicKeyPem: x25519.publicKey
+        .export({ type: "spki", format: "pem" })
+        .toString(),
     };
   }
 
   private toIdentity(stored: StoredIdentity): DeviceIdentity {
     return {
       ...stored,
-      ed25519PublicKeyBase64Url: toBase64Url(stored.ed25519PublicKeyPem),
-      x25519PublicKeyBase64Url: toBase64Url(stored.x25519PublicKeyPem),
+      ed25519PublicKeyBase64Url: exportOkpPublicKeyBase64Url(
+        stored.ed25519PublicKeyPem,
+        "Ed25519",
+      ),
+      x25519PublicKeyBase64Url: exportOkpPublicKeyBase64Url(
+        stored.x25519PublicKeyPem,
+        "X25519",
+      ),
     };
   }
 }
 
+function exportOkpPublicKeyBase64Url(
+  publicKeyPem: string,
+  expectedCurve: "Ed25519" | "X25519",
+): string {
+  const jwk = createPublicKey(publicKeyPem).export({
+    format: "jwk",
+  }) as JsonWebKey;
+  if (
+    jwk.kty !== "OKP" ||
+    jwk.crv !== expectedCurve ||
+    typeof jwk.x !== "string" ||
+    jwk.x.length === 0
+  ) {
+    throw new Error(`Unsupported ${expectedCurve} public key export`);
+  }
+  return toBase64Url(Buffer.from(jwk.x, "base64url"));
+}

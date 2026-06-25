@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { validateEnvelope } from "../src/envelope.js";
-import { validateMessage, validateNotificationPushPayload } from "../src/messages.js";
+import {
+  createEnvelopeSigningPayload,
+  validateEnvelope,
+} from "../src/envelope.js";
+import {
+  validateMessage,
+  validateNotificationPushPayload,
+} from "../src/messages.js";
 
 describe("protocol message validation", () => {
   it("accepts a session.event with M5 agent attribution", () => {
@@ -45,6 +51,7 @@ describe("protocol message validation", () => {
     const message = validateMessage({
       type: "fs.tree",
       payload: {
+        session_id: "sess-1",
         workspace_path: "/tmp/work",
         dir_path: "src",
         entries: [
@@ -70,6 +77,7 @@ describe("protocol message validation", () => {
     const message = validateMessage({
       type: "fs.file",
       payload: {
+        session_id: "sess-1",
         file_path: "README.md",
         mime_type: "text/markdown",
         chunk_index: 0,
@@ -121,6 +129,48 @@ describe("protocol message validation", () => {
     expect(message.payload.workspace_path).toBe("");
   });
 
+  it("accepts structured session.start.result outcomes", () => {
+    const started = validateMessage({
+      type: "session.start.result",
+      payload: {
+        request_id: "req-start-1",
+        session_id: "sess-1",
+        agent_type: "shell",
+        workspace_path: "/tmp/workspace",
+        status: "started",
+        message: "Session started",
+      },
+    });
+    const rejected = validateMessage({
+      type: "session.start.result",
+      payload: {
+        request_id: "req-start-2",
+        session_id: "sess-2",
+        agent_type: "claude_code",
+        workspace_path: "/outside",
+        status: "rejected",
+        code: "WORKSPACE_FORBIDDEN",
+        message: "Workspace is outside allowed paths",
+      },
+    });
+
+    expect(started.type).toBe("session.start.result");
+    if (started.type !== "session.start.result") {
+      throw new Error("expected session.start.result");
+    }
+    expect(started.payload.status).toBe("started");
+
+    expect(rejected.type).toBe("session.start.result");
+    if (rejected.type !== "session.start.result") {
+      throw new Error("expected session.start.result");
+    }
+    expect(rejected.payload.status).toBe("rejected");
+    if (rejected.payload.status !== "rejected") {
+      throw new Error("expected rejected start result");
+    }
+    expect(rejected.payload.code).toBe("WORKSPACE_FORBIDDEN");
+  });
+
   it("accepts history.list request and response variants", () => {
     const request = validateMessage({
       type: "history.list",
@@ -146,6 +196,103 @@ describe("protocol message validation", () => {
     expect(response.type).toBe("history.list");
   });
 
+  it("accepts session-scoped slash.list responses and danger approvals", () => {
+    const slash = validateMessage({
+      type: "slash.list",
+      payload: {
+        session_id: "sess-1",
+        commands: [
+          {
+            name: "compact",
+            desc: "Compress history",
+          },
+        ],
+      },
+    });
+    const dangerAllow = validateMessage({
+      type: "danger.allow",
+      payload: {
+        session_id: "sess-1",
+        danger_id: "danger-1",
+        biometric_verified: true,
+      },
+    });
+    const error = validateMessage({
+      type: "error",
+      payload: {
+        request_id: "req-1",
+        session_id: "sess-1",
+        code: "SESSION_NOT_FOUND",
+        message: "missing",
+      },
+    });
+
+    expect(slash.type).toBe("slash.list");
+    expect(dangerAllow.type).toBe("danger.allow");
+    expect(error.type).toBe("error");
+  });
+
+  it("accepts structured danger result outcomes", () => {
+    const result = validateMessage({
+      type: "danger.result",
+      payload: {
+        danger_id: "danger-1",
+        session_id: "sess-1",
+        status: "timed_out",
+        message: "Danger approval timed out",
+      },
+    });
+
+    expect(result.type).toBe("danger.result");
+    if (result.type !== "danger.result") {
+      throw new Error("expected danger.result");
+    }
+    expect(result.payload.status).toBe("timed_out");
+  });
+
+  it("accepts structured replay.done outcomes", () => {
+    const result = validateMessage({
+      type: "replay.done",
+      payload: {
+        session_id: "sess-1",
+        replayed_count: 2,
+        current_seq: 4,
+        status: "ok",
+        message: "Replay complete",
+      },
+    });
+
+    expect(result.type).toBe("replay.done");
+    if (result.type !== "replay.done") {
+      throw new Error("expected replay.done");
+    }
+    expect(result.payload.status).toBe("ok");
+  });
+
+  it("accepts pairing handshake payloads on SAS and confirm messages", () => {
+    const sas = validateMessage({
+      type: "device.pair.sas",
+      payload: {
+        sas: ["🐢", "🪐", "🍵", "🎷", "🌙"],
+        noise_handshake: "noise-message-1",
+        daemon_pubkey: "daemon-pubkey",
+        daemon_ed25519_pubkey: "daemon-ed25519-pubkey",
+        machine_name: "CI-Mac",
+        os: "darwin",
+      },
+    });
+    const confirm = validateMessage({
+      type: "device.pair.confirm",
+      payload: {
+        confirmed: true,
+        noise_handshake: "noise-message-2",
+      },
+    });
+
+    expect(sas.type).toBe("device.pair.sas");
+    expect(confirm.type).toBe("device.pair.confirm");
+  });
+
   it("validates push payload separately from runtime websocket messages", () => {
     const payload = validateNotificationPushPayload({
       aps: {
@@ -162,17 +309,61 @@ describe("protocol message validation", () => {
     expect(payload.event_type).toBe("task_done");
   });
 
-  it("accepts development envelopes with an empty signature placeholder", () => {
+  it("builds a stable signing payload for envelopes", () => {
     const envelope = validateEnvelope({
       from: "app-1",
       to: "",
       session_id: "",
       seq: 1,
       ts: 1718956800000,
-      sig: "",
+      sig: "signature",
       ciphertext: "eyJ0eXBlIjoiYXV0aC5hdHRhY2gifQ",
     });
 
-    expect(envelope.sig).toBe("");
+    expect(
+      Buffer.from(createEnvelopeSigningPayload(envelope)).toString("utf8"),
+    ).toBe(
+      '["app-1","","",1,1718956800000,"eyJ0eXBlIjoiYXV0aC5hdHRhY2gifQ","","",""]',
+    );
+  });
+
+  it("includes routing metadata in the stable signing payload when present", () => {
+    const envelope = validateEnvelope({
+      from: "app-1",
+      to: "daemon-1",
+      session_id: "sess-1",
+      seq: 9,
+      ts: 1718956800001,
+      sig: "signature",
+      ciphertext: "ciphertext",
+      message_type: "session.start",
+      cipher_mode: "noise_static_v1",
+      sender_pubkey: "sender-pubkey",
+    });
+
+    expect(
+      Buffer.from(createEnvelopeSigningPayload(envelope)).toString("utf8"),
+    ).toBe(
+      '["app-1","daemon-1","sess-1",9,1718956800001,"ciphertext","session.start","noise_static_v1","sender-pubkey"]',
+    );
+  });
+
+  it("requires session_id on key ratchet control messages", () => {
+    const ratchet = validateMessage({
+      type: "key.ratchet",
+      payload: {
+        session_id: "sess-ratchet-1",
+        next_pubkey: "next-pubkey",
+      },
+    });
+    const ack = validateMessage({
+      type: "key.ratchet_ack",
+      payload: {
+        session_id: "sess-ratchet-1",
+      },
+    });
+
+    expect(ratchet.type).toBe("key.ratchet");
+    expect(ack.type).toBe("key.ratchet_ack");
   });
 });

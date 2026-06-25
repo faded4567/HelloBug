@@ -93,6 +93,11 @@ export class DeviceRegistry {
     return this.daemonDevices.get(deviceId);
   }
 
+  getDaemonByPubKey(devicePubKey: string): DaemonDeviceRecord | undefined {
+    const deviceId = this.daemonDeviceByPubKey.get(devicePubKey);
+    return deviceId ? this.daemonDevices.get(deviceId) : undefined;
+  }
+
   getAppDevice(deviceId: string): AppDeviceRecord | undefined {
     return this.appDevices.get(deviceId);
   }

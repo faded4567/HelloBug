@@ -1,14 +1,15 @@
-import type { Message } from "@hellobug/protocol";
+import type { Envelope, Message } from "@hellobug/protocol";
 
 type SessionEventMessage = Extract<Message, { type: "session.event" }>;
 
 export interface RelayReplayEntry {
   message: SessionEventMessage;
+  envelope?: Envelope;
   storedAt: number;
 }
 
 export interface RelayReplayResult {
-  messages: SessionEventMessage[];
+  entries: RelayReplayEntry[];
   replayedCount: number;
   currentSeq: number;
 }
@@ -37,7 +38,7 @@ export class RelayReplayBuffer {
     this.now = options.now ?? (() => Date.now());
   }
 
-  append(message: SessionEventMessage): void {
+  append(message: SessionEventMessage, envelope?: Envelope): void {
     const ts = this.now();
     this.pruneExpired(ts);
 
@@ -52,6 +53,7 @@ export class RelayReplayBuffer {
     buffer.currentSeq = Math.max(buffer.currentSeq, message.payload.seq);
     buffer.entries.push({
       message,
+      envelope,
       storedAt: ts,
     });
 
@@ -69,20 +71,22 @@ export class RelayReplayBuffer {
     const buffer = this.sessions.get(sessionId);
     if (!buffer) {
       return {
-        messages: [],
+        entries: [],
         replayedCount: 0,
         currentSeq: lastSeq,
       };
     }
 
-    const messages = buffer.entries
+    const entries = buffer.entries
       .filter((entry) => entry.message.payload.seq > lastSeq)
-      .map((entry) => entry.message)
-      .sort((left, right) => left.payload.seq - right.payload.seq);
+      .sort((left, right) => left.message.payload.seq - right.message.payload.seq)
+      .map((entry) => ({
+        ...entry,
+      }));
 
     return {
-      messages,
-      replayedCount: messages.length,
+      entries,
+      replayedCount: entries.length,
       currentSeq: buffer.currentSeq,
     };
   }

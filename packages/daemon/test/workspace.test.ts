@@ -72,6 +72,7 @@ describe("daemon workspace service", () => {
     expect(message).toMatchObject({
       type: "fs.tree",
       payload: {
+        session_id: "sess-1",
         workspace_path: workspaceRoot,
         dir_path: "",
       },
@@ -155,6 +156,7 @@ describe("daemon workspace service", () => {
         v: 1,
         type: "fs.file",
         payload: {
+          session_id: "sess-1",
           file_path: emptyFilePath,
           mime_type: "text/plain",
           chunk_index: 0,
@@ -255,6 +257,7 @@ describe("daemon workspace service", () => {
         type: "error",
         payload: {
           request_id: "file-escape-1",
+          session_id: "sess-1",
           code: "WORKSPACE_FORBIDDEN",
           message: expect.stringContaining("outside"),
         },
