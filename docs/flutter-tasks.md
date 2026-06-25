@@ -38,7 +38,7 @@
 当前优先收口：
   ├── Spike F1（E2EE 跨端互通）
   ├── M1 运行时接线：真实 WsClient 注入、bootstrap 初始化、pairing 联调
-  ├── App 与 daemon 对接面：`templates.list` / `slash.list` / `session.agent.add` / push token
+  ├── App 与 daemon 对接面：`slash.list` 错误态 / `templates.list` 本地覆盖语义 / `session.agent.add` / push token
   ├── 现有页面接活：devices / danger.pending 状态收口 / file preview 补态 / history / reconnect
   └── Spike F4（pinning + JWT 恢复）
 
@@ -343,7 +343,7 @@ app/lib/screens/new_session/
   - 如果协议最终把工作区选择拆为单独消息，向导层要可兼容，不把协议细节写死在 widget 内
 
 ### ⚠️ 2.4 `app/lib/screens/chat/` — 聊天主页骨架
-> **现状补充**：`ChatPage`、`ChatTimeline`、`ChatInputBar`、`ChatHeader`、`ChatStatusBanner` 均已存在，并能消费第一版 provider；全局 `danger.pending` 与图片 / 语音入口已经接通，剩余主要是状态机收口、恢复语义和更多正式数据源对齐。
+> **现状补充**：`ChatPage`、`ChatTimeline`、`ChatInputBar`、`ChatHeader`、`ChatStatusBanner` 均已存在，并能消费第一版 provider；全局 `danger.pending` 与图片 / 语音入口已经接通，且 `session.done / session_not_found / replaying / 断线` 下的基础 banner 与输入 gating 已补一轮，剩余主要是更完整的状态页、恢复语义和更多正式数据源对齐。
 
 文件结构：
 ```
@@ -392,7 +392,7 @@ app/lib/widgets/
   - `tool_input` / `tool_result` 可能很大，卡片内必须有截断和懒展开机制
 
 ### ⚠️ 2.6 输入栏、模板芯片与消息发送流
-> **现状补充**：`chat_input_bar.dart`、`template_chip_bar.dart`、`slash_palette/` 已存在，文本发送、斜杠命令发送与 optimistic echo 已有第一版逻辑；daemon 已支持 `templates.list` / `slash.list`，但 Flutter 模板仍是静态 `kDefaultTemplates`，尚未切到真实来源与设置页。
+> **现状补充**：`chat_input_bar.dart`、`template_chip_bar.dart`、`slash_palette/` 已存在，文本发送、斜杠命令发送与 optimistic echo 已有第一版逻辑；Flutter 模板列表与输入栏芯片已经接到 `templates.list`，并支持本地 override / delete 持久化，slash 也已补第一轮超时 / 错误 / 重试。剩余主要是模板最终存储归属和更完整的 slash 参数 UI。
 
 - `template_chip_bar.dart`：横向滚动模板芯片，至少支持 `git status`、`跑测试`、`看最近 5 个 commit`
 - `chat_input_controller.dart`：管理草稿、发送态、禁用态、多行高度
@@ -438,7 +438,7 @@ app/lib/widgets/workspace_switch/
 - 页面文案要强调：规则实际执行在 daemon 侧，Flutter 只负责管理与确认
 
 ### ⚠️ 2.9 `app/lib/screens/history/` — 历史 Transcript 浏览
-> **现状补充**：`HistoryListPage` 与 `HistoryDetailPage` 已存在，并具备 `history.list` / `history.get` 的分页读取第一版逻辑；但专门的 controller 分层、只读态约束与“从历史继续”仍未收口。
+> **现状补充**：`HistoryListPage` 与 `HistoryDetailPage` 已存在，并具备 `history.list` / `history.get` 的分页读取第一版逻辑；历史页“继续会话”入口已接通到 `session.start + resume_session_id`，会话恢复第一轮状态也已接到 `replaying / session_not_found`，`SESSION_NOT_FOUND / WORKSPACE_FORBIDDEN` 也已有基础错误承接，但专门的 controller 分层与更完整的恢复策略仍未收口。
 
 文件结构：
 ```
@@ -499,7 +499,7 @@ app/lib/screens/diff/
 - 与 `session.event` 的 `file.changed` 字段严格对齐，不自己猜 diff
 
 ### ⚠️ 3.3 `app/lib/screens/filetree/` — 文件树页
-> **现状补充**：`FileTreePage`、`FileTreeController`、`TreeNodeTile`、`TreeCache` 均已存在，支持第一版懒加载与展开；但稳定协议与 session wiring 仍未完成。
+> **现状补充**：`FileTreePage`、`FileTreeController`、`TreeNodeTile`、`TreeCache` 均已存在，支持第一版懒加载与展开，且 `SESSION_NOT_FOUND / WORKSPACE_FORBIDDEN` 已有基础错误承接；会话信息页现在已有文件树入口，打开文件树 / 文件预览时也会同步当前工作区。完整工作区上下文联动、权限细分态与缓存语义仍未完成。
 
 文件结构：
 ```
@@ -521,7 +521,7 @@ app/lib/screens/filetree/
   - 修改文件用橙色点或标记，不要用整行强色块压住层级结构
 
 ### ⚠️ 3.4 `app/lib/screens/filetree/file_preview_page.dart` — 单文件只读预览
-> **现状补充**：`file_preview_page.dart` 已存在并能做第一版分片拼装，且已切到正式 `fs.file.req` + `data/data_base64url`；当前剩余主要是高亮、虚拟滚动，以及 `large-file / binary / permission` 等状态补口。
+> **现状补充**：`file_preview_page.dart` 已存在并能做第一版分片拼装，且已切到正式 `fs.file.req` + `data/data_base64url`，`SESSION_NOT_FOUND / WORKSPACE_FORBIDDEN` 也已分流到结构化错误态；当前剩余主要是高亮、虚拟滚动，以及 `large-file / binary / permission` 等状态补口。
 
 - `file_preview_page.dart`：只读内容页，支持代码高亮和文本类文件预览
 - `chunked_file_controller.dart`：处理 `fs.file` 分片拼装、base64 解码、大文件分段加载
@@ -532,7 +532,7 @@ app/lib/screens/filetree/
   - 内容只读，不开放编辑入口，避免越过项目边界
 
 ### ⚠️ 3.5 工作区切换与聊天 / 文件树联动补全
-> **现状补充**：工作区切换 sheet 与 `workspace_history_provider.dart` 已存在，并且最近 / 置顶历史可持久化；但聊天、文件树、Diff、分支上下文之间的联动仍是半成品。
+> **现状补充**：工作区切换 sheet 与 `workspace_history_provider.dart` 已存在，并且最近 / 置顶历史与 `currentPath` 都可持久化；聊天页选择其他工作区后，当前实现会保留旧会话并带新路径进入 `NewSessionFlow`，历史页也会优先读取当前工作区，文件树 / 文件预览 / diff / 终端打开时也会回写当前工作区。文件树、Diff、分支上下文之间的完整联动仍是半成品。
 
 - 把 M2 的 `workspace_switch_sheet.dart` 扩展成完整工作区上下文入口
 - 聊天页、文件树页、Diff 页都要感知当前工作区与当前分支
@@ -546,7 +546,7 @@ app/lib/screens/filetree/
 > **现状说明**：terminal、image input、voice input、slash palette、security、notifications、device detail、appearance、about 等已经不再是空白；M4 当前更像“前半段已有第一版实现，后半段推送 wiring / 多会话并发 / 若干运行时接线还未收口”。
 
 ### ⚠️ 4.1 `app/lib/screens/terminal/` — 终端页
-> **现状补充**：`TerminalPage`、`PtySessionController`、`TerminalToolbar` 已存在，并能通过 `pty.input` / `pty.data` 走第一版消息链路；连接状态、字号与更多宿主行为仍未收口。
+> **现状补充**：`TerminalPage`、`PtySessionController`、`TerminalToolbar` 已存在，并能通过 `pty.input` / `pty.data` 走第一版消息链路；会话恢复后的只读 gating 已接到 `running + online`，但权限拒绝、字号与更多宿主行为仍未收口。
 
 文件结构：
 ```
@@ -699,7 +699,7 @@ Flutter 不直连 daemon，不直接访问本地文件系统，也不假设 daem
 
 > **当前代码偏差（待统一，2026-06-24）**：
 > - `WsClient` 重放当前已经发送 `session.resume`
-> - `slash.list` / `templates.list` 的 daemon 后端已补完，但 Flutter 还没把模板入口切到真实来源
+> - `slash.list` / `templates.list` 的 daemon 后端已补完；Flutter 模板入口已经接到真实来源，剩余主要是本地覆盖语义与最终存储归属
 
 ```
 App → Server:

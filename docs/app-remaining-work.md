@@ -6,6 +6,7 @@
 > 这份文档也是当前阶段唯一的任务状态真源；其他文档只做规划、分工、规格或启动上下文，不单独维护一套完成状态。
 > Flutter 客户端任务明确标记为 **Claude**，协议、后端、daemon、部署与联调总控任务明确标记为 **Codex**。
 > 相关支持文档：
+>
 > - Flutter 规划/验收：`docs/flutter-tasks.md`
 > - Claude Flutter 范围说明（沿用历史文件名）：`docs/claude-ui-tasks.md`
 > - Codex 后端细分：`docs/codex-tasks.md`
@@ -29,18 +30,22 @@
 - `[~]` Flutter 端大部分主页面已经有第一版 UI，不再是“缺页面”的问题。
 - `[~]` Flutter 当前的核心缺口已经不只是 UI，而是 `transport / crypto / state / runtime wiring` 还没有完全收口。
 - `[~]` Flutter 与 wireframe 的根导航已经切到 2-tab 方向，但当前第一分支仍实际挂在 `SessionsPage`；工作区主页这层信息架构还没有完全落地。
-- `[~]` server 已能兼容 app 侧 `Envelope`，但只是 base64 包内层 `Message` 的开发态桥接，不是真正的端到端加密。
-- `[~]` daemon 仍然使用明文 `Message` WebSocket，没有正式切到 `Envelope`、签名、验签、mTLS 实链路。
-- `[~]` pairing、SAS、`auth.attach/auth.token`、`session.start`、`session.input`、`danger.allow/deny`、replay 基础闭环已存在。
+- `[~]` app / server / daemon 现在都已接到签名版 `Envelope` 主链路；server 能校验 app / daemon 来向签名，并尽量保留原始 envelope 做转发 / replay。
+- `[~]` 已启用一轮 staged session E2EE：app -> daemon 的 `session.start / session.input / session.input.image / session.input.voice_text / session.command.slash / session.cancel / pty.input / pty.resize`，以及 daemon -> app 的 `session.start.result / session.event / danger.pending`，在配对完成后会切到 `noise_static_v1`；server 依赖外层 `message_type / cipher_mode / session_id / seq` 做路由，不再解密这些业务消息。
+- `[x]` staged 显式 `key.ratchet` 已双向打通：daemon / app 任一侧都可发起 `key.ratchet`，对端切换会话密钥并回 `key.ratchet_ack`，server 按 `session_id` 定向路由，daemon / protocol / server / Flutter 目标验证已通过。
+- `[~]` 这还不等于“全链路完全 opaque”：虽然正式 pairing 已经走真实两消息 `Noise IK` transcript 并做本地 SAS 校验，且首个加密会话已优先使用 pairing-derived keys，但 `daemon.hello / auth / push_token / session.resume / replay.done / error / device.status` 仍然走 plain envelope，pinning 与更严格的 relay 安全边界仍未完成。
+- `[~]` pairing、SAS、`auth.attach/auth.token`、`session.start`、`session.input`、`danger.allow/deny`、replay 基础闭环已存在；server 已能在 `auth.attach` 后补发仍未处理的 `danger.pending`，app 也已按 `danger_id` 做前台去重。
+- `[x]` `session.start -> session.start.result` 已补结构化启动结果：daemon 会返回 `started / rejected`，server 只在 daemon 确认成功后注册 session，Flutter `NewSessionFlow` 现在会等待正式回执后再落本地会话并跳转。
+- `[x]` `session.resume -> replay.done` 已补结构化恢复结果：server 会校验 session 归属并返回 `ok / session_not_found`，app 会停止继续恢复失效 session，避免卡在“同步中”。
 - `[x]` 已在局域网 `ws://192.168.18.8:3000/v1/relay` 验证一轮开发态联调：`pairing -> SAS -> session.start(shell) -> pty.input/pty.resize -> terminal output`，`pwd` 已返回真实工作区路径。
 - `[x]` daemon 已补上 `fs.tree.req` / `fs.file.req` / `history.list` / `history.get` / `pty.input` / `pty.resize` / `templates.list` / `slash.list`。
 - `[~]` `session.agent.add` 当前已收口为明确错误响应，避免静默失败；真实多 agent runtime 仍未实现。
 - `[~]` `device.push_token` 已补 server 持久化，但 app 自动上报和真实推送服务都还没接上。
-- `[ ]` app 侧 `noise_ik.dart`、`session_cipher.dart` 仍是 stub，无法宣称移动端到电脑端全链路已加密。
+- `[~]` app / daemon 已新增共享 `noise_ik_fixture.json`，Node / Flutter 跨端测试已对齐；正式配对流现已接入真实两消息握手与本地 SAS 校验，但会话初始化仍主要走 staged `noise_static_v1` / static HKDF 派生，plain envelope 回退也还没完全移除，不能宣称所有消息都已端到端加密。
 
 ## 总执行顺序
 
-1. 继续清理 app / daemon 间剩余的 legacy 兼容漂移，并把 Flutter 端模板数据切到真实 `templates.list`。
+1. 继续清理 app / daemon 间剩余的 legacy 兼容漂移，并收口 Flutter 端模板 / slash 的错误态与本地覆盖语义。
 2. 再打真正的安全边界：`Envelope`、Noise IK、签名/验签、pinning、relay 安全边界。
 3. 再补 push token 上报、设备管理、工作区状态与恢复闭环。
 4. 最后进入多会话、多 agent、生产化硬化。
@@ -51,11 +56,11 @@
 
 ### 1. 安全与传输链路
 
-- `[ ] [Codex]` 让 daemon 传输层正式切到 `Envelope`，不再以 plain `Message` 为主路径。
-- `[ ] [Codex]` 为 server / daemon 侧 envelope 补真实签名、验签、seq 管理、错误处理。
-- `[ ] [Shared]` 完成 app / daemon 跨端 Noise IK fixture，对齐 nonce、HKDF、AEAD 细节。
-- `[ ] [Claude]` 落地 app 侧真实 `session_cipher`，去掉开发态 base64 明文回退。
-- `[ ] [Codex]` 完成 server 侧真正的 relay 安全边界，而不是“解包后按明文转发”的兼容模式。
+- `[x] [Codex]` 让 daemon 传输层正式切到 `Envelope`，不再以 plain `Message` 为主路径。
+- `[~] [Codex]` 为 server / daemon 侧 envelope 补真实签名、验签、seq 管理、错误处理。
+- `[x] [Shared]` 完成 app / daemon 跨端最小 E2EE fixture，对齐 X25519、HKDF、nonce、AEAD 细节。
+- `[~] [Shared]` app / daemon 已把 `session_cipher`、双向显式 `key.ratchet`、共享 fixture、真实两消息握手原语与 pairing-derived 首会话引导接到真实会话消息传输；所有消息去除 plain 回退与 pinning 仍未完成。
+- `[~] [Codex]` 完成 server 侧真正的 relay 安全边界，而不是“解包后按明文转发”的兼容模式。
 - `[ ] [Claude]` 补 app 侧 pinning 真正接线，包括证书材料持久化、失败提示、恢复策略。
 
 ### 2. Daemon 业务能力补齐
@@ -90,7 +95,7 @@
 
 - `[~] [Claude]` 配对入口、扫码、SAS 页已存在。
 - `[~] [Claude]` app 已能发 `device.pair` / 等 SAS / `device.pair.confirm` / 接 `auth.token`。
-- `[ ] [Shared]` pairing 后真正建立加密会话和 pin 信任。
+- `[~] [Shared]` pairing 后真实握手、SAS 校验与首会话初始化都已切到 pairing-derived 材料，但 pin 信任与更广泛的 opaque 控制消息仍未完成。
 - `[ ] [Claude]` pairing 成功后写入 push token、设备指纹、服务器 pin、设备显示名。
 - `[~] [Claude]` `manual_pair_page.dart` 已有完整首版 UI，但真实手输配对流程仍要继续接活。
 - `[ ] [Claude]` 配对异常页、异常恢复路径和本地持久化语义统一收口。
@@ -113,25 +118,25 @@
 ### 5. 会话列表 / 新建会话 / 会话恢复
 
 - `[~] [Claude]` `SessionsPage`、`NewSessionFlow` 已存在。
-- `[~] [Shared]` `session.start` 基础跨端闭环已存在。
+- `[x] [Shared]` `session.start` 已补正式确认闭环：`session.start.result` 成功后才创建本地会话，失败会返回结构化拒绝结果。
 - `[x] [Claude]` 去掉新建会话里的 dev fallback 设备逻辑，切到真实设备/工作区来源。
-- `[ ] [Shared]` 明确 `session.resume`、历史恢复、session not found 的真实恢复路径。
-- `[ ] [Claude]` 会话不存在、恢复中、空会话列表等 UI 与客户端状态收口。
+- `[~] [Shared]` `session.resume` 与 `session_not_found` 基础恢复路径已明确；历史页“继续会话”入口已接上 `session.start + resume_session_id`，Flutter 端也已补第一轮自动恢复跟踪、`replaying` 状态，并把聊天 / 终端输入收口为“仅 `running + online` 可写”；更完整的恢复策略仍待补。
+- `[~] [Claude]` 会话不存在、恢复中、空会话列表等 UI 与客户端状态已补第一轮收口；更完整的恢复/空态页面表达仍待继续打磨。
 
 ### 6. 聊天主链路
 
 - `[~] [Claude]` chat timeline、input bar、tool card、thinking card、diff card 基本都在。
 - `[~] [Shared]` session input、cancel、image chunk upload、voice text、slash command 基础通路已存在。
-- `[~] [Claude]` `danger.pending` 已接到 app 全局监听，能自动弹出确认层；但超时/失败/已处理状态还没完全收口。
+- `[~] [Claude]` `danger.pending` 已接到 app 全局监听，能自动弹出确认层，且重连补发同一 `danger_id` 时会做前台去重；确认层现在会等待 `danger.result` 再关闭，失败类结果在无活动确认层时也会走全局 alert 兜底，但视觉层状态收口还没完全做完。
 - `[ ] [Shared]` 收口 provider 事件模型与 daemon payload，避免继续漂移。
-- `[~] [Claude]` 聊天页与聊天状态机：空会话空态 / 等待首条回复 spinner / 会话结束（已有 `done` item）/ session not found 页已接入；连接恢复中已由 `ChatStatusBanner` 覆盖，重连后会话恢复语义仍待补。
+- `[~] [Claude]` 聊天页与聊天状态机：空会话空态 / 等待首条回复 spinner / 会话结束（已有 `done` item）/ session not found 页已接入；`done / session_not_found / replaying / 断线` 下的 banner 与输入禁用已补第一轮语义，仍待继续收口更完整的恢复/错误页面状态。
 
 ### 7. 危险操作确认
 
 - `[~] [Claude]` `DangerConfirmSheet` 已存在。
-- `[~] [Codex]` daemon `dangerInterceptor` 和 allow/deny 已接上。
-- `[~] [Claude]` app 侧对 `danger.pending` 的全局订阅、弹层路由和 allow/deny 正式 payload 已接通；状态收口仍未完成。
-- `[ ] [Shared]` 明确 danger request 生命周期：超时、已处理、找不到 request 的回执。
+- `[x] [Codex]` daemon `dangerInterceptor`、server 侧待审批缓存、`danger.result` 结构化回执，以及 app 重连后的 `danger.pending` 恢复已接通。
+- `[~] [Claude]` app 侧对 `danger.pending` 的全局订阅、弹层路由、重复 `danger_id` 去重、allow/deny 正式 payload、`danger.result` 等待，以及失败结果的全局 alert 兜底已接通；状态收口仍未完成。
+- `[~] [Shared]` danger request 生命周期已定义结构化回执：`approved / denied / timed_out / not_found / biometric_required`；仍需继续收口更多客户端视觉状态与跨页提示。
 - `[ ] [Claude]` 补确认失败、已超时、已被其他端处理等视觉与客户端状态。
 
 ### 8. 文件树与文件预览
@@ -140,8 +145,8 @@
 - `[x] [Codex]` daemon 已实现 `fs.tree.req` / `fs.file.req`，server 也已补当前 Flutter 所需的兼容桥接与测试。
 - `[x] [Claude]` app 已改为发送正式 `fs.tree.req { session_id, workspace_path, dir_path }`，`applyResponse` 已解析 `entries/type` 字段；文件预览已改为自行解码 `fs.file.data` base64url，移除 `content` 兼容回退。
 - `[ ] [Shared]` 定义大文件、二进制文件、不可读文件的返回语义。
-- `[~] [Claude]` 文件预览页已有 `loading / empty / error`；仍需补 `large-file / binary file / permission` 状态，并接上真实读取链路。
-- `[ ] [Claude]` 文件树页补更完整的空态、权限受限态、工作区失效态与客户端缓存行为。
+- `[~] [Claude]` 文件预览页已有 `loading / empty / error`，并已对 `SESSION_NOT_FOUND / WORKSPACE_FORBIDDEN` 做基础错误分流；仍需补 `large-file / binary file / permission` 状态，并接上真实读取链路。
+- `[~] [Claude]` 文件树页已补工作区失效 / 会话失效的基础错误态与返回 / 重试分流；更完整的空态、权限受限态与客户端缓存行为仍待继续收口。
 
 ### 9. Diff
 
@@ -155,20 +160,20 @@
 - `[~] [Claude]` 历史列表和详情页已有 UI。
 - `[x] [Codex]` daemon 已实现 `history.list` / `history.get`，按工作区映射 Claude transcript 目录并返回原始 JSONL 分页。
 - `[x] [Codex]` transcript 存储来源、分页与基础读取规则已收口到 `~/.claude/projects/<workspace-slug>/*.jsonl`。
-- `[~] [Claude]` 历史页已切到正式协议并能解析基础 Claude JSONL；筛选/搜索态、恢复失败态和客户端恢复入口仍待补。
+- `[~] [Claude]` 历史页已切到正式协议并能解析基础 Claude JSONL，且 `SESSION_NOT_FOUND / WORKSPACE_FORBIDDEN` 已有基础错误分流与重试/返回；筛选/搜索态和更完整的恢复失败态仍待补。
 
 ### 11. 终端
 
 - `[~] [Claude]` terminal 页面、toolbar、status bar UI 基本存在。
 - `[x] [Codex]` daemon 已实现真实 PTY runtime、输出流转发、`pty.input` / `pty.resize`、关闭。
-- `[ ] [Shared]` 处理终端权限、只读模式、会话结束后的状态回执。
-- `[~] [Claude]` 终端页已切到 `session.event -> pty.data` 正式事件形态；未连接、只读、权限拒绝、退出完成等状态仍待补。
+- `[~] [Shared]` 终端只读模式与会话结束 / 失效后的基础状态回执已接通；权限拒绝等更细语义仍待继续定义。
+- `[~] [Claude]` 终端页已切到 `session.event -> pty.data` 正式事件形态，并补上恢复中 / 失效 / 已结束时的只读 gating；未连接细节、权限拒绝和更多宿主行为仍待补。
 
 ### 12. 模板、Slash、图片、语音
 
 - `[~] [Claude]` 模板页、slash palette、图片输入、语音输入 UI 已存在。
 - `[x] [Codex]` `templates.list`、`slash.list` 已有 daemon 默认后端来源。
-- `[ ] [Shared]` 模板 CRUD 是否落 app 本地还是 daemon/server，要正式定下来并落实现。
+- `[~] [Shared]` Flutter 模板列表与输入栏芯片已经接到 `templates.list`，并支持本地 override / delete 持久化；模板 CRUD 是否最终落 app 本地还是 daemon/server 仍需正式定下来。
 - `[ ] [Shared]` 图片输入最终链路继续完善，包括上传完成确认、失败回执、服务端限制。
 - `[~] [Claude]` 语音输入已接上真实 STT、权限声明和 `session.input.voice_text` 发送；更完整的权限拒绝恢复与状态抽象仍待收口。
 - `[~] [Claude]` 聊天输入栏图片/语音入口已完成；发送前确认、异常状态和本地交互仍待收口。
@@ -195,7 +200,8 @@
 
 - `[~] [Claude]` 工作区切换 sheet 已存在，根导航也已经转向 2-tab；设计稿还有 `43/44/45/49/50/51/60` 一整套页面。
 - `[ ] [Codex]` 工作区来源、权限检测、路径失效、空工作区、新建工作区流程还没有完整后端支持。
-- `[ ] [Shared]` 会话、文件树、diff 和当前工作区之间的真实联动规则要收口。
+- `[~] [Shared]` 会话、历史与当前工作区现在已有统一客户端状态：`workspace_history_provider` 会持久化 `currentPath`，聊天页“切换工作区”会保留旧会话并带新路径进入 `NewSessionFlow`，文件树 / 文件预览 / diff / 终端打开时也会同步当前工作区；更完整的文件树 / diff / 分支上下文联动规则仍待继续收口。
+- `[~] [Shared]` 文件树 / 文件预览 / 历史页已补 `SESSION_NOT_FOUND`、`WORKSPACE_FORBIDDEN` 基础错误承接；更完整的工作区失效/权限受限状态仍待继续收口。
 - `[ ] [Claude]` 工作区主页、工作区设置、路径失效、空工作区、新建工作区、权限受限页补齐或收口，并把新的 2-tab 工作区入口、路由和页面语义收口一致。
 
 ### 16. 多会话 / 横屏 / 多布局
@@ -226,7 +232,7 @@
 
 ### 客户端运行时 P0
 
-- `[ ] [Claude]` app 侧 `noise_ik.dart` / `session_cipher.dart` 落地，移除开发态 base64 明文回退
+- `[~] [Claude]` app 侧 `noise_ik.dart` / `session_cipher.dart`、真实配对 transcript、pairing-derived 首会话引导与双向显式 `key.ratchet` 已接入会话传输；仍需继续移除剩余 plain envelope 回退并补 pinning 收口
 - `[ ] [Claude]` app 侧 pinning、JWT 恢复、`bootstrap()` 生命周期接线补齐
 - `[ ] [Claude]` pairing 成功后 push token 上报、本地 runtime 持久化、设备指纹 / pin / 显示名收口
 - `[~] [Claude]` `danger.pending` 全局监听、弹层路由和 allow/deny 正式 payload 已接通；状态回执处理仍未完成
@@ -263,7 +269,7 @@
 - `[ ] [Claude]` 配对过期页 `48`
 - `[ ] [Claude]` 工作区路径失效 / 空工作区 / 新建工作区 / 权限受限页 `49/50/51/60`
 - `[ ] [Claude]` push landing 页 `53`
-- `[ ] [Claude]` 聊天页内“会话结束 / 空态 / 恢复中 / 错误态”补齐
+- `[~] [Claude]` 聊天页内“会话结束 / 空态 / 恢复中 / 错误态”已补第一轮行为，专门状态页与更完整视觉仍待继续
 - `[ ] [Claude]` 文件预览页的 `large-file / binary / permission` 状态补齐
 - `[ ] [Claude]` 设备列表右上角设置入口与刷新 / 失败视觉收口
 
@@ -274,7 +280,7 @@
 - `[ ] [Claude]` 横屏双栏 UI `36`
 - `[ ] [Claude]` 设备详情页和设备列表的刷新/错误/已吊销视觉状态
 - `[ ] [Claude]` 历史记录页的失败态、筛选态、搜索态
-- `[ ] [Claude]` 终端页只读/权限拒绝/已结束状态
+- `[~] [Claude]` 终端页只读/已结束状态已补，权限拒绝仍待继续
 - `[ ] [Claude]` 通知权限被拒绝后的设置内状态提示
 
 ### P2

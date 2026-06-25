@@ -29,15 +29,24 @@
 - `[~]` 已完成 `packages/server` 第一版骨架：`/health`、`/v1/register`、JWT/证书、配对服务、在线状态广播、session 级 relay 路由骨架
 - `[~]` 已完成 `packages/daemon` 第一版骨架：配置、设备密钥、配对槽位、注册流程、WebSocket 连接、消息路由、工作区围栏、可替换的 session manager / runtime 基础闭环、图片分片临时文件组装、危险操作审批骨架、加密审计日志，以及已对齐真实 Claude Code CLI 多轮 `stream-json` 行为的子进程 runtime
 - `[x]` 当前已验证 `packages/protocol`、`packages/server`、`packages/daemon` 以及 `packages/` 根 `build` / `test` / `lint` 通过（通过 `npm run ...` 触发各子包脚本）
-- `[ ]` 尚未完成真实 E2EE、Noise IK、mTLS 校验、完整生产级 Agent 集成、文件系统、推送与多 Agent 群组能力
+- `[ ]` 尚未完成完整生产级 E2EE 收口、mTLS 校验、完整生产级 Agent 集成、文件系统、推送与多 Agent 群组能力
 - `[x]` 2026-06-24 已补一轮跨端协议对齐：Flutter `session.event` 嵌套解析、slash args 数组、shell 路由、文件预览错误与 `data_base64url`、danger confirm race；server 补 legacy `session.start` / `session.command.slash` 兼容；daemon 补 `~` 路径展开与文件树响应对外形态保持
+- `[x]` 2026-06-24 已把 daemon 主传输切到签名版 `Envelope`，server 已按阶段验 app / daemon 签名，并在兼容允许时保留原始 envelope 做转发与 replay
+- `[x]` 2026-06-24 已修 server 单连接入站消息串行化，消除 `daemon.hello` 与紧随其后的 `device.pair.ready` 并发竞态
 - `[x]` 2026-06-24 已在局域网 relay 下验证开发态联调：`pairing/SAS/auth.token -> session.start(shell) -> pty.input/pty.resize -> terminal output`
 - `[x]` 2026-06-24 已补 daemon catalog 能力：`templates.list`、`slash.list`、`session.agent.add` 显式错误收口，以及 app-style slash command 到 Claude-like runtime 的归一化
+- `[x]` 2026-06-24 已完成跨端 E2EE Spike F1 的最小底座：统一 app/daemon 公钥编码为裸 `base64url` 公钥字节，补 Node + Flutter 的 X25519 共享密钥 / HKDF 方向性派生 / ChaCha20-Poly1305 fixture，并在配对态持久化 daemon 公钥材料
+- `[x]` 2026-06-24 已完成 staged session encryption 第一轮接线：`Envelope` 增加 `message_type / cipher_mode / sender_pubkey` 外层元数据；server 可在不解密 inner message 的前提下路由加密会话消息；app/daemon 已对白名单业务消息启用 `noise_static_v1`
+- `[x]` 2026-06-24 已补 staged `key.ratchet` 双向接线：daemon / app 任一侧都可发起显式 `key.ratchet`，对端会切换会话密钥并回 `key.ratchet_ack`，server 按 `session_id` 定向路由，daemon / protocol / server / Flutter 目标验证均已通过
+- `[x]` 2026-06-24 已把真实两消息 `Noise IK` transcript 接入正式配对流：`device.pair.sas` 携带 `message_1`，App 本地复算并校验 SAS，`device.pair.confirm` 回传 `message_2`，daemon 完成握手确认
+- `[x]` 2026-06-24 已把首个加密会话初始化切到 pairing-derived keys：App 在配对成功后持久化 responder `send/recv` key，daemon 按 `app_pubkey` 持久化 initiator `send/recv` key，后续首个 `session.start` 会优先使用这组密钥，缺失时才回退到旧 static HKDF 兼容路径
+- `[x]` 2026-06-24 已补 `session.start` 结构化确认链路：daemon 返回 `session.start.result { started | rejected }`，server 改为 pending session + 成功后确认注册，Flutter 侧会等待成功回执后再创建本地会话
+- `[x]` 2026-06-24 已补 `session.resume` 结构化恢复结果：`replay.done` 现在带 `status/message`，server 会校验 session 归属并对失效 session 返回 `session_not_found`
 
 ## 后续开发顺序
 
 1. 继续清理 legacy 命名/兼容漂移，并推动 Flutter 侧接入 daemon `templates.list` 默认来源。
-2. 再推进 M1 剩余核心能力：Noise IK、真正的 envelope 签名/验签、relay 安全边界与基础配对确认闭环。
+2. 继续推进 M1 剩余核心能力：扩大 opaque ciphertext 覆盖面、逐步移除 static HKDF 兼容回退、pinning 与 relay 安全边界继续收口。
 3. 再补设备管理、push backend、workspace/restore 这些会继续阻塞 Flutter 业务闭环的后端能力。
 
 ---
@@ -47,6 +56,7 @@
 这几个 spike 的结论会影响后续实现路径，必须优先跑通。
 
 ### Spike 1：E2EE 跨端互通（1-2 天）
+
 **目标**：Node 端 + Flutter 端之间，用 Noise IK 握手后加解密一条消息。
 
 - Node 端：`libsodium-wrappers`（当前已在 `packages/daemon` workspace 中引入）
@@ -55,6 +65,7 @@
 - 产出：一个能跑的 test fixture，包含公钥对、握手向量、加密消息、期望密文
 
 ### Spike 2：Claude Code stream-json 稳定性（1-2 天）
+
 **目标**：确定 daemon 接入 Claude Code 的主路径。
 
 状态：`[x]` 当前阶段已完成，M2 主路径已选定为 CLI `stream-json` 子进程；SDK 记录为后续替换候选。
@@ -89,6 +100,7 @@
   - `packages/daemon/test/claude.test.ts` 已覆盖嵌入式工具事件、多轮 `result != session.done`、JSON stdin 与图片路径输入
 
 ### Spike 3：Codex 非交互模式（1 天）
+
 **目标**：确认 `codex exec` / JSON 输出是否可靠。
 
 - 跑 `codex exec` 看输出格式与稳定性
@@ -127,6 +139,7 @@ HelloBug/
 状态：`[x]` 已完成基础协议落地与测试；后续如 `docs/protocol.md` 继续变更，再同步补字段。
 
 文件结构：
+
 ```
 packages/protocol/src/
   envelope.ts       # 路由层类型
@@ -136,6 +149,7 @@ packages/protocol/src/
 ```
 
 具体要实现：
+
 - **`docs/protocol.md` 是唯一字段真源**。`packages/protocol` 只负责把协议文档逐字落成 Zod schema 与 TypeScript 类型，不在本文件重复定义字段名，避免再次漂移。
 - `messages.ts` 需完整覆盖当前协议中的消息：
   - 鉴权：`auth.attach` / `auth.refresh` / `auth.token`
@@ -152,6 +166,7 @@ packages/protocol/src/
 ### 1.3 packages/daemon — 主进程骨架
 
 #### 1.3.1 密钥生成与存储（`src/crypto/keys.ts`）
+
 状态：`[x]` 已完成基础实现（本地生成、持久化、恢复、导出公钥）。
 
 - 生成 Ed25519 长期身份密钥对（签名用）
@@ -160,24 +175,32 @@ packages/protocol/src/
 - 导出公钥（Base64），供配对流程展示
 
 #### 1.3.2 Noise IK 握手（`src/crypto/noise.ts`）
-状态：`[ ]` 未开始。
+
+状态：`[~]` 2026-06-24 已补跨端共享 JSON fixture、真实两消息握手原语、AEAD 与 ratchet 向量校验，并已把 transcript 接进正式配对流；但会话传输初始化仍主要使用 staged static 派生，完整生产化接线尚未完成。
 
 - 使用 `libsodium-wrappers` 实现 Noise IK pattern
 - initiator 侧（daemon 发起）和 responder 侧（App 发起）均实现
 - 握手完成后派生 sending_key + receiving_key（ChaCha20-Poly1305）
 - 会话密钥每 100 条消息**或** 10 分钟自动轮换（双条件取先到者），旧密钥立即销毁
 - 对外暴露：`encrypt(plaintext: Buffer, key: SessionKey): Buffer`、`decrypt(ciphertext: Buffer, key: SessionKey): Buffer`
+- 当前阶段补充：
+  - 已有 repo 级共享 fixture：`fixtures/noise_ik_fixture.json`
+  - Node / Flutter 已对齐真实两消息握手 transcript、AEAD 与 ratchet 向量
+  - 现网传输层的首个会话已优先使用 pairing-derived keys，但为了兼容旧配对记录，仍保留静态 X25519 shared secret + HKDF 的 `deriveSessionKeys()` fallback 路径
+  - 下一步是把会话初始化切到配对握手产物，并逐步移除 staged static 派生
 
 #### 1.3.3 配对码生成（`src/pairing/code.ts`）
-状态：`[~]` 已完成 pairing slot / code / SAS 响应基础能力；真实 Noise 握手与完整确认后本地绑定逻辑未完成。
+
+状态：`[~]` 已完成 pairing slot / code / SAS 响应，并已接入真实 Noise 握手消息往返；后续还需把配对产物进一步用于正式会话初始化与持久信任材料。
 
 - daemon 本地生成 `pairing_id`（32 字节随机 hex）+ 6 位 `pairing_code`
 - 30 秒过期（setTimeout + Map 存储），并通过 `device.pair.ready { pairing_id, pairing_code, expires_at }` 上报 server
-- SAS 生成：从握手完成后的共享密钥派生 5 个 emoji（固定 emoji 列表，HMAC-SHA256 切片）
+- SAS 生成：从配对握手中间态派生 5 个 emoji（固定 emoji 列表，HMAC-SHA256 切片），保证 daemon 在收到 `message_2` 前即可展示，App 也能独立复算校验
 - 提供 `issuePairingSlot()`、`consumePairingSlot()`、`getSas(sessionKey)` 函数
 
 #### 1.3.4 传输层（`src/transport/connection.ts`）
-状态：`[~]` 已完成注册、WebSocket 连接、消息路由拆分，以及 `session.start / session.input / session.cancel` 接入 daemon 会话层；真实 E2EE、签名、seq 校验、mTLS 验证未完成。
+
+状态：`[~]` 已完成注册、WebSocket 连接、Envelope 收发、消息路由拆分，以及 `session.start / session.input / session.cancel` 接入 daemon 会话层；并已对核心会话消息接上 `noise_static_v1` 加解密、真实两消息 `Noise IK` 配对 transcript、pairing-derived 首会话引导、`session.start.result` 结构化回执与双向显式 `key.ratchet`。全面 opaque ciphertext、移除兼容 fallback 与 mTLS 验证未完成。
 
 - **daemon 主动 outbound 连服务器**（反向 WebSocket）
 - 若本地尚无设备证书，先调用 `POST /v1/register`（普通 HTTPS）完成 bootstrap 注册，拿到 `{ cert, ca_cert }` 后再连接 `/v1/relay`
@@ -190,6 +213,7 @@ packages/protocol/src/
 - seq 管理：发送方递增，接收方检测乱序（乱序打日志，不丢弃）
 
 #### 1.3.5 主进程入口（`src/index.ts`）
+
 状态：`[~]` 已完成基础启动流程与 session manager 接线；优雅关闭细节、watchdog、真实 agent runtime 未完成。
 
 - 解析 config（`~/.hellobug/daemon.json`）：服务器地址、工作区白名单
@@ -198,17 +222,20 @@ packages/protocol/src/
 - systemd watchdog 心跳（`WATCHDOG_USEC` 环境变量检测）
 
 #### 1.3.6 会话层骨架（`src/sessions/`）
-状态：`[~]` 已完成模块化 session manager、事件发射器和可替换 runtime 接口；当前 runtime 为内存 echo stub，用于打通 daemon 会话主链路。
+
+状态：`[~]` 已完成模块化 session manager、事件发射器和可替换 runtime 接口；当前 runtime 为内存 echo stub，用于打通 daemon 会话主链路，并已在 `startSession` 成功后返回规范化工作区给 `session.start.result`。
 
 - `manager.ts`：维护 `session_id -> SessionHandle`，负责 `start / input / cancel` 编排与基础并发上限
 - `events.ts`：统一构造 `session.event`，集中维护 seq 递增与事件封装
 - `runtime.ts`：定义可插拔 agent runtime 接口，后续 Claude / Codex / shell PTY 直接按此接入
 - `memory-runtime.ts`：当前最小运行时，实现输入回显与取消后发送 `session.done`
 - 已接入 `allowed_paths` 工作区围栏，`session.start` 若越界会返回 `WORKSPACE_FORBIDDEN`
+- `session.start` 失败不再只回通用 `error`，而是统一回 `session.start.result { status: "rejected", code, message }`
 
 ### 1.4 packages/server — 主进程骨架
 
 #### 1.4.1 Fastify 服务器（`src/index.ts`）
+
 状态：`[~]` 已完成 Fastify 应用骨架与 `GET /health`；`/v1/relay` 仅基础接线。
 
 - Fastify 5 + `@fastify/websocket`
@@ -218,6 +245,7 @@ packages/protocol/src/
 - mTLS 客户端证书验证（从 Caddy 透传 `X-Client-Cert` header，服务器验证签名）
 
 #### 1.4.2 认证模块（`src/auth/`）
+
 状态：`[~]` 已完成 bootstrap token、JWT、证书签发、pairing service 基础结构；设备吊销与更完整绑定流程未完成。
 
 - `register.ts`：实现 `POST /v1/register`，校验 server 侧签发的一次性 bootstrap token（哈希存内存，TTL 5 分钟），为 daemon 签发 mTLS 证书
@@ -227,16 +255,19 @@ packages/protocol/src/
 - `cert.ts`：维护 server 自签 CA 与 daemon mTLS 客户端证书签发；App 不参与 mTLS
 
 #### 1.4.3 中继逻辑（`src/relay/`）
-状态：`[~]` 已完成 relay handler / registry / session registry，以及 app ↔ daemon 的配对、会话消息转发、`session.event` 环形缓冲与 `session.resume` 重放；消息签名验证未完成。
+
+状态：`[~]` 已完成 relay handler / registry / session registry，以及 app ↔ daemon 的配对、会话消息转发、`session.event` 环形缓冲与 `session.resume` 重放；并已补 active `danger.pending` 的 server 侧待审批缓存与 `auth.attach` 恢复、envelope 签名验证，以及对 staged 加密 envelope 的“仅凭外层 metadata 路由 / replay / 直转”能力。`session.start` 现已改为 pending session + `session.start.result` 成功后确认注册。仍未达到所有消息全面 opaque 的最终形态。
 
 - `router.ts`：根据 envelope 的 `to_device_id` 找到对应 WebSocket 连接，转发
 - `buffer.ts`：每个 session_id 对应一个环形缓冲（最近 500 条，TTL 24h）
   - 当前已实现 `session.event` 的最近 500 条缓存、TTL 清理与 `replay(session_id, last_seq)` 查询
   - 现阶段先缓存协议中已定义 `seq` 的 `session.event`，其余消息类型待补充明确重放语义后再纳入
-- `session.ts`：会话注册表（`session_id → {app_device_id, daemon_device_id}`）
+- `pending-danger.ts`：按 `danger_id` 维护仍未处理的 `danger.pending`，在 App `auth.attach` 后按 `app_device_id` 定向补发，并在 `danger.allow / danger.deny` 后清理
+- `session.ts`：会话注册表（confirmed session）+ pending start 状态（等待 daemon `session.start.result`）
 - 消息签名验证：验证 envelope 的 Ed25519 签名（用发送方已注册的公钥）
 
 #### 1.4.4 设备在线状态（`src/state/presence.ts`）
+
 状态：`[~]` 已完成基础在线状态记录与 `device.status` 广播骨架；真实多设备场景与重放一致性仍待补全。
 
 - WebSocket 连接时标记设备在线，断线时标记离线
@@ -248,6 +279,7 @@ packages/protocol/src/
 ## M2：聊天闭环（约 5-7 天，状态：[~] 进行中）
 
 ### 2.1 Claude Code 适配器（`packages/daemon/src/agents/claude.ts`）
+
 状态：`[~]` 已完成子进程 runtime、真实 CLI `stream-json` 对齐、runtime factory 与 fixture 测试；真实危险工具握手、录制回放 fixture 与更完整错误恢复仍待补全。
 
 - 子进程模式（根据 Spike 2 结果选定）：
@@ -274,6 +306,7 @@ packages/protocol/src/
   - 已用假 fixture 子进程覆盖 `assistant.thinking`、`assistant.delta`、`tool.use`、`tool.result`、`session.usage`、多轮 `result != session.done`、`cancel -> SIGINT` 与图片路径注入
 
 ### 2.2 危险操作拦截（`packages/daemon/src/guard/`）
+
 状态：`[~]` 已完成规则加载、审批队列、`danger.pending / allow / deny` 路由与 60 秒自动 deny；真实 Claude CLI 原生工具拦截握手仍待结合 Spike 2 继续补强。
 
 - `rules.ts`：规则加载（从 `~/.hellobug/danger-rules.json`）
@@ -297,6 +330,7 @@ packages/protocol/src/
   - 当前 daemon 会在 `tool.use` 事件层暂停向 App 继续透传，等待审批结果；若被拒绝，则向 App 注入合成的 `tool.result` 错误事件，并丢弃对应真实结果
 
 ### 2.3 审计日志（`packages/daemon/src/audit/`）
+
 状态：`[~]` 已完成本地加密 JSONL、按天轮转、30 天清理与会话/危险操作审计接线；`file.changed`、多 Agent 维度和历史读取接口仍待后续补齐。
 
 - append-only 日志文件：`~/.hellobug/audit/<date>.jsonl`
@@ -312,15 +346,17 @@ packages/protocol/src/
   - 已把 `session.start`、`session.input*`、`session.cancel`、`tool.use`、`tool.result`、`session.done`、`danger.pending / allow / deny` 接入审计
   - 当前实现已避免把原始文本输入和工具原始参数直接落盘，优先记录 hash 或摘要
 
-### 2.4 服务器：环形缓冲与重放（`packages/server/src/relay/buffer.ts`）
+### 2.4 服务器：环形缓冲与重放（`packages/server/src/relay/buffer.ts` / `pending-danger.ts`）
 
-- 状态：`[x]` 已完成首版服务端重放闭环（当前范围：`session.event`）
+- 状态：`[~]` 已完成两类恢复闭环：`session.event` 的按 seq 重放，以及 active `danger.pending` 的 `auth.attach` 补发
 - App 重连时携带 `last_seq`
 - 服务器批量推送 `[last_seq+1, current_seq]` 的 `session.event`
 - 批量推送完成后发 `replay.done`（含当前 seq）
 - 缓冲满（>500 条）时丢弃最旧的，不阻塞新消息
+- 服务器会在 `auth.attach` 后主动补发仍未超时、且尚未被 `danger.allow / danger.deny` 处理的 `danger.pending`
 - 后续待补：
-  - 是否把 `danger.pending` / 其他带 `session_id` 的消息纳入重放
+  - `danger.result` 已补结构化回执；后续继续收口客户端跨页提示与更多恢复语义
+  - 其他带 `session_id` 的消息是否需要定义类似恢复语义
   - 与未来真实 E2EE envelope / 签名校验的结合
 
 ---
@@ -372,10 +408,12 @@ packages/protocol/src/
 根据 Spike 3 结果二选一：
 
 **方案 A（JSON 模式，Spike 3 确认稳定后用）**：
+
 - `codex exec --json ...` 子进程
 - 解析 JSON 输出，映射到 protocol 事件类型
 
 **方案 B（PTY 兜底）**：
+
 - `node-pty` 开 PTY 运行 `codex`
 - 原始字节流封装为 `pty.data` 事件
 - App 端用 xterm.dart 渲染（等同终端会话）
@@ -390,6 +428,7 @@ packages/protocol/src/
 - 会话结束：监听 `exit` 事件，发 `session.done`
 
 ### 4.4 图片分片上传（`packages/daemon/src/fs/image.ts`）
+
 状态：`[~]` 已完成 daemon 侧分片组装、临时文件落盘、Claude runtime 路径注入与 session 结束清理；App 端联调与更完整图片生命周期仍待补全。
 
 - 收到 `session.input.image`（分片）：
@@ -399,6 +438,7 @@ packages/protocol/src/
 - 会话结束后清理临时文件
 
 ### 4.5 历史 Transcript 读取（`packages/daemon/src/history/`）
+
 状态：`[x]` 已完成基础 transcript 扫描与分页读取；后续只剩更复杂的过滤/恢复扩展。
 
 - `finder.ts`：扫描 Claude Code 的 transcript 目录（`~/.claude/projects/<hash>/`）
@@ -412,23 +452,32 @@ packages/protocol/src/
 ### 4.6 服务器：APNS 推送（`packages/server/src/push/apns.ts`）
 
 触发时机（daemon 发 `push.trigger` 给服务器）：
+
 - `session.done`（任务完成）
 - `danger.pending`（需要确认危险操作）
 - `session.error`（agent 出错）
 
 实现：
+
 - Apple APNS HTTP/2 API（token-based auth，`.p8` 私钥）
 - 每个 App 设备注册 APNS token，服务器维护 `device_id → apns_token` 映射
 - 推送内容：**只含** `session_id` + `event_type`（不含任何代码或用户输入）
   ```json
-  { "aps": { "alert": { "title": "HelloBug", "body": "任务已完成" }, "sound": "default" },
-    "session_id": "xxx", "event_type": "task_done" }
+  {
+    "aps": {
+      "alert": { "title": "HelloBug", "body": "任务已完成" },
+      "sound": "default"
+    },
+    "session_id": "xxx",
+    "event_type": "task_done"
+  }
   ```
 - 失败处理：410 Gone → 清除 token；5xx → 重试 3 次（指数退避）
 
 ### 4.7 服务器：Android 厂商推送（`packages/server/src/push/android.ts`）
 
 根据 Spike 预研结果，实现对应厂商 HTTP API：
+
 - 小米推送（Mi Push）：`https://api.xmpush.xiaomi.com/v3/message/regid`
 - OPPO Push：`https://api.push.oppomobile.com/server/v1/message/notification/unicast`
 - vivo Push：`https://api-push.vivo.com.cn/message/send`
@@ -440,6 +489,7 @@ packages/protocol/src/
 ### 4.8 部署配置（`deploy/`）
 
 `deploy/Caddyfile`：
+
 ```
 relay.yourdomain.com {
   reverse_proxy localhost:3000
@@ -450,6 +500,7 @@ relay.yourdomain.com {
 ```
 
 `deploy/hellobug-server.service`（systemd）：
+
 ```ini
 [Unit]
 Description=HelloBug Relay Server
@@ -545,16 +596,16 @@ WantedBy=multi-user.target
 
 ### 5.7 测试要求（M5 专项）
 
-| 测试场景 | 验证点 |
-|---|---|
-| 单会话多 agent | 同时启动 agent-A 和 agent-B，两者子进程独立运行 |
-| 动态加 agent | `session.start` 启动主 agent 后，`session.agent.add` 能成功追加 agent-B |
-| @mention 精确路由 | `target_agent_id: "agent-A"` 的消息只有 A 收到，B 不收到 |
-| 默认编排路由 | `target_agent_id: null` 且未显式 broadcast 时，只有主 agent 收到 |
-| 显式广播路由 | `routing_mode: "broadcast"` 的消息 A 和 B 都收到 |
-| 并发写保护 | A 和 B 同时尝试写同一文件，后者等待前者完成，文件内容无损坏 |
-| 事件归属 | session.event / danger.pending 正确携带 `agent_id` / `agent_type` |
-| Agent 独立审计 | A 和 B 的操作在审计日志中可按 agent_id 区分 |
+| 测试场景          | 验证点                                                                  |
+| ----------------- | ----------------------------------------------------------------------- |
+| 单会话多 agent    | 同时启动 agent-A 和 agent-B，两者子进程独立运行                         |
+| 动态加 agent      | `session.start` 启动主 agent 后，`session.agent.add` 能成功追加 agent-B |
+| @mention 精确路由 | `target_agent_id: "agent-A"` 的消息只有 A 收到，B 不收到                |
+| 默认编排路由      | `target_agent_id: null` 且未显式 broadcast 时，只有主 agent 收到        |
+| 显式广播路由      | `routing_mode: "broadcast"` 的消息 A 和 B 都收到                        |
+| 并发写保护        | A 和 B 同时尝试写同一文件，后者等待前者完成，文件内容无损坏             |
+| 事件归属          | session.event / danger.pending 正确携带 `agent_id` / `agent_type`       |
+| Agent 独立审计    | A 和 B 的操作在审计日志中可按 agent_id 区分                             |
 
 ---
 
@@ -588,19 +639,20 @@ Flutter App **只通过 WebSocket 与云服务器通信**，所有消息格式�
 
 每个模块需要对应测试文件（`*.test.ts`，使用 Vitest）：
 
-| 模块 | 测试重点 |
-|---|---|
-| `protocol/` | 每种消息类型的 Zod 验证通过/失败 |
-| `daemon/crypto/` | E2EE 加解密向量（与 Flutter 端对齐） |
-| `daemon/pairing/` | 配对码过期、限流、SAS 生成 |
-| `daemon/transport/` | 重连退避、心跳超时、签名验证 |
-| `daemon/guard/` | 黑名单命中、白名单放行、路径越界 |
-| `daemon/agents/claude` | stream-json 解析（用录制的 fixture） |
-| `server/relay/` | 路由转发、环形缓冲、断线重放 |
-| `server/auth/` | 配对流程、JWT 签发/验证、设备吊销 |
-| `server/push/` | APNS token 失效处理、Android 厂商路由 |
+| 模块                   | 测试重点                              |
+| ---------------------- | ------------------------------------- |
+| `protocol/`            | 每种消息类型的 Zod 验证通过/失败      |
+| `daemon/crypto/`       | E2EE 加解密向量（与 Flutter 端对齐）  |
+| `daemon/pairing/`      | 配对码过期、限流、SAS 生成            |
+| `daemon/transport/`    | 重连退避、心跳超时、签名验证          |
+| `daemon/guard/`        | 黑名单命中、白名单放行、路径越界      |
+| `daemon/agents/claude` | stream-json 解析（用录制的 fixture）  |
+| `server/relay/`        | 路由转发、环形缓冲、断线重放          |
+| `server/auth/`         | 配对流程、JWT 签发/验证、设备吊销     |
+| `server/push/`         | APNS token 失效处理、Android 厂商路由 |
 
 集成测试：
+
 - M1 完成后：E2EE echo round-trip（Node → Flutter 模拟端）
 - M2 完成后：完整聊天闭环（用预录的 Claude Code 事件流回放）
 - M4 完成后：多并发会话不串消息

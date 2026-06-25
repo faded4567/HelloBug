@@ -24,25 +24,25 @@ WebSocket Frame (binary / text)
 
 ### 1.1 Envelope 字段
 
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| `from` | string | 发送方 `device_id`（UUID） |
-| `to` | string | 接收方 `device_id`（UUID），服务器内部路由用 |
-| `session_id` | string | 会话 UUID（无关联会话时传空字符串） |
-| `seq` | number (u64) | 单 session 内严格递增，从 1 开始；无会话上下文的消息（如 auth）使用全局递增序列 |
-| `ts` | number | Unix 毫秒时间戳 |
-| `sig` | string | 对 `from+to+session_id+seq+ts` 拼接后的 Ed25519 签名（base64url），防篡改与重放 |
-| `ciphertext` | string | base64url 编码的 AEAD 密文（InnerMessage 加密后） |
+| 字段         | 类型         | 说明                                                                            |
+| ------------ | ------------ | ------------------------------------------------------------------------------- |
+| `from`       | string       | 发送方 `device_id`（UUID）                                                      |
+| `to`         | string       | 接收方 `device_id`（UUID），服务器内部路由用                                    |
+| `session_id` | string       | 会话 UUID（无关联会话时传空字符串）                                             |
+| `seq`        | number (u64) | 单 session 内严格递增，从 1 开始；无会话上下文的消息（如 auth）使用全局递增序列 |
+| `ts`         | number       | Unix 毫秒时间戳                                                                 |
+| `sig`        | string       | 对 `from+to+session_id+seq+ts` 拼接后的 Ed25519 签名（base64url），防篡改与重放 |
+| `ciphertext` | string       | base64url 编码的 AEAD 密文（InnerMessage 加密后）                               |
 
 > 服务器拒绝条件：sig 无效 / seq 重复或回退 / ts 偏差超过 ±5 分钟。
 
 ### 1.2 InnerMessage 字段
 
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| `v` | number | 协议版本，当前为 `1` |
-| `id` | string | 消息 UUID（用于去重与 ACK） |
-| `type` | string | 消息类型，见下文 |
+| 字段      | 类型   | 说明                         |
+| --------- | ------ | ---------------------------- |
+| `v`       | number | 协议版本，当前为 `1`         |
+| `id`      | string | 消息 UUID（用于去重与 ACK）  |
+| `type`    | string | 消息类型，见下文             |
 | `payload` | object | 具体业务字段，由 `type` 决定 |
 
 ---
@@ -97,61 +97,62 @@ derive session keys
 
 ### App → Server（转发给 Daemon）
 
-| type | 说明 |
-|---|---|
-| `auth.attach` | 重连时重新挂载连接（携带 JWT） |
-| `auth.refresh` | JWT 续期请求 |
-| `device.pair` | 首次配对请求 |
-| `device.pair.confirm` | 用户确认 SAS 后发送 |
-| `device.push_token` | 上报推送 token（配对完成后立即发送） |
-| `session.start` | 启动新 agent 会话 |
-| `session.agent.add` | 向既有会话动态添加一个 agent（M5） |
-| `session.resume` | 断线重连后按会话粒度请求重放缺失消息 |
-| `session.input` | 发送文本指令（M5 支持 `direct` / `broadcast` / `orchestrated` 路由） |
-| `session.input.image` | 发送图片（分片） |
-| `session.input.voice_text` | 发送语音转文字结果 |
-| `session.command.slash` | 执行斜杠命令 |
-| `session.cancel` | 中断当前 agent |
-| `danger.allow` | 允许危险操作 |
-| `danger.deny` | 拒绝危险操作 |
-| `fs.tree.req` | 请求文件树 |
-| `fs.file.req` | 请求文件内容 |
-| `history.list` | 列出本地 transcript |
-| `history.get` | 读取 transcript 分页 |
-| `templates.list` | 拉取指令模板列表 |
-| `slash.list` | 拉取斜杠命令列表 |
-| `pty.input` | 向 PTY 写入原始输入字节（base64） |
-| `pty.resize` | 调整 PTY 终端大小 |
+| type                       | 说明                                                                 |
+| -------------------------- | -------------------------------------------------------------------- |
+| `auth.attach`              | 重连时重新挂载连接（携带 JWT）                                       |
+| `auth.refresh`             | JWT 续期请求                                                         |
+| `device.pair`              | 首次配对请求                                                         |
+| `device.pair.confirm`      | 用户确认 SAS 后发送                                                  |
+| `device.push_token`        | 上报推送 token（配对完成后立即发送）                                 |
+| `session.start`            | 启动新 agent 会话                                                    |
+| `session.agent.add`        | 向既有会话动态添加一个 agent（M5）                                   |
+| `session.resume`           | 断线重连后按会话粒度请求重放缺失消息                                 |
+| `session.input`            | 发送文本指令（M5 支持 `direct` / `broadcast` / `orchestrated` 路由） |
+| `session.input.image`      | 发送图片（分片）                                                     |
+| `session.input.voice_text` | 发送语音转文字结果                                                   |
+| `session.command.slash`    | 执行斜杠命令                                                         |
+| `session.cancel`           | 中断当前 agent                                                       |
+| `danger.allow`             | 允许危险操作                                                         |
+| `danger.deny`              | 拒绝危险操作                                                         |
+| `fs.tree.req`              | 请求文件树                                                           |
+| `fs.file.req`              | 请求文件内容                                                         |
+| `history.list`             | 列出本地 transcript                                                  |
+| `history.get`              | 读取 transcript 分页                                                 |
+| `templates.list`           | 拉取指令模板列表                                                     |
+| `slash.list`               | 拉取斜杠命令列表                                                     |
+| `pty.input`                | 向 PTY 写入原始输入字节（base64）                                    |
+| `pty.resize`               | 调整 PTY 终端大小                                                    |
 
 ### Server / Daemon → App
 
-| type | 说明 |
-|---|---|
-| `server.hello` | 连接建立后服务器第一条消息 |
-| `auth.token` | `auth.attach` / `auth.refresh` 的响应，返回新 JWT |
-| `device.status` | 设备在线状态变更 |
-| `device.pair.sas` | 配对 SAS 核对词（daemon 通过 server 中继返回） |
-| `session.event` | agent 事件流（见 §4），M5 起每个事件携带 `agent_id` / `agent_type` |
-| `danger.pending` | 等待用户确认危险操作 |
-| `fs.tree` | 文件树响应 |
-| `fs.file` | 文件内容响应（支持分片） |
-| `history.list` | transcript 列表响应 |
-| `history.get` | transcript 内容响应 |
-| `replay.done` | 断线重放完成标记 |
-| `key.ratchet` | 密钥轮换通知（任意一侧均可发起） |
-| `key.ratchet_ack` | 密钥轮换确认（收到 key.ratchet 后立即回复） |
+| type              | 说明                                                               |
+| ----------------- | ------------------------------------------------------------------ |
+| `server.hello`    | 连接建立后服务器第一条消息                                         |
+| `auth.token`      | `auth.attach` / `auth.refresh` 的响应，返回新 JWT                  |
+| `device.status`   | 设备在线状态变更                                                   |
+| `device.pair.sas` | 配对 SAS 核对词（daemon 通过 server 中继返回）                     |
+| `session.start.result` | `session.start` 的结构化成功/失败回执                          |
+| `session.event`   | agent 事件流（见 §4），M5 起每个事件携带 `agent_id` / `agent_type` |
+| `danger.pending`  | 等待用户确认危险操作                                               |
+| `fs.tree`         | 文件树响应                                                         |
+| `fs.file`         | 文件内容响应（支持分片）                                           |
+| `history.list`    | transcript 列表响应                                                |
+| `history.get`     | transcript 内容响应                                                |
+| `replay.done`     | 断线重放完成标记                                                   |
+| `key.ratchet`     | 密钥轮换通知（任意一侧均可发起）                                   |
+| `key.ratchet_ack` | 密钥轮换确认（收到 key.ratchet 后立即回复）                        |
 
 ### Daemon → Server（不转发给 App）
 
-| type | 说明 |
-|---|---|
-| `daemon.hello` | mTLS 握手完成后 daemon 立即发送，上报自身信息 |
+| type                | 说明                                           |
+| ------------------- | ---------------------------------------------- |
+| `daemon.hello`      | mTLS 握手完成后 daemon 立即发送，上报自身信息  |
 | `device.pair.ready` | daemon 就绪后上报配对槽信息，供 App 扫码后路由 |
 
 ### 通用（任意方向均可发）
 
-| type | 说明 |
-|---|---|
+| type    | 说明             |
+| ------- | ---------------- |
 | `error` | 消息处理失败响应 |
 
 ---
@@ -280,6 +281,7 @@ JWT 即将过期时 App 主动续期（方向：App→Server），不依赖重�
   "type": "device.pair.sas",
   "payload": {
     "sas": ["🐢", "🪐", "🍵", "🎷", "🌙"],
+    "noise_handshake": "<base64url Noise IK message_1>",
     "daemon_pubkey": "<base64url Curve25519 公钥>",
     "daemon_ed25519_pubkey": "<base64url Ed25519 公钥>",
     "machine_name": "MacBook-Pro-M3",
@@ -294,10 +296,13 @@ JWT 即将过期时 App 主动续期（方向：App→Server），不依赖重�
 {
   "type": "device.pair.confirm",
   "payload": {
-    "confirmed": true
+    "confirmed": true,
+    "noise_handshake": "<base64url Noise IK message_2>"
   }
 }
 ```
+
+当前实现中，daemon 作为 `Noise IK` initiator，App 作为 responder。双方展示与核对的 `sas` 由握手中间态派生，因此 daemon 可以在收到 `message_2` 前先显示 SAS，App 也能基于同一握手阶段本地复算并校验。
 
 `pairing_code` 仅作用户输入与展示校验。`server_url` 可选：扫码场景通常已由二维码提供，手动输入场景可随 `device.pair` 一并提交。Server 实际通过 `device.pair.ready` 预先登记的 `pairing_id` 槽位路由到对应 daemon：扫码流程可直接命中该 pairing slot，手动输入流程则先按 `pairing_code` 查回对应 `pairing_id`。
 
@@ -320,6 +325,50 @@ JWT 即将过期时 App 主动续期（方向：App→Server），不依赖重�
 `agent_type` 枚举：`claude_code` / `codex` / `shell`  
 `workspace_path`：可为空字符串；为空时表示“使用 daemon 默认工作区”  
 `resume_session_id`：非空时 daemon 用 `claude --resume <id>` 续接历史会话。
+
+### 4.7.1 session.start.result
+
+daemon 在真正尝试启动 runtime 后返回 `session.start.result`。App 必须在收到 `status = "started"` 后，才把本地 session 加入列表并进入会话页。
+
+成功示例：
+
+```json
+{
+  "type": "session.start.result",
+  "payload": {
+    "request_id": "req-uuid",
+    "session_id": "sess-uuid",
+    "agent_type": "claude_code",
+    "workspace_path": "/Users/me/projects/hello",
+    "status": "started",
+    "message": "Session started"
+  }
+}
+```
+
+失败示例：
+
+```json
+{
+  "type": "session.start.result",
+  "payload": {
+    "request_id": "req-uuid",
+    "session_id": "sess-uuid",
+    "agent_type": "claude_code",
+    "workspace_path": "/outside/workspace",
+    "status": "rejected",
+    "code": "WORKSPACE_FORBIDDEN",
+    "message": "Workspace is outside allowed paths"
+  }
+}
+```
+
+说明：
+
+- `request_id`：原始 `session.start` 的消息 id
+- `workspace_path`：成功时为 daemon 最终采用的真实工作区路径；如果请求里传空字符串，这里会返回 daemon 默认工作区
+- `status = "rejected"` 时必须携带 `code`，其枚举与通用 `error.code` 一致
+- server 本地预检失败（例如 daemon 离线、app 未认证）也复用同一个拒绝结构，避免客户端只能靠超时判断失败
 
 ---
 
@@ -451,6 +500,7 @@ Daemon 向 agent 子进程发 SIGINT。
 {
   "type": "danger.allow",
   "payload": {
+    "session_id": "sess-uuid",
     "danger_id": "dng-uuid",
     "biometric_verified": true
   }
@@ -461,6 +511,7 @@ Daemon 向 agent 子进程发 SIGINT。
 {
   "type": "danger.deny",
   "payload": {
+    "session_id": "sess-uuid",
     "danger_id": "dng-uuid"
   }
 }
@@ -492,7 +543,32 @@ Daemon 向 agent 子进程发 SIGINT。
 
 ---
 
-### 4.16 session.event（agent 事件流）
+### 4.16 danger.result
+
+```json
+{
+  "type": "danger.result",
+  "payload": {
+    "danger_id": "dng-uuid",
+    "session_id": "sess-uuid",
+    "status": "timed_out",
+    "message": "Danger approval timed out"
+  }
+}
+```
+
+`status` 枚举：
+- `approved`
+- `denied`
+- `timed_out`
+- `not_found`
+- `biometric_required`
+
+App 在发送 `danger.allow` / `danger.deny` 后，应该等待对应 `danger_id` 的 `danger.result`，再决定关闭确认层或展示错误提示。
+
+---
+
+### 4.17 session.event（agent 事件流）
 
 `session.event` 是一个容器，内部 `event` 字段为联合类型：
 
@@ -634,9 +710,27 @@ App 端 xterm.dart 直接写入。
     "workspace_path": "/Users/shuai/projects/HelloBug",
     "dir_path": "src/auth",
     "entries": [
-      { "name": "login.ts",    "path": "src/auth/login.ts",    "type": "file", "modified": true,  "size": 1240 },
-      { "name": "register.ts", "path": "src/auth/register.ts", "type": "file", "modified": false, "size": 880 },
-      { "name": "utils",       "path": "src/auth/utils",       "type": "dir",  "modified": false, "size": 0 }
+      {
+        "name": "login.ts",
+        "path": "src/auth/login.ts",
+        "type": "file",
+        "modified": true,
+        "size": 1240
+      },
+      {
+        "name": "register.ts",
+        "path": "src/auth/register.ts",
+        "type": "file",
+        "modified": false,
+        "size": 880
+      },
+      {
+        "name": "utils",
+        "path": "src/auth/utils",
+        "type": "dir",
+        "modified": false,
+        "size": 0
+      }
     ]
   }
 }
@@ -831,10 +925,10 @@ App 端 xterm.dart 直接写入。
   "type": "slash.list",
   "payload": {
     "commands": [
-      { "name": "clear",   "desc": "清空当前会话上下文" },
+      { "name": "clear", "desc": "清空当前会话上下文" },
       { "name": "compact", "desc": "压缩历史，只保留摘要" },
-      { "name": "init",    "desc": "生成 CLAUDE.md" },
-      { "name": "model",   "desc": "切换模型" }
+      { "name": "init", "desc": "生成 CLAUDE.md" },
+      { "name": "model", "desc": "切换模型" }
     ]
   }
 }
@@ -923,7 +1017,7 @@ App 重连流程：
 3. Server 回复 `auth.token`（必要时返回续期后的 JWT）
 4. App 按需逐会话发送 `session.resume { session_id, last_seq }`
 5. 服务器推送 `[last_seq+1, current_seq]` 的所有密文 envelope
-6. 服务器发送 `replay.done`
+6. 服务器发送 `replay.done { status, message }`
 7. App 解密重放消息，恢复 UI 状态
 ```
 
@@ -939,11 +1033,31 @@ App 重连流程：
 
 服务器环形缓冲：每 session 最近 500 条密文 envelope，TTL 24 小时，超出后丢弃最旧条目。
 
+`replay.done` 结构：
+
+```json
+{
+  "type": "replay.done",
+  "payload": {
+    "session_id": "sess-uuid",
+    "replayed_count": 3,
+    "current_seq": 44,
+    "status": "ok",
+    "message": "Replay complete"
+  }
+}
+```
+
+`status` 枚举：
+
+- `ok`：恢复完成，可继续使用该 session
+- `session_not_found`：该 session 已失效、已被清理，或不归当前 App 设备所有；客户端应停止继续恢复这个 session，并清理本地恢复状态
+
 ---
 
 ## 六、错误响应
 
-任何消息处理失败时，发送方回复：
+除 `session.start` 外，其他消息处理失败时，发送方回复：
 
 ```json
 {
@@ -956,16 +1070,18 @@ App 重连流程：
 }
 ```
 
-| code | 含义 |
-|---|---|
-| `AUTH_EXPIRED` | JWT 过期 |
-| `AUTH_INVALID` | 签名验证失败 |
-| `DEVICE_REVOKED` | 设备已吊销 |
-| `SESSION_NOT_FOUND` | 会话不存在或已结束 |
-| `RATE_LIMITED` | 请求过于频繁 |
+| code                  | 含义                 |
+| --------------------- | -------------------- |
+| `AUTH_EXPIRED`        | JWT 过期             |
+| `AUTH_INVALID`        | 签名验证失败         |
+| `DEVICE_REVOKED`      | 设备已吊销           |
+| `SESSION_NOT_FOUND`   | 会话不存在或已结束   |
+| `RATE_LIMITED`        | 请求过于频繁         |
 | `WORKSPACE_FORBIDDEN` | 工作区路径不在白名单 |
-| `CHUNK_MISSING` | 分片缺失，请重传 |
-| `PROTOCOL_VERSION` | 协议版本不兼容 |
+| `CHUNK_MISSING`       | 分片缺失，请重传     |
+| `PROTOCOL_VERSION`    | 协议版本不兼容       |
+
+`session.start` 是特例：成功与失败都统一走 `session.start.result`。失败态在 payload 里返回 `status = "rejected"` 与对应 `code / message`。
 
 ---
 

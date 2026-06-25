@@ -88,13 +88,68 @@
       </div>
 
       <div style="margin-top:14px;display:flex;gap:8px">
-        <button class="btn" style="flex:1;font-size:13px">复制会话 ID</button>
-        <button class="btn" style="flex:1;font-size:13px;color:var(--red);border-color:var(--red)">终止会话</button>
+        <button class="btn" style="flex:1;font-size:13px" onclick="location.href='06-filetree.html'">文件树 →</button>
+        <button class="btn" style="flex:1;font-size:13px">复制 ID</button>
+        <button class="btn" style="flex:1;font-size:13px;color:var(--red);border-color:var(--red)">终止</button>
       </div>
     </div>
   </div>
 
-  <!-- B: 已完成会话 -->
+  <!-- C: 回放中会话 -->
+  <div class="phone-label">40-C · 会话信息 — 回放中</div>
+  <div class="phone" style="position:relative;overflow:hidden">
+    <div class="dynamic-island"></div>
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div style="background:var(--bg2);border-bottom:1px solid var(--separator);padding:10px 16px 8px;display:flex;align-items:center;gap:8px;filter:blur(1px);flex-shrink:0">
+      <span style="font-size:17px;font-weight:600">HelloBug</span>
+      <div style="width:8px;height:8px;border-radius:50%;background:var(--tint)"></div>
+    </div>
+    <div class="chat-area" style="filter:blur(2px);flex:1;overflow:hidden">
+      <div class="msg ai"><div class="bubble">正在回放历史消息…</div></div>
+    </div>
+    <div class="sheet-overlay"></div>
+    <div class="sheet" style="padding-bottom:40px">
+      <div class="sheet-handle"></div>
+      <div style="display:flex;align-items:center;padding:0 16px 14px">
+        <div style="font-size:17px;font-weight:600;flex:1">会话信息</div>
+        <button style="color:var(--tint);font-size:15px;background:none;border:none;cursor:pointer">完成</button>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;padding:0 16px 14px">
+        <div style="width:10px;height:10px;border-radius:50%;background:var(--tint)"></div>
+        <span style="font-size:15px;font-weight:600">HelloBug</span>
+        <span class="pill-label" style="font-size:11px;background:var(--tint-bg);color:var(--tint)">回放中</span>
+        <div style="flex:1"></div>
+        <span style="font-size:12px;color:var(--fg3)">共 18 分钟</span>
+      </div>
+
+      <div style="background:var(--bg2);border-radius:var(--r);margin:0 0 12px">
+        <div class="stat-row"><span class="stat-label">模型</span><span class="stat-value" style="font-family:var(--font-ui);font-size:13px">claude-sonnet-4-5</span></div>
+        <div class="stat-row"><span class="stat-label">设备</span><span class="stat-value" style="font-family:var(--font-ui)">💻 MacBook Pro</span></div>
+        <div class="stat-row"><span class="stat-label">输入 Token</span><span class="stat-value">12,480</span></div>
+        <div class="stat-row"><span class="stat-label">输出 Token</span><span class="stat-value">3,214</span></div>
+        <div class="stat-row"><span class="stat-label">工具调用</span><span class="stat-value">7 次</span></div>
+      </div>
+
+      <div style="font-size:12px;color:var(--fg2);padding:0 0 8px;font-weight:600;text-transform:uppercase;letter-spacing:.04em">涉及文件</div>
+      <div style="display:flex;flex-wrap:wrap;margin:-2px -3px">
+        <div class="file-chip">📄 router.dart</div>
+        <div class="file-chip">📄 chat_page.dart</div>
+      </div>
+
+      <div style="margin-top:14px;display:flex;gap:8px">
+        <button class="btn" style="flex:1;font-size:13px" onclick="location.href='06-filetree.html'">文件树 →</button>
+        <button class="btn" style="flex:1;font-size:13px">复制 ID</button>
+        <button class="btn" style="flex:1;font-size:13px;color:var(--red);border-color:var(--red)">终止</button>
+      </div>
+    </div>
+  </div>
   <div class="phone-label">40-B · 会话信息 — 已完成</div>
   <div class="phone" style="position:relative;overflow:hidden">
     <div class="dynamic-island"></div>

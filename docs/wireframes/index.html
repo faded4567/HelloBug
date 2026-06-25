@@ -203,6 +203,8 @@ const edges = [
   { from:'media_drawer', to:'img_input', label:'相机/相册', type:'ok' },
   { from:'chat', to:'msg_actions',label:'长按消息',   type:'action', fromPort:'r', toPort:'l' },
   { from:'chat', to:'sess_info',  label:'会话信息',   type:'action', fromPort:'r', toPort:'l' },
+  { from:'sess_info', to:'filetree', label:'文件树(运行中)', type:'action', fromPort:'l', toPort:'r' },
+  { from:'diff',      to:'filetree', label:'对应文件 ↗',    type:'action', fromPort:'r', toPort:'l' },
   { from:'chat', to:'sess_tabs',  label:'多会话',     type:'action', fromPort:'r', toPort:'l' },
   { from:'chat', to:'landscape',  label:'横屏',       type:'opt',    fromPort:'r', toPort:'l' },
 

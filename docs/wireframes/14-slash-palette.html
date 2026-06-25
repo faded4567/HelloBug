@@ -109,6 +109,62 @@
     </div>
   </div>
 </div>
+
+<!-- shared status bar SVG snippets reused below -->
+<div class="phone-wrap">
+
+  <div class="phone-label">14-B · Slash 面板 — 加载中</div>
+  <div class="phone" style="position:relative">
+    <div class="dynamic-island"></div>
+    <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg><svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg></div></div>
+    <div class="nav"><div class="nav-back"><svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8,1 2,9 8,17"/></svg></div><div class="nav-title" style="font-size:15px">HelloBug · Claude Code</div><div class="nav-right">⋯</div></div>
+    <div class="chat-bg" style="opacity:.35;pointer-events:none"><div class="msg me"><div class="bubble">帮我重构一下 auth 模块</div></div></div>
+    <div class="palette" style="position:absolute;left:12px;right:12px;bottom:68px">
+      <div class="palette-search"><span class="palette-search-icon">⁄</span><input class="palette-input" type="text" placeholder="搜索命令…" value="/"></div>
+      <div style="display:flex;align-items:center;justify-content:center;padding:32px 0;gap:10px;color:var(--fg3);font-size:14px">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="currentColor" stroke-width="2" opacity=".25"/><path d="M9 2a7 7 0 0 1 7 7" stroke="var(--tint)" stroke-width="2" stroke-linecap="round"><animateTransform attributeName="transform" type="rotate" from="0 9 9" to="360 9 9" dur=".9s" repeatCount="indefinite"/></path></svg>
+        正在加载命令列表…
+      </div>
+    </div>
+    <div class="input-bar" style="padding:8px 12px 28px"><div class="input-row"><div class="input-field" style="color:var(--tint);font-family:var(--font-mono)">/</div><button class="input-action send">↑</button></div></div>
+  </div>
+
+  <div class="phone-label">14-C · Slash 面板 — 加载失败</div>
+  <div class="phone" style="position:relative">
+    <div class="dynamic-island"></div>
+    <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg><svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg></div></div>
+    <div class="nav"><div class="nav-back"><svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8,1 2,9 8,17"/></svg></div><div class="nav-title" style="font-size:15px">HelloBug · Claude Code</div><div class="nav-right">⋯</div></div>
+    <div class="chat-bg" style="opacity:.35;pointer-events:none"><div class="msg me"><div class="bubble">帮我重构一下 auth 模块</div></div></div>
+    <div class="palette" style="position:absolute;left:12px;right:12px;bottom:68px">
+      <div class="palette-search"><span class="palette-search-icon">⁄</span><input class="palette-input" type="text" placeholder="搜索命令…" value="/"></div>
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 0;gap:12px">
+        <span style="font-size:28px">⚠️</span>
+        <span style="font-size:14px;color:var(--fg2)">命令列表加载失败</span>
+        <span style="font-size:12px;color:var(--fg3)">请求超时，请检查连接</span>
+        <div style="color:var(--tint);font-size:14px;cursor:pointer;padding:6px 16px;background:var(--tint-bg);border-radius:var(--r-sm)">重试</div>
+      </div>
+    </div>
+    <div class="input-bar" style="padding:8px 12px 28px"><div class="input-row"><div class="input-field" style="color:var(--tint);font-family:var(--font-mono)">/</div><button class="input-action send">↑</button></div></div>
+  </div>
+
+  <div class="phone-label">14-D · Slash 面板 — 无匹配</div>
+  <div class="phone" style="position:relative">
+    <div class="dynamic-island"></div>
+    <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><svg viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity=".3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity=".5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg><svg viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="1.5" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg></div></div>
+    <div class="nav"><div class="nav-back"><svg viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8,1 2,9 8,17"/></svg></div><div class="nav-title" style="font-size:15px">HelloBug · Claude Code</div><div class="nav-right">⋯</div></div>
+    <div class="chat-bg" style="opacity:.35;pointer-events:none"><div class="msg me"><div class="bubble">帮我重构一下 auth 模块</div></div></div>
+    <div class="palette" style="position:absolute;left:12px;right:12px;bottom:68px">
+      <div class="palette-search"><span class="palette-search-icon">⁄</span><input class="palette-input" type="text" placeholder="搜索命令…" value="/xyz123"></div>
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 0;gap:8px">
+        <span style="font-size:28px">🔍</span>
+        <span style="font-size:14px;color:var(--fg2)">无匹配命令</span>
+        <span style="font-size:12px;color:var(--fg3)">/xyz123</span>
+      </div>
+    </div>
+    <div class="input-bar" style="padding:8px 12px 28px"><div class="input-row"><div class="input-field" style="color:var(--tint);font-family:var(--font-mono)">/xyz123</div><button class="input-action send">↑</button></div></div>
+  </div>
+  </div>
+
 <script>
 function toggleTheme() {
   const html = document.documentElement;
