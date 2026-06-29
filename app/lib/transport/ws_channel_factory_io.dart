@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:web_socket_channel/io.dart';
 
+import 'pinned_http_client.dart';
 import 'ws_channel_factory.dart';
 
 class _IoPlatformWsSocket implements PlatformWsSocket {
@@ -22,5 +25,9 @@ class _IoPlatformWsSocket implements PlatformWsSocket {
   Future<void> close() => _channel.sink.close();
 }
 
-PlatformWsSocket createPlatformWebSocketChannel(Uri uri) =>
-    _IoPlatformWsSocket(IOWebSocketChannel.connect(uri));
+PlatformWsSocket createPlatformWebSocketChannel(Uri uri) => _IoPlatformWsSocket(
+  IOWebSocketChannel.connect(
+    uri,
+    customClient: PinnedHttpClient.build(uri) as HttpClient?,
+  ),
+);

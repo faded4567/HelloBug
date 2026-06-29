@@ -20,6 +20,7 @@ const _kLocalTemplatesKey = 'templates.local.v1';
 class TemplatesNotifier extends Notifier<List<TemplateSummary>> {
   WsClient? _lastClient;
   Future<void>? _localLoadFuture;
+  String? _activeRequestId;
   List<TemplateSummary>? _remoteTemplates;
   Map<String, TemplateSummary> _localOverrides = {};
   Set<String> _deletedIds = {};
@@ -33,6 +34,8 @@ class TemplatesNotifier extends Notifier<List<TemplateSummary>> {
     final client = ref.watch(wsClientProvider);
     if (!identical(client, _lastClient)) {
       _lastClient = client;
+      _activeRequestId = null;
+      _loading = false;
       _loadedRemote = false;
       _remoteTemplates = null;
       if (client != null) {
@@ -49,8 +52,11 @@ class TemplatesNotifier extends Notifier<List<TemplateSummary>> {
     }
 
     _loading = true;
+    String? requestId;
     try {
       final request = InnerMessage.create('templates.list', const {});
+      requestId = request.id;
+      _activeRequestId = request.id;
       final response = client.messages
           .firstWhere(
             (message) =>
@@ -65,16 +71,22 @@ class TemplatesNotifier extends Notifier<List<TemplateSummary>> {
       if (msg.type == 'error') {
         throw StateError(msg.payload['message'] as String? ?? '模板列表读取失败');
       }
-      final templates = TemplateSummary.listFromPayload(
+      final templates = TemplateSummary.listFromWirePayload(
         msg.payload['templates'],
       );
+      if (_activeRequestId != request.id) {
+        return;
+      }
       _remoteTemplates = templates;
       _loadedRemote = true;
       state = _composeTemplates();
     } catch (error) {
       debugPrint('[Templates] load failed -> $error');
     } finally {
-      _loading = false;
+      if (_activeRequestId == null || _activeRequestId == requestId) {
+        _activeRequestId = null;
+        _loading = false;
+      }
     }
   }
 
@@ -201,6 +213,6 @@ class TemplatesNotifier extends Notifier<List<TemplateSummary>> {
     if (_loadedRemote) {
       return _remoteTemplates ?? const <TemplateSummary>[];
     }
-    return _remoteTemplates ?? kDefaultTemplates;
+    return _remoteTemplates ?? const <TemplateSummary>[];
   }
 }

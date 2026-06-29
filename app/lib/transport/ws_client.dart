@@ -5,7 +5,9 @@ import 'package:flutter/foundation.dart';
 
 import '../models/inner_message.dart';
 import 'connection_state.dart';
+import 'envelope_routing.dart';
 import 'framed_codec.dart';
+import 'pinned_http_client.dart';
 import 'reconnect_policy.dart';
 import 'ws_channel_factory.dart';
 
@@ -39,16 +41,32 @@ typedef EnvelopeSignFn =
       int seq,
       int ts,
       String ciphertext, [
+      String? requestId,
       String? messageType,
       String? cipherMode,
       String? senderPubkey,
+      String? routingPayload,
     ]);
+typedef WsSocketFactory = PlatformWsSocket Function(Uri uri);
+
+const _routingPayloadPlaceholderMessageTypes = <String>{
+  'auth.token',
+  'device.list',
+  'device.pair.sas',
+  'device.rename',
+  'device.revoke',
+  'device.status',
+  'error',
+  'session.start.result',
+  'replay.done',
+};
 
 class WsClient {
   final Uri serverUri;
   final String Function() getJwt;
   final void Function(String jwt)? onJwt;
   final EnvelopeSignFn? signEnvelope;
+  final WsSocketFactory _socketFactory;
 
   CryptoFn? encrypt;
   DecryptFn? decrypt;
@@ -63,12 +81,15 @@ class WsClient {
   PlatformWsSocket? _ch;
   StreamSubscription<dynamic>? _sub;
   Timer? _retryTimer;
+  Timer? _refreshTimer;
   bool _disposed = false;
+  bool _authenticated = false;
   String _deviceId;
   final Map<String, int> _lastSeq = {}; // session_id → last received seq
   final Set<String> _trackedSessions = {};
   final Set<String> _pendingReplaySessions = {};
   final Set<String> _invalidReplaySessions = {};
+  bool _awaitingReplayAfterAttach = false;
 
   WsClient({
     required this.serverUri,
@@ -76,22 +97,27 @@ class WsClient {
     required this.getJwt,
     this.onJwt,
     this.signEnvelope,
-  }) : _deviceId = deviceId;
+    WsSocketFactory? socketFactory,
+  }) : _deviceId = deviceId,
+       _socketFactory = socketFactory ?? createPlatformWebSocketChannel;
 
   Stream<InnerMessage> get messages => _msgCtrl.stream;
   Stream<WsConnectionState> get states => _stateCtrl.stream;
   Map<String, int> get lastSeq => Map.unmodifiable(_lastSeq);
   Set<String> get trackedSessions => Set.unmodifiable(_trackedSessions);
-  Set<String> get pendingReplaySessions => Set.unmodifiable(_pendingReplaySessions);
-  Set<String> get invalidReplaySessions => Set.unmodifiable(_invalidReplaySessions);
+  Set<String> get pendingReplaySessions =>
+      Set.unmodifiable(_pendingReplaySessions);
+  Set<String> get invalidReplaySessions =>
+      Set.unmodifiable(_invalidReplaySessions);
   String get deviceId => _deviceId;
+  bool get isAuthenticated => _authenticated;
 
-  Future<void> connect() async {
+  Future<void> connect({bool rethrowErrors = false}) async {
     if (_disposed) return;
     _emit(WsConnectionState.connecting);
     try {
       debugPrint('[WsClient] connect -> $serverUri');
-      _ch = createPlatformWebSocketChannel(serverUri);
+      _ch = _socketFactory(serverUri);
       _sub = _ch!.stream.listen(
         (raw) {
           debugPrint('[WsClient] raw <- ${raw.runtimeType}');
@@ -112,8 +138,12 @@ class WsClient {
       _emit(WsConnectionState.online);
       _sendAuthAttach();
     } catch (error) {
-      debugPrint('[WsClient] connect error -> $error');
+      final decorated = _decorateConnectError(error);
+      debugPrint('[WsClient] connect error -> $decorated');
       _scheduleRetry();
+      if (rethrowErrors) {
+        throw decorated;
+      }
     }
   }
 
@@ -127,16 +157,38 @@ class WsClient {
     );
     final plain = jsonEncode(msg.toJson());
     final messageType = msg.type;
-    final sessionId = msg.payload['session_id'] as String? ?? '';
+    final sessionId = resolveEnvelopeSessionIdForMessage(msg);
+    final requestId = envelopeRequestIdForMessage(msg);
+    final routingPayload = envelopeRoutingPayloadForMessage(msg);
+    final requiresNoiseTransport =
+        routingPayload == null && sessionId.isNotEmpty;
+    if (encrypt == null && requiresNoiseTransport) {
+      throw StateError(
+        'Transport crypto is not configured for $messageType '
+        '(session_id=$sessionId)',
+      );
+    }
     final seq = _nextSeq();
     final crypto =
         encrypt != null
             ? await encrypt!(plain, sessionId, seq, messageType)
+            : routingPayload != null
+            ? (
+              ciphertext: base64Url.encode(utf8.encode('opaque')),
+              cipherMode: 'noise_static_v1',
+              senderPubkey: null,
+            )
             : (
               ciphertext: base64Url.encode(utf8.encode(plain)),
               cipherMode: 'plain',
               senderPubkey: null,
             );
+    if (requiresNoiseTransport && crypto.cipherMode != 'noise_static_v1') {
+      throw StateError(
+        'Transport crypto must use noise_static_v1 for $messageType '
+        '(session_id=$sessionId)',
+      );
+    }
     final ts = DateTime.now().millisecondsSinceEpoch;
     final sig =
         signEnvelope != null
@@ -147,9 +199,11 @@ class WsClient {
               seq,
               ts,
               crypto.ciphertext,
+              requestId,
               messageType,
               crypto.cipherMode,
               crypto.senderPubkey,
+              routingPayload,
             )
             : '';
 
@@ -164,6 +218,8 @@ class WsClient {
       'message_type': messageType,
       'cipher_mode': crypto.cipherMode,
       if (crypto.senderPubkey != null) 'sender_pubkey': crypto.senderPubkey,
+      if (requestId != null) 'request_id': requestId,
+      if (routingPayload != null) 'routing_payload': routingPayload,
     };
     _ch!.sendText(_codec.encode(env));
   }
@@ -208,30 +264,52 @@ class WsClient {
           final messageType = obj['message_type'] as String? ?? '';
           final cipherMode = obj['cipher_mode'] as String? ?? 'plain';
           final senderPubkey = obj['sender_pubkey'] as String?;
-          final text =
-              cipherMode == 'noise_static_v1'
-                  ? await (decrypt != null
-                      ? decrypt!(
-                        ciphertext: ciphertext,
-                        sessionId: sessionId,
-                        seq: seq,
-                        messageType: messageType,
-                        cipherMode: cipherMode,
-                        senderPubkey: senderPubkey,
-                      )
-                      : Future<String>.error(
-                        const FormatException(
-                          'missing decryptor for encrypted envelope',
-                        ),
-                      ))
-                  : utf8.decode(
-                    base64Url.decode(base64Url.normalize(ciphertext)),
+          final routingPayload = obj['routing_payload'] as String?;
+          final preferDecryptedSessionStartResult =
+              messageType == 'session.start.result' &&
+              cipherMode == 'noise_static_v1' &&
+              senderPubkey != null &&
+              senderPubkey.isNotEmpty &&
+              decrypt != null;
+          final msg =
+              !preferDecryptedSessionStartResult &&
+                      cipherMode == 'noise_static_v1' &&
+                      _routingPayloadPlaceholderMessageTypes.contains(
+                        messageType,
+                      ) &&
+                      routingPayload != null &&
+                      routingPayload.isNotEmpty
+                  ? _messageFromRoutingPayload(
+                    messageType,
+                    routingPayload,
+                    requestId: obj['request_id'] as String?,
+                  )
+                  : InnerMessage.fromJson(
+                    jsonDecode(
+                          cipherMode == 'noise_static_v1'
+                              ? await (decrypt != null
+                                  ? decrypt!(
+                                    ciphertext: ciphertext,
+                                    sessionId: sessionId,
+                                    seq: seq,
+                                    messageType: messageType,
+                                    cipherMode: cipherMode,
+                                    senderPubkey: senderPubkey,
+                                  )
+                                  : Future<String>.error(
+                                    const FormatException(
+                                      'missing decryptor for encrypted envelope',
+                                    ),
+                                  ))
+                              : utf8.decode(
+                                base64Url.decode(
+                                  base64Url.normalize(ciphertext),
+                                ),
+                              ),
+                        )
+                        as Map<String, dynamic>,
                   );
-          final msg = InnerMessage.fromJson(
-            jsonDecode(text) as Map<String, dynamic>,
-          );
-          if (interceptMessage != null &&
-              await interceptMessage!(msg, this)) {
+          if (interceptMessage != null && await interceptMessage!(msg, this)) {
             continue;
           }
           _handleIncomingMessage(msg, sessionId: sessionId, seq: seq);
@@ -263,11 +341,19 @@ class WsClient {
     }
     _msgCtrl.add(msg);
     if (msg.type == 'auth.token') {
+      _authenticated = true;
       final jwt = msg.payload['jwt'] as String?;
+      final expiresAt = (msg.payload['expires_at'] as num?)?.toInt();
       if (jwt != null && jwt.isNotEmpty) {
         onJwt?.call(jwt);
       }
-      _requestReplays();
+      if (expiresAt != null && expiresAt > 0) {
+        _scheduleJwtRefresh(expiresAt);
+      }
+      if (_awaitingReplayAfterAttach) {
+        _awaitingReplayAfterAttach = false;
+        _requestReplays();
+      }
     }
     if (msg.type == 'replay.done') {
       final sessionId = msg.payload['session_id'] as String? ?? '';
@@ -297,6 +383,26 @@ class WsClient {
     return raw.toString();
   }
 
+  InnerMessage _messageFromRoutingPayload(
+    String messageType,
+    String routingPayload, {
+    String? requestId,
+  }) {
+    final payload =
+        jsonDecode(
+              utf8.decode(
+                base64Url.decode(base64Url.normalize(routingPayload)),
+              ),
+            )
+            as Map<String, dynamic>;
+    return InnerMessage.fromJson({
+      'v': 1,
+      if (requestId != null && requestId.isNotEmpty) 'id': requestId,
+      'type': messageType,
+      'payload': payload,
+    });
+  }
+
   // Call when app returns to foreground and connection may have dropped.
   void reconnectIfNeeded() {
     if (_ch == null && !_disposed) {
@@ -308,7 +414,16 @@ class WsClient {
   void _sendAuthAttach() {
     final jwt = getJwt();
     if (jwt.isEmpty) return;
-    send(InnerMessage.create('auth.attach', {'jwt': jwt}));
+    _awaitingReplayAfterAttach = true;
+    unawaited(send(InnerMessage.create('auth.attach', {'jwt': jwt})));
+  }
+
+  void _sendAuthRefresh() {
+    final jwt = getJwt();
+    if (jwt.isEmpty || _ch == null || _disposed) {
+      return;
+    }
+    unawaited(send(InnerMessage.create('auth.refresh', {'jwt': jwt})));
   }
 
   void _requestReplays() {
@@ -334,15 +449,43 @@ class WsClient {
   int _seqCounter = Random.secure().nextInt(1 << 30);
   int _nextSeq() => ++_seqCounter;
 
+  void _scheduleJwtRefresh(int expiresAtMs) {
+    _refreshTimer?.cancel();
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final remainingMs = expiresAtMs - nowMs;
+    if (remainingMs <= 0) {
+      _sendAuthRefresh();
+      return;
+    }
+
+    final leadMs = const Duration(minutes: 2).inMilliseconds;
+    final delayMs =
+        remainingMs > leadMs
+            ? remainingMs - leadMs
+            : max(5000, remainingMs ~/ 2);
+    _refreshTimer = Timer(Duration(milliseconds: delayMs), _sendAuthRefresh);
+  }
+
+  Object _decorateConnectError(Object error) {
+    final pinFailure = PinnedHttpClient.takeLastFailure(serverUri);
+    if (pinFailure != null) {
+      return StateError(pinFailure);
+    }
+    return error;
+  }
+
   void _scheduleRetry() {
     if (_disposed) return;
     _sub?.cancel();
     unawaited(_ch?.close());
     _ch = null;
+    _authenticated = false;
+    _awaitingReplayAfterAttach = false;
     _pendingReplaySessions.clear();
+    _refreshTimer?.cancel();
     _emit(WsConnectionState.offline);
     _retryTimer?.cancel();
-    _retryTimer = Timer(_policy.next(), connect);
+    _retryTimer = Timer(_policy.next(), () => connect());
   }
 
   void _emit(WsConnectionState s) {
@@ -351,7 +494,9 @@ class WsClient {
 
   void dispose() {
     _disposed = true;
+    _authenticated = false;
     _retryTimer?.cancel();
+    _refreshTimer?.cancel();
     _sub?.cancel();
     unawaited(_ch?.close());
     _msgCtrl.close();

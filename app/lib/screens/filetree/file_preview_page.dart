@@ -84,6 +84,21 @@ class _FilePreviewPageState extends ConsumerState<FilePreviewPage> {
       if (msg.payload['session_id'] != widget.sessionId) return;
       if (msg.payload['file_path'] != widget.filePath) return;
       final p = msg.payload;
+      final status = (p['status'] as String?) ?? 'ready';
+      if (status != 'ready') {
+        if (mounted) {
+          setState(() {
+            _loading = false;
+            _chunks.clear();
+            _totalChunks = null;
+            _error = _resolvePreviewState(p, status);
+          });
+        }
+        debugPrint(
+          '[FilePreview] state file=${widget.filePath} status=$status message=${_error?.message}',
+        );
+        return;
+      }
       final idx = (p['chunk_index'] as int?) ?? 0;
       final total = (p['total_chunks'] as int?) ?? 1;
       debugPrint(
@@ -95,6 +110,8 @@ class _FilePreviewPageState extends ConsumerState<FilePreviewPage> {
         if (mounted) {
           setState(() {
             _loading = false;
+            _chunks.clear();
+            _totalChunks = null;
             _error = const AccessFailure(message: '不支持的文件格式', retryable: false);
           });
         }
@@ -129,11 +146,65 @@ class _FilePreviewPageState extends ConsumerState<FilePreviewPage> {
   }
 
   String _decodeChunkPayload(Map<String, dynamic> payload) {
-    final encoded =
-        payload['data_base64url'] as String? ??
-        payload['data'] as String? ??
-        '';
+    final encoded = payload['data'] as String? ?? '';
     return _decodeBase64Url(encoded);
+  }
+
+  AccessFailure _resolvePreviewState(
+    Map<String, dynamic> payload,
+    String status,
+  ) {
+    final fallback = payload['message'] as String? ?? '读取文件失败';
+    switch (status) {
+      case 'binary':
+        return AccessFailure(
+          message: '二进制文件暂不支持文本预览',
+          retryable: false,
+        );
+      case 'too_large':
+        final totalSize = (payload['total_size'] as num?)?.toInt();
+        final maxPreviewSize = (payload['max_preview_size'] as num?)?.toInt();
+        return AccessFailure(
+          message: _buildTooLargeMessage(totalSize, maxPreviewSize),
+          retryable: false,
+        );
+      case 'permission_denied':
+        return resolveAccessFailure(
+          surface: AccessFailureSurface.filePreview,
+          code: 'WORKSPACE_FORBIDDEN',
+          fallback: fallback,
+        );
+      case 'not_found':
+        return resolveAccessFailure(
+          surface: AccessFailureSurface.filePreview,
+          code: 'FILE_NOT_FOUND',
+          fallback: fallback,
+        );
+      default:
+        return AccessFailure(message: fallback);
+    }
+  }
+
+  String _buildTooLargeMessage(int? totalSize, int? maxPreviewSize) {
+    final sizeLabel = totalSize == null ? null : _formatBytes(totalSize);
+    final limitLabel =
+        maxPreviewSize == null ? null : _formatBytes(maxPreviewSize);
+    if (sizeLabel != null && limitLabel != null) {
+      return '文件过大，暂不支持文本预览（$sizeLabel，当前上限 $limitLabel）';
+    }
+    return '文件过大，暂不支持文本预览';
+  }
+
+  String _formatBytes(int bytes) {
+    const kb = 1024;
+    const mb = kb * 1024;
+    if (bytes >= mb) {
+      return '${(bytes / mb).toStringAsFixed(bytes % mb == 0 ? 0 : 1)} MB';
+    }
+    if (bytes >= kb) {
+      return '${(bytes / kb).toStringAsFixed(bytes % kb == 0 ? 0 : 1)} KB';
+    }
+    return '$bytes B';
   }
 
   String get _content {

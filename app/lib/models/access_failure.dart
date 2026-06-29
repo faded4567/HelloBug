@@ -42,6 +42,16 @@ AccessFailure resolveAccessFailure({
         },
         retryable: false,
       );
+    case 'FILE_NOT_FOUND':
+      return AccessFailure(
+        message: switch (surface) {
+          AccessFailureSurface.fileTree => '目标文件或目录不存在，请返回后刷新工作区',
+          AccessFailureSurface.filePreview => '目标文件不存在或已被移动，无法继续预览',
+          AccessFailureSurface.historyList => '目标记录不存在',
+          AccessFailureSurface.historyDetail => '目标记录不存在',
+        },
+        retryable: false,
+      );
     default:
       return AccessFailure(message: fallbackMessage);
   }

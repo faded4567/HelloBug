@@ -12,9 +12,18 @@ import '../crypto/nonce_counter.dart';
 import '../crypto/secure_store.dart';
 import '../crypto/session_cipher.dart';
 import '../models/inner_message.dart';
+import 'envelope_routing.dart';
+import 'pinned_http_client.dart';
 import 'ws_client.dart';
 
 const _encryptedAppMessageTypes = <String>{
+  'auth.attach',
+  'auth.refresh',
+  'device.push_token',
+  'device.list',
+  'device.rename',
+  'device.revoke',
+  'session.resume',
   'session.start',
   'session.agent.add',
   'session.input',
@@ -26,10 +35,26 @@ const _encryptedAppMessageTypes = <String>{
   'danger.deny',
   'fs.tree.req',
   'fs.file.req',
+  'workspace.list',
+  'workspace.resolve',
+  'history.list',
   'history.get',
+  'templates.list',
   'slash.list',
   'pty.input',
   'pty.resize',
+  'key.ratchet',
+  'key.ratchet_ack',
+};
+
+const _serverHandledEncryptedMessageTypes = <String>{
+  'auth.attach',
+  'auth.refresh',
+  'device.push_token',
+  'device.list',
+  'device.rename',
+  'device.revoke',
+  'session.resume',
 };
 
 const _defaultRatchetMessageLimit = 100;
@@ -104,10 +129,7 @@ class _TransportSessionCryptoState {
   DateTime lastRatchetAt = DateTime.now();
   String? pendingRatchetPubKey;
 
-  Future<String> decrypt(
-    Uint8List ciphertext,
-    Uint8List nonce,
-  ) async {
+  Future<String> decrypt(Uint8List ciphertext, Uint8List nonce) async {
     try {
       final plaintext = await currentCipher.decrypt(ciphertext, nonce);
       return utf8.decode(plaintext);
@@ -127,6 +149,7 @@ class AppRuntimeState {
     required this.serverUrl,
     required this.deviceId,
     required this.jwt,
+    this.serverPin,
     this.pairedDaemonId,
     this.pairedDaemonPubKey,
     this.pairedDaemonEd25519PubKey,
@@ -140,6 +163,7 @@ class AppRuntimeState {
   // App-side device id embedded in the app JWT, used for auth.attach.
   final String deviceId;
   final String jwt;
+  final String? serverPin;
   final String? pairedDaemonId;
   final String? pairedDaemonPubKey;
   final String? pairedDaemonEd25519PubKey;
@@ -150,6 +174,7 @@ class AppRuntimeState {
 
   WsClient createClient() {
     var currentJwt = jwt;
+    PinnedHttpClient.configure(Uri.parse(serverUrl), pin: serverPin);
     final deviceKeys = DeviceKeys.loadOrCreate();
     final client = WsClient(
       serverUri: Uri.parse(serverUrl),
@@ -166,9 +191,11 @@ class AppRuntimeState {
         seq,
         ts,
         ciphertext, [
+        requestId,
         messageType,
         cipherMode,
         senderPubkey,
+        routingPayload,
       ]) async {
         final keys = await deviceKeys;
         return EnvelopeSigner(keys.ed25519).sign(
@@ -178,9 +205,11 @@ class AppRuntimeState {
           seq,
           ts,
           ciphertext,
+          requestId,
           messageType,
           cipherMode,
           senderPubkey,
+          routingPayload,
         );
       },
     );
@@ -205,6 +234,7 @@ class AppRuntimeStore {
     final serverUrl = await SecureStore.read(SecureStore.keyServerUrl);
     final deviceId = await SecureStore.read(SecureStore.keyPairedDeviceId);
     final jwt = await SecureStore.read(SecureStore.keyJwt);
+    final serverPin = await SecureStore.read(SecureStore.keyServerPin);
     if (serverUrl == null || deviceId == null || jwt == null) {
       return null;
     }
@@ -237,6 +267,7 @@ class AppRuntimeStore {
       serverUrl: serverUrl,
       deviceId: deviceId,
       jwt: jwt,
+      serverPin: serverPin,
       pairedDaemonId: pairedDaemonId,
       pairedDaemonPubKey: pairedDaemonPubKey,
       pairedDaemonEd25519PubKey: pairedDaemonEd25519PubKey,
@@ -252,6 +283,7 @@ class AppRuntimeStore {
   static Future<AppRuntimeState> persist({
     required String serverUrl,
     required String jwt,
+    String? serverPin,
     String? pairedDaemonId,
     String? pairedDaemonPubKey,
     String? pairedDaemonEd25519PubKey,
@@ -269,6 +301,8 @@ class AppRuntimeStore {
       SecureStore.write(SecureStore.keyServerUrl, serverUrl),
       SecureStore.write(SecureStore.keyPairedDeviceId, appDeviceId),
       SecureStore.write(SecureStore.keyJwt, jwt),
+      if (serverPin != null)
+        SecureStore.write(SecureStore.keyServerPin, serverPin),
       if (pairedDaemonId != null)
         SecureStore.write(SecureStore.keyPairedDaemonId, pairedDaemonId),
       if (pairedDaemonPubKey != null)
@@ -300,6 +334,7 @@ class AppRuntimeStore {
       serverUrl: serverUrl,
       deviceId: appDeviceId,
       jwt: jwt,
+      serverPin: serverPin,
       pairedDaemonId: pairedDaemonId,
       pairedDaemonPubKey: pairedDaemonPubKey,
       pairedDaemonEd25519PubKey: pairedDaemonEd25519PubKey,
@@ -348,6 +383,7 @@ class AppRuntimeStore {
       SecureStore.delete(SecureStore.keyPairedTransportSendKey),
       SecureStore.delete(SecureStore.keyPairedTransportRecvKey),
       SecureStore.delete(SecureStore.keyJwt),
+      SecureStore.delete(SecureStore.keyServerPin),
       SecureStore.delete(SecureStore.keyPairedMachineName),
       SecureStore.delete(SecureStore.keyPairedOs),
     ]);
@@ -432,8 +468,12 @@ class AppRuntimeStore {
         return;
       }
 
-      final sessionId = message.payload['session_id'] as String? ?? '';
-      if (sessionId.isEmpty) {
+      if (_serverHandledEncryptedMessageTypes.contains(message.type)) {
+        return;
+      }
+
+      final sessionId = resolveEnvelopeSessionIdForMessage(message);
+      if (sessionId.isEmpty || sessionId == transportControlSessionId) {
         return;
       }
 
@@ -454,7 +494,8 @@ class AppRuntimeStore {
       await resolvedDeviceKeys;
       final nextLocalKeyPair = await X25519().newKeyPair();
       final nextLocalPub = await nextLocalKeyPair.extractPublicKey();
-      final nextLocalPrivBytes = await nextLocalKeyPair.extractPrivateKeyBytes();
+      final nextLocalPrivBytes =
+          await nextLocalKeyPair.extractPrivateKeyBytes();
       final nextLocalPubBase64 = base64Url
           .encode(nextLocalPub.bytes)
           .replaceAll('=', '');
@@ -495,10 +536,22 @@ class AppRuntimeStore {
         );
       }
 
+      if (_serverHandledEncryptedMessageTypes.contains(messageType)) {
+        return (
+          ciphertext: base64Url.encode(utf8.encode('opaque')),
+          cipherMode: 'noise_static_v1',
+          senderPubkey: null,
+        );
+      }
+
       final crypto = await context;
       final session = await crypto.session(sessionId);
       final nonce = await NonceCounter(sessionId).fromCounter(seq);
-      final ciphertext = await session.currentCipher.encrypt(
+      final cipher =
+          messageType == 'key.ratchet'
+              ? (session.previousCipher ?? session.currentCipher)
+              : session.currentCipher;
+      final ciphertext = await cipher.encrypt(
         Uint8List.fromList(utf8.encode(data)),
         nonce,
       );

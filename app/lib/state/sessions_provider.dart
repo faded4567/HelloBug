@@ -53,6 +53,23 @@ class SessionsNotifier extends Notifier<List<SessionSummary>> {
         .toList(),
   );
 
+  void clear() {
+    for (final session in _sessions) {
+      _client?.untrackSession(session.sessionId);
+    }
+    _setSessions(const []);
+  }
+
+  void markDeviceOffline(String deviceId) {
+    final affected = _sessions
+        .where((session) => session.deviceId == deviceId)
+        .map((session) => session.sessionId)
+        .toList(growable: false);
+    for (final sessionId in affected) {
+      markOffline(sessionId);
+    }
+  }
+
   void markOffline(String sessionId) =>
       _updateStatus(sessionId, SessionStatus.offline, untrack: true);
 

@@ -1,19 +1,20 @@
-import 'dart:io';
+import 'pinned_http_client_stub.dart'
+    if (dart.library.io) 'pinned_http_client_io.dart'
+    as impl;
+import 'server_pin_store.dart';
 
-// Returns an HttpClient with optional certificate pinning.
-// In M1 pinning is not yet active; Spike F4 will fill in the pin bytes.
 class PinnedHttpClient {
-  // SHA-256 DER fingerprint of server's leaf certificate; set after Spike F4.
-  static List<int>? _pinBytes;
-
-  static void setPin(List<int> derFingerprint) => _pinBytes = derFingerprint;
-
-  static HttpClient build() {
-    final client = HttpClient();
-    if (_pinBytes != null) {
-      client.badCertificateCallback = (cert, host, port) => false;
-      // Full pin verification wired in after Spike F4.
-    }
-    return client;
+  static void configure(Uri uri, {String? pin}) {
+    ServerPinStore.configure(uri, pin: pin);
   }
+
+  static String? configuredPin(Uri uri) => ServerPinStore.configuredPin(uri);
+
+  static String? observedPin(Uri uri) => ServerPinStore.observedPin(uri);
+
+  static String? resolvedPin(Uri uri) => ServerPinStore.resolvedPin(uri);
+
+  static String? takeLastFailure(Uri uri) => ServerPinStore.takeFailure(uri);
+
+  static Object? build(Uri uri) => impl.buildPinnedHttpClient(uri);
 }

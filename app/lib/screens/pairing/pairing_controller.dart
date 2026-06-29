@@ -12,6 +12,7 @@ import '../../models/device_summary.dart';
 import '../../models/inner_message.dart';
 import '../../state/devices_provider.dart';
 import '../../transport/app_runtime_store.dart';
+import '../../transport/pinned_http_client.dart';
 import '../../transport/ws_client.dart';
 import '../../transport/ws_provider.dart';
 
@@ -74,6 +75,7 @@ class PairingController extends StateNotifier<PairingState> {
   String _serverUrl = '';
   String? _pendingDaemonPubKey;
   String? _pendingDaemonEd25519PubKey;
+  String? _pendingServerPin;
   String? _pendingNoiseHandshake;
   String? _pendingInitialTransportSendKey;
   String? _pendingInitialTransportRecvKey;
@@ -83,13 +85,18 @@ class PairingController extends StateNotifier<PairingState> {
       final data = jsonDecode(qrPayload) as Map<String, dynamic>;
       final pairingCode = data['pairing_code'];
       final serverUrl = data['server_url'];
+      final serverPin = data['server_pin'];
       if (pairingCode is! String || serverUrl is! String) {
         throw const FormatException(
           'QR payload missing pairing_code/server_url',
         );
       }
 
-      return _start(pairingCode: pairingCode, serverUrl: serverUrl);
+      return _start(
+        pairingCode: pairingCode,
+        serverUrl: serverUrl,
+        serverPin: serverPin is String ? serverPin : null,
+      );
     } catch (_) {
       state = const PairingState(
         step: PairingStep.error,
@@ -161,6 +168,7 @@ class PairingController extends StateNotifier<PairingState> {
       await AppRuntimeStore.persist(
         serverUrl: _serverUrl,
         jwt: jwt,
+        serverPin: _resolvedServerPin(),
         pairedDaemonId: pairedDaemonId,
         pairedDaemonPubKey: _pendingDaemonPubKey,
         pairedDaemonEd25519PubKey: _pendingDaemonEd25519PubKey,
@@ -202,6 +210,7 @@ class PairingController extends StateNotifier<PairingState> {
       _pairingClient = null;
       _pendingDaemonPubKey = null;
       _pendingDaemonEd25519PubKey = null;
+      _pendingServerPin = null;
       _pendingNoiseHandshake = null;
       _pendingInitialTransportSendKey = null;
       _pendingInitialTransportRecvKey = null;
@@ -231,6 +240,7 @@ class PairingController extends StateNotifier<PairingState> {
   Future<bool> _start({
     required String pairingCode,
     required String serverUrl,
+    String? serverPin,
   }) async {
     final trimmedCode = pairingCode.trim();
     final trimmedUrl = serverUrl.trim();
@@ -250,15 +260,18 @@ class PairingController extends StateNotifier<PairingState> {
 
     await _clearPending(disposeClient: true);
     _serverUrl = trimmedUrl;
+    _pendingServerPin = serverPin?.trim();
     state = const PairingState(step: PairingStep.connecting);
     debugPrint('[Pairing] start code=$trimmedCode server=$trimmedUrl');
 
     try {
+      final resolvedUri = uri;
+      PinnedHttpClient.configure(resolvedUri, pin: _pendingServerPin);
       final keys = await DeviceKeys.loadOrCreate();
       final signer = EnvelopeSigner(keys.ed25519);
       final jwtHolder = _JwtHolder('');
       final client = WsClient(
-        serverUri: uri,
+        serverUri: resolvedUri,
         deviceId: await AppRuntimeStore.loadOrCreateInstanceId(),
         getJwt: () => jwtHolder.value,
         onJwt: (nextJwt) {
@@ -274,7 +287,8 @@ class PairingController extends StateNotifier<PairingState> {
       _deviceStatusCompleter = Completer<Map<String, dynamic>>();
       _pairingMessagesSub = client.messages.listen(_handlePairingMessage);
 
-      await client.connect();
+      await client.connect(rethrowErrors: true);
+      _pendingServerPin = _resolvedServerPin();
       debugPrint('[Pairing] connected, sending device.pair');
       await client.send(
         InnerMessage.create('device.pair', {
@@ -381,7 +395,11 @@ class PairingController extends StateNotifier<PairingState> {
   Future<void> _persistRuntimeJwt(String serverUrl, String jwt) async {
     try {
       debugPrint('[Pairing] persist jwt server=$serverUrl');
-      await AppRuntimeStore.persist(serverUrl: serverUrl, jwt: jwt);
+      await AppRuntimeStore.persist(
+        serverUrl: serverUrl,
+        jwt: jwt,
+        serverPin: _resolvedServerPin(serverUrl),
+      );
     } catch (_) {
       // Pairing flow will surface a user-visible error if persistence fails.
     }
@@ -414,6 +432,7 @@ class PairingController extends StateNotifier<PairingState> {
     _deviceStatusCompleter = null;
     _pendingDaemonPubKey = null;
     _pendingDaemonEd25519PubKey = null;
+    _pendingServerPin = null;
     _pendingNoiseHandshake = null;
     _pendingInitialTransportSendKey = null;
     _pendingInitialTransportRecvKey = null;
@@ -440,6 +459,15 @@ class PairingController extends StateNotifier<PairingState> {
 
   String _encodeBase64Url(List<int> bytes) =>
       base64Url.encode(bytes).replaceAll('=', '');
+
+  String? _resolvedServerPin([String? serverUrl]) {
+    final targetUrl = serverUrl ?? _serverUrl;
+    final uri = Uri.tryParse(targetUrl);
+    if (uri == null) {
+      return _pendingServerPin;
+    }
+    return PinnedHttpClient.resolvedPin(uri) ?? _pendingServerPin;
+  }
 
   String _friendlyError(Object error) {
     if (error is TimeoutException) {

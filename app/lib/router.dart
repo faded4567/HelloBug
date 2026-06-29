@@ -139,8 +139,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/device/:id',
         builder:
-            (_, state) =>
-                DeviceDetailPage(device: state.extra! as DeviceSummary),
+            (_, state) => DeviceDetailPage(
+              deviceId: state.pathParameters['id']!,
+              initialDevice:
+                  state.extra is DeviceSummary
+                      ? state.extra! as DeviceSummary
+                      : null,
+            ),
       ),
       GoRoute(path: '/history', builder: (_, __) => const HistoryListPage()),
       GoRoute(

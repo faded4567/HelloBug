@@ -23,6 +23,8 @@ class SlashPaletteController extends ChangeNotifier {
   String? errorMessage;
   String _query = '';
   Future<void>? _pendingLoad;
+  String? _activeRequestId;
+  bool _disposed = false;
 
   String get query => _query;
 
@@ -40,22 +42,26 @@ class SlashPaletteController extends ChangeNotifier {
   }
 
   void filter(String query) {
+    if (_disposed) {
+      return;
+    }
     _query = query;
     final q = query.toLowerCase().replaceFirst('/', '');
     filtered =
         q.isEmpty
             ? _all
             : _all.where((c) => c.name.toLowerCase().contains(q)).toList();
-    notifyListeners();
+    _notifySafely();
   }
 
   Future<void> _loadInternal() async {
     final request = InnerMessage.create('slash.list', {
       'session_id': sessionId,
     });
+    _activeRequestId = request.id;
     loading = true;
     errorMessage = null;
-    notifyListeners();
+    _notifySafely();
 
     try {
       final response = wsClient.messages
@@ -75,14 +81,16 @@ class SlashPaletteController extends ChangeNotifier {
       }
 
       final rawItems = msg.payload['commands'] as List? ?? const [];
+      if (_activeRequestId != request.id) {
+        return;
+      }
       _all = rawItems
           .whereType<Map>()
           .map((item) => Map<String, dynamic>.from(item))
           .map(
             (json) => SlashCommand(
               name: json['name'] as String? ?? '',
-              description:
-                  (json['desc'] ?? json['description']) as String? ?? '',
+              description: json['desc'] as String? ?? '',
             ),
           )
           .where((command) => command.name.isNotEmpty)
@@ -93,6 +101,9 @@ class SlashPaletteController extends ChangeNotifier {
       loaded = false;
       errorMessage = _friendlyError(error);
     } finally {
+      if (_activeRequestId == request.id) {
+        _activeRequestId = null;
+      }
       loading = false;
       _pendingLoad = null;
       filter(_query);
@@ -107,5 +118,17 @@ class SlashPaletteController extends ChangeNotifier {
       return error.message.toString();
     }
     return '读取命令列表失败';
+  }
+
+  void _notifySafely() {
+    if (!_disposed) {
+      notifyListeners();
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }

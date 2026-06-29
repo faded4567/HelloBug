@@ -37,17 +37,45 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
   bool _hasFocus = false;
   SlashPaletteController? _slashCtrl;
 
+  void _bindSlashController() {
+    final ws = ref.read(wsClientProvider);
+    final current = _slashCtrl;
+    if (ws == null) {
+      current?.dispose();
+      _slashCtrl = null;
+      return;
+    }
+    if (current != null &&
+        current.sessionId == widget.sessionId &&
+        identical(current.wsClient, ws)) {
+      return;
+    }
+
+    current?.dispose();
+    final next = SlashPaletteController(
+      sessionId: widget.sessionId,
+      wsClient: ws,
+    );
+    _slashCtrl = next;
+    if (_showSlash) {
+      unawaited(next.load());
+      next.filter(_ctrl.text);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _focus.addListener(() => setState(() => _hasFocus = _focus.hasFocus));
-    final ws = ref.read(wsClientProvider);
     unawaited(ref.read(templatesProvider.notifier).load());
-    if (ws != null) {
-      _slashCtrl = SlashPaletteController(
-        sessionId: widget.sessionId,
-        wsClient: ws,
-      );
+    _bindSlashController();
+  }
+
+  @override
+  void didUpdateWidget(covariant ChatInputBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.sessionId != widget.sessionId) {
+      _bindSlashController();
     }
   }
 
@@ -183,10 +211,11 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
 
   @override
   Widget build(BuildContext context) {
+    final wsClient = ref.watch(wsClientProvider);
+    _bindSlashController();
     final c = context.colors;
     final templates = ref.watch(templatesProvider);
-    final canSend =
-        widget.enabled && _hasText && ref.watch(wsClientProvider) != null;
+    final canSend = widget.enabled && _hasText && wsClient != null;
     final voiceHoldEnabled = widget.enabled && !_hasFocus && !_hasText;
     final inputPlaceholder =
         widget.enabled

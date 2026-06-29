@@ -9,9 +9,11 @@ Uint8List _signaturePayload(
   int seq,
   int ts,
   String ciphertext,
+  String? requestId,
   String? messageType,
   String? cipherMode,
   String? senderPubkey,
+  String? routingPayload,
 ) => Uint8List.fromList(
   utf8.encode(
     jsonEncode([
@@ -24,6 +26,8 @@ Uint8List _signaturePayload(
       messageType ?? '',
       cipherMode ?? '',
       senderPubkey ?? '',
+      requestId ?? '',
+      routingPayload ?? '',
     ]),
   ),
 );
@@ -43,9 +47,11 @@ class EnvelopeSigner {
     int seq,
     int ts,
     String ciphertext, [
+    String? requestId,
     String? messageType,
     String? cipherMode,
     String? senderPubkey,
+    String? routingPayload,
   ]) async {
     final sig = await _algo.sign(
       _signaturePayload(
@@ -55,9 +61,11 @@ class EnvelopeSigner {
         seq,
         ts,
         ciphertext,
+        requestId,
         messageType,
         cipherMode,
         senderPubkey,
+        routingPayload,
       ),
       keyPair: _kp,
     );
@@ -71,9 +79,11 @@ class EnvelopeSigner {
     required int seq,
     required int ts,
     required String ciphertext,
+    String? requestId,
     String? messageType,
     String? cipherMode,
     String? senderPubkey,
+    String? routingPayload,
     required String sigBase64,
     required SimplePublicKey pubKey,
   }) async {
@@ -85,9 +95,11 @@ class EnvelopeSigner {
         seq,
         ts,
         ciphertext,
+        requestId,
         messageType,
         cipherMode,
         senderPubkey,
+        routingPayload,
       ),
       signature: Signature(
         base64Url.decode(base64Url.normalize(sigBase64)),
