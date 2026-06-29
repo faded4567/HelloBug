@@ -1,6 +1,7 @@
 .claude/
 .playwright-cli/
 .hellobug/
+.reasonix/
 
 # Backend workspace
 packages/node_modules/

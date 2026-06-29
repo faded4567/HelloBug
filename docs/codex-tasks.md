@@ -4,7 +4,7 @@
 > 本文件只包含 **Codex 负责的后端与基础设施任务**。
 > 整个 Flutter 客户端由 Claude 负责，见 `docs/flutter-tasks.md`。
 > 协议格式规范见 `docs/protocol.md`。
-> 更新：2026-06-24
+> 更新：2026-06-28
 
 ---
 
@@ -42,12 +42,46 @@
 - `[x]` 2026-06-24 已把首个加密会话初始化切到 pairing-derived keys：App 在配对成功后持久化 responder `send/recv` key，daemon 按 `app_pubkey` 持久化 initiator `send/recv` key，后续首个 `session.start` 会优先使用这组密钥，缺失时才回退到旧 static HKDF 兼容路径
 - `[x]` 2026-06-24 已补 `session.start` 结构化确认链路：daemon 返回 `session.start.result { started | rejected }`，server 改为 pending session + 成功后确认注册，Flutter 侧会等待成功回执后再创建本地会话
 - `[x]` 2026-06-24 已补 `session.resume` 结构化恢复结果：`replay.done` 现在带 `status/message`，server 会校验 session 归属并对失效 session 返回 `session_not_found`
+- `[x]` 2026-06-26 已把 Flutter 设备 / 工作区真实联调补齐一轮：设备页与详情页接到 `device.list / device.rename / device.revoke`，工作区切换接到 `workspace.list / workspace.resolve`，并通过 `flutter analyze` 与 `flutter build web --debug`
+- `[x]` 2026-06-26 已补 Flutter runtime 两条恢复/推送接线：本地 push token 会在 pairing 成功装载 live client 后或后续 `auth.token` 时自动上报 `device.push_token`；收到 `DEVICE_REVOKED` 或 `auth.attach|auth.refresh -> AUTH_INVALID` 时会清 runtime、断开 ws 并回 onboarding
+- `[x]` 2026-06-26 已补 Android 原生 push token bridge：App 侧通过 Firebase Messaging 获取 token，并经现有 runtime 自动上报 `device.push_token`；当前按 `manufacturer=Other` 落库，运行时仍需提供 `app/android/app/google-services.json`
+- `[x]` 2026-06-26 已补 `device.status` live 元数据：server 现在会在 presence 广播里携带 `os / daemon_version / paired_at / last_seen_at / revoked_at / active_session_count`，并在会话启动确认后同步新的活跃会话数；Flutter 设备状态解析也已跟进
+- `[x]` 2026-06-26 已补会话结束后的活跃计数回落：server 现在会在 `session.done` 时把 session 标记为 inactive、立即广播 `device.status.active_session_count=0`，同时保留 session ownership 与 replay buffer，因此 daemon 断开后 `session.resume` 仍可离线回放已完成会话
+- `[x]` 2026-06-27 已补 daemon 挂起请求失败快返第二轮：不仅 daemon 断线时会立即失败，daemon 保持在线但迟迟不回包时，pending `session.start` 也会超时收到 `session.start.result(rejected)`，pending `workspace.list / workspace.resolve / history.list / templates.list / history.get / slash.list` 会超时收到 `error(SESSION_NOT_FOUND)`；超时后的迟到回包也会被 server 丢弃，不再误广播
+- `[x]` 2026-06-26 已补无会话直连控制流量的 opaque relay：`workspace.list / workspace.resolve / history.list / templates.list` 现统一走保留控制通道 `transport.control.v1`，app / daemon 会在 outer envelope 带 `request_id`，server 可在不解密 payload 的前提下完成定向路由
+- `[x]` 2026-06-26 已补恢复链路的半 opaque 收口：`session.resume` 现附 outer `routing_payload` 并走会话 `noise_static_v1`，server 可不解密 inner 直接执行 replay；`replay.done` 对 envelope 客户端改为 opaque placeholder envelope，Flutter 侧优先读取 `routing_payload`，且恢复请求不会触发 session ratchet
+- `[x]` 2026-06-26 已补 server 自产消息的第二轮 opaque 收口：`device.status` 与 server 生成的 `error` 对 envelope 客户端现统一走 outer `routing_payload` placeholder，且错误回执会优先携带原始请求 `id` 与可用的 `session_id`
+- `[x]` 2026-06-27 已补控制链路第三轮 opaque 收口：`daemon.hello`、`auth.attach / auth.refresh / auth.token`、`device.push_token`、`device.list / device.rename / device.revoke` 现也统一走 outer `routing_payload` placeholder；daemon 已能正确消费 server 返回的 placeholder `error`
+- `[x]` 2026-06-27 已继续收紧 relay envelope 边界：server 现在会拒绝 `ts` 偏差超过 ±5 分钟的 signed envelope，并拒绝在有效时间窗内跨连接原样重放同一份 signed envelope
+- `[x]` 2026-06-27 已补 relay plaintext downgrade 收口第一轮：对于已带现代 outer metadata 的 `auth.attach / auth.refresh / daemon.hello / device.pair.* / device.push_token / device.list / device.rename / device.revoke / session.resume`，server 现在会拒绝 `cipher_mode=plain` 的 envelope 回退，同时保留老的纯 JSON 报文兼容入口
+- `[x]` 2026-06-27 已补控制流量的 downgrade 收口第二轮：`workspace.list / workspace.resolve / history.list / templates.list` 这批无会话 metadata-bearing plain request 现在会被 server 直接拒绝；`history.get / slash.list` 这批 session utility 请求若本来就是 `noise_static_v1`，daemon 再回 plain response 也会被 server 拦下并改回带原始 `session_id` 的 `error(PROTOCOL_VERSION)`
+- `[x]` 2026-06-27 已补 Flutter `WsClient` 本地 downgrade 收口第三轮：未注入 transport crypto 时，只有 `auth/device/pairing/session.resume` 这类带 outer `routing_payload` 的 bootstrap / control 消息还能继续发送；`workspace.* / history.get / slash.list / session.* / pty.*` 等 runtime 消息会本地快速失败，不再静默回退成 plain envelope
+- `[x]` 2026-06-28 已补 relay plaintext downgrade 收口第四轮：对于带 modern outer metadata 的 app runtime request envelope，server 现在也会拒绝 `cipher_mode=plain` 的明文回退，包括 `session.start / session.agent.add / session.input* / session.command.slash / session.cancel / danger.allow / danger.deny / fs.tree.req / fs.file.req / pty.input / pty.resize`，以及 request 变体 `workspace.list / workspace.resolve / history.list / history.get / templates.list / slash.list`；但无 outer metadata 的旧 plain envelope / raw JSON 兼容入口仍保留
+- `[x]` 2026-06-28 已补 server 自产 `session.start.result` 的 opaque 收口：对于 envelope 客户端，server 在 timeout / offline / 未认证等路径下生成的 `session.start.result(rejected)` 现在也统一走 outer `routing_payload` placeholder，不再回退 plain inner message
+- `[x]` 2026-06-28 已补加密 `session.start` 的回包收口：server 现在会把 pending session 记成 `requiresEncryptedTransport`，若 app 的 `session.start` 已走 `noise_static_v1`，daemon 回 `session.start.result` 时也必须继续走 `noise_static_v1`；daemon 的 plain downgrade 会被 server 拦下并改回结构化 `session.start.result(rejected, code=PROTOCOL_VERSION)`。同时 daemon 会给加密 `session.start.result` 补最小 outer `routing_payload` 状态提示，Flutter `WsClient` 在 `sender_pubkey` 存在时会优先解密真实 ciphertext，而不是直接消费该提示
+- `[x]` 2026-06-28 已补加密 session 的后续回包收口：对于已确认 `requiresEncryptedTransport` 的 session，daemon→app 的 `session.event / danger.pending / danger.result / fs.tree / fs.file / history.get / slash.list / key.ratchet / key.ratchet_ack / error(session-scoped)` 若退回 plain，也会被 server 拦下并改回结构化 `error(PROTOCOL_VERSION)`，不再把明文 runtime 数据透传给 app
+- `[x]` 2026-06-28 已继续缩小 legacy raw JSON relay 入口：`session.resume`、`key.ratchet / key.ratchet_ack`、`history.get`、`danger.pending / danger.result`、`session.event`、`fs.tree / fs.file`、`slash.list` 现已不再接受无 envelope 的旧 raw JSON 报文；相关恢复、ratchet、danger replay、session replay、文件浏览与 session utility 回归测试也已切到签名 envelope 主路径
+- `[x]` 2026-06-28 已继续缩小 legacy raw JSON relay 入口第二轮：`auth.refresh` 与 `session.start` 也已不再接受无 envelope 的旧 raw JSON 报文；`session.start` 挂起超时/断线回归测试已切到签名 envelope 发起，当前剩余 raw JSON 主要收敛到 `daemon.hello`、`auth.attach` 与少量更早期开发态控制消息
+- `[x]` 2026-06-28 已继续缩小 legacy raw JSON relay 入口第三轮：`auth.attach` 与 `daemon.hello` 也已不再接受无 envelope 的旧 raw JSON 报文；相关 server relay 回归已切到签名 envelope 主路径，V1 主路径里的 raw JSON bootstrap 已基本清空
+- `[x]` 2026-06-28 已继续收紧直连控制链路 fallback：`device.push_token`、`device.list / device.rename / device.revoke`、`workspace.list / workspace.resolve`、`history.list`、`templates.list` 现也不再接受 legacy raw JSON；同时 `workspace.list / workspace.resolve / history.list / history.get / templates.list / slash.list` 这批 plain envelope 现在必须带 outer `message_type + cipher_mode`，且 outer `message_type` 必须与 inner message 对齐，不再接受无 outer metadata 的旧 envelope
+- `[x]` 2026-06-29 已继续收紧 runtime fallback：`session.agent.add / session.input* / session.command.slash / session.cancel / danger.allow / danger.deny / fs.tree.req / fs.file.req / pty.input / pty.resize` 的 legacy raw JSON relay 入口也已移除；`session.start / danger.allow / session.event / replay.done / session.start.result / danger.result / fs.tree / fs.file` 这批 plain envelope 也不再接受无 outer metadata 的旧形态
+- `[x]` 2026-06-29 已补加密 `session.event` 的最小 outer routing hint：daemon 现在会给 runtime `session.event` 附最小 `routing_payload`，server 在不解密业务正文的前提下也能识别 `session.done`，及时回落 `device.status.active_session_count`，且相关 completed-session replay 回归已通过
+- `[x]` 2026-06-29 已继续收紧关键加密会话消息的 outer routing hint：server 现已把 `session.start / session.start.result / session.event / danger.allow / danger.deny / danger.pending / danger.result` 的 `routing_payload` 视为必需路由提示，不再接受仅凭 `message_type/session_id` 伪造 placeholder payload 的旧开发态兼容；同时 daemon 已给加密 session-scoped `error` 补 outer `routing_payload`，相关 `framing/server/daemon` 回归与 `test:v1:backend`、`build` 均已通过
+- `[x]` 2026-06-29 已移除 legacy envelope signature fallback：server 现在只接受覆盖 `routing_payload` 在内的现代 envelope 签名，不再兼容旧的无 `routing_payload` 签名 payload；相关拒绝回归已补齐
+- `[x]` 2026-06-29 已继续收紧回包链路 fallback：raw JSON `session.start.result / replay.done / error` 已不再接受；加密 `error` 也已像 `session.start.result / session.event / danger.*` 一样要求 outer `routing_payload`
+- `[x]` 2026-06-29 已补工作区发现基础元数据：daemon `workspace.list / workspace.resolve` 现在会额外返回 `is_empty / repo_root / git_branch`，帮助后续 Flutter 工作区主页与空工作区状态接线
+- `[x]` 2026-06-29 已补工作区修复提示第一版：daemon `workspace.resolve` 现在还会返回 `status_reason / access_mode / repair_hint`，用于区分“路径不存在 / 非目录 / 超出 allowed_paths / 权限不足”，并在可行时给出默认工作区、最近存在祖先目录、同名允许目录或修权限提示，帮助后续 Flutter 接工作区路径失效与权限受限页
+- `[x]` 2026-06-29 已把 `push.trigger` 从单纯 dispatch 记录推进到 provider-ready 骨架：server `push` 层现在已有 `PushProvider` 接口、默认 noop provider、按平台/厂商分流的 route 描述，以及 `invalid_token` 自动清理与持久化钩子；当前仍未真正接 APNS / Android 厂商 HTTP 出网
+- `[x]` 2026-06-29 已补加密 envelope 的 `sender_pubkey` 边界收口：server 现在会拒绝缺少 `sender_pubkey` 的真 `noise_static_v1` 业务 envelope，避免 relay 把目标端无法解密的坏包继续转发；placeholder 控制消息仍保持可不带 `sender_pubkey` 的现有限界，相关 framing/server 回归已补齐
+- `[x]` 2026-06-27 已补 presence 第一轮一致性修正：`device.status.ts` 改为真实广播时间，`last_seen_at` 改为只在设备实际在线/离线切换时更新，不再被 `device.rename` 或 `active_session_count` 变化伪刷新；同时补回归测试覆盖离线设备重命名广播到所有关联 App
+- `[x]` 2026-06-27 已补文件预览正式状态语义：daemon `fs.file` 现在会显式返回 `ready / binary / too_large / permission_denied / not_found`，文本文件仍按 200KB 分片；Flutter 文件预览页已接上这些状态，不再只能靠 UTF-8 解码失败兜底
 
 ## 后续开发顺序
 
-1. 继续清理 legacy 命名/兼容漂移，并推动 Flutter 侧接入 daemon `templates.list` 默认来源。
-2. 继续推进 M1 剩余核心能力：扩大 opaque ciphertext 覆盖面、逐步移除 static HKDF 兼容回退、pinning 与 relay 安全边界继续收口。
-3. 再补设备管理、push backend、workspace/restore 这些会继续阻塞 Flutter 业务闭环的后端能力。
+1. 继续推进 M1 剩余核心能力：在会话流量、`workspace/history/templates` 直连控制流量、恢复链路、server 自产消息，以及 `daemon.hello/auth/device/device.push_token` 控制链路之外，继续扩大 opaque ciphertext 覆盖面，逐步移除 static HKDF 兼容回退，并收口 pinning 与 relay 安全边界。
+   - 2026-06-26 补充：`fs.read -> fs.file.req`、`fs.file.content|data_base64url -> data`、`session.replay/from_seq -> session.resume/last_seq` 这批 legacy 命名漂移已收掉；随后又移除了 relay 对旧版 `session.start` 缺省字段、旧版 slash 字符串参数与 `fs.tree.req.path` 的自动归一化兼容。2026-06-28/29 又收掉了 raw JSON `auth.attach`、`auth.refresh`、`daemon.hello`、`device.push_token`、`device.list / device.rename / device.revoke`、`session.resume`、`session.start`、`session.agent.add`、`session.input*`、`session.command.slash`、`session.cancel`、`danger.allow / danger.deny`、`workspace.list / workspace.resolve`、`history.list / history.get`、`templates.list`、`key.ratchet*`、`danger.pending / danger.result`、`session.event`、`fs.tree.req / fs.file.req / fs.tree / fs.file`、`slash.list`、`pty.input / pty.resize`，并继续收掉了 `workspace.list / workspace.resolve / history.list / history.get / templates.list / slash.list / session.start / danger.allow / session.event / replay.done / session.start.result / danger.result / fs.tree / fs.file` 的 no-metadata plain envelope 入口；剩余兼容主要集中在更少量的开发态 plain envelope 分支。
+2. 继续把设备管理、push backend、workspace/restore 收到可用态；其中 `device.list / device.rename / device.revoke`、`workspace.list / workspace.resolve`、app 侧 `device.push_token` 自动上报，以及 server 侧 `push.trigger + provider-ready push service + invalid token cleanup` 已落地；剩余是 APNS / Android 厂商 provider 真正出网、deep link 与更深的恢复语义。
+3. 继续维护跨端文档与代码口径一致，避免任务状态、shared memory 与运行时现实再次分叉。
 
 ---
 
@@ -256,7 +290,7 @@ packages/protocol/src/
 
 #### 1.4.3 中继逻辑（`src/relay/`）
 
-状态：`[~]` 已完成 relay handler / registry / session registry，以及 app ↔ daemon 的配对、会话消息转发、`session.event` 环形缓冲与 `session.resume` 重放；并已补 active `danger.pending` 的 server 侧待审批缓存与 `auth.attach` 恢复、envelope 签名验证，以及对 staged 加密 envelope 的“仅凭外层 metadata 路由 / replay / 直转”能力。`session.start` 现已改为 pending session + `session.start.result` 成功后确认注册。仍未达到所有消息全面 opaque 的最终形态。
+状态：`[~]` 已完成 relay handler / registry / session registry，以及 app ↔ daemon 的配对、会话消息转发、`session.event` 环形缓冲与 `session.resume` 重放；并已补 active `danger.pending` 的 server 侧待审批缓存与 `auth.attach` 恢复、envelope 签名验证，以及对 staged 加密 envelope 的“仅凭外层 metadata 路由 / replay / 直转”能力。`session.start` 现已改为 pending session + `session.start.result` 成功后确认注册，且 daemon 中途断线时会立即回 rejected；`session.done` 会把 session 标记为 inactive 而不是立即删除，以便 `active_session_count` 正常回落且已完成会话在 daemon 离线后仍可继续 replay。仍未达到所有消息全面 opaque 的最终形态。
 
 - `router.ts`：根据 envelope 的 `to_device_id` 找到对应 WebSocket 连接，转发
 - `buffer.ts`：每个 session_id 对应一个环形缓冲（最近 500 条，TTL 24h）
@@ -268,7 +302,7 @@ packages/protocol/src/
 
 #### 1.4.4 设备在线状态（`src/state/presence.ts`）
 
-状态：`[~]` 已完成基础在线状态记录与 `device.status` 广播骨架；真实多设备场景与重放一致性仍待补全。
+状态：`[~]` 已完成基础在线状态记录、`device.status` 广播骨架与 live 元数据补齐；`device.status.ts` 现为真实广播时间，`last_seen_at` 不再被重命名或会话计数变化伪刷新，离线设备重命名也会广播给所有关联 App。真实多设备场景里的竞争写入与更复杂一致性仍待补全。
 
 - WebSocket 连接时标记设备在线，断线时标记离线
 - 状态变化推送：给该设备关联的所有 App 连接发 `device.status` 事件
@@ -331,7 +365,7 @@ packages/protocol/src/
 
 ### 2.3 审计日志（`packages/daemon/src/audit/`）
 
-状态：`[~]` 已完成本地加密 JSONL、按天轮转、30 天清理与会话/危险操作审计接线；`file.changed`、多 Agent 维度和历史读取接口仍待后续补齐。
+状态：`[~]` 已完成本地加密 JSONL、按天轮转、30 天清理与会话/危险操作审计接线；`file.changed` 事件审计也已接入，多 Agent 维度和历史读取接口仍待后续补齐。
 
 - append-only 日志文件：`~/.hellobug/audit/<date>.jsonl`
 - 每条记录：`{ts, session_id, device_id, event_type, summary}`
@@ -343,7 +377,7 @@ packages/protocol/src/
 - 提供 `appendAuditEntry(entry)` 和 `readAuditLog(date)` 接口
 - 当前实现说明：
   - 已新增 `audit/logger.ts`，使用 daemon 设备密钥派生对称密钥，对每条 JSONL 记录单独加密
-  - 已把 `session.start`、`session.input*`、`session.cancel`、`tool.use`、`tool.result`、`session.done`、`danger.pending / allow / deny` 接入审计
+  - 已把 `session.start`、`session.input*`、`session.cancel`、`tool.use`、`tool.result`、`file.changed`、`session.done`、`danger.pending / allow / deny` 接入审计
   - 当前实现已避免把原始文本输入和工具原始参数直接落盘，优先记录 hash 或摘要
 
 ### 2.4 服务器：环形缓冲与重放（`packages/server/src/relay/buffer.ts` / `pending-danger.ts`）
@@ -361,16 +395,22 @@ packages/protocol/src/
 
 ---
 
-## M3：文件系统（约 5-7 天，状态：[ ] 未开始）
+## M3：文件系统（约 5-7 天，状态：[~] 进行中）
 
-### 3.1 文件变更监听（`packages/daemon/src/fs/watcher.ts`）
+### 3.1 文件变更监听 / diff 派生（`packages/daemon/src/sessions/`）
 
-- 用 `chokidar` 监听工作区目录变化
-- 仅监听 Claude Code 子进程正在操作的工作区（避免全局文件系统监听）
-- 检测到文件变化后：
-  - 用 `diff` 工具（`unified-diff` npm 包）生成 unified diff string
-  - 构造 `file.changed` 事件：`{file_path, diff, ts}`
-  - 推送到对应 session 的 App 端
+- 当前已实现第一版真实 diff 后端：
+  - 在 `tool.use` 捕获 Claude `Write / Edit / MultiEdit` 的目标文件快照
+  - 在成功 `tool.result` 后重读文件并生成 unified diff
+  - 推送 `file.changed { file_path, diff, added, removed }`
+- 当前第一版降级规则：
+  - 仅处理工作区内文件
+  - 仅处理 UTF-8 文本文件
+  - 当前限额：文件大小 `<= 256KB`、行数 `<= 2000`
+  - 无变更、失败结果、越界路径、非文本、超大文件时不发 diff
+- 后续待补：
+  - 若需要会话外文件变更感知，再评估是否引入 `chokidar`
+  - 若需要更大 diff 或更精确 patch，再评估外部 diff 引擎/依赖
 
 ### 3.2 文件树（`packages/daemon/src/fs/tree.ts`）
 
@@ -401,7 +441,7 @@ packages/protocol/src/
 - 每个 SessionHandle 包含：`agent_type`, `child_process`, `workspace`, `seq`, `created_at`
 - 同一 daemon 最多支持 10 个并发会话（可配置）
 - 超出限制时返回错误，不静默丢弃
-- 会话结束时（`session.done`）从注册表移除，回收子进程
+- 会话结束时回收子进程；session 路由记录先标记 inactive 并保留一段时间，避免影响 `session.resume` 离线回放
 
 ### 4.2 Codex 适配器（`packages/daemon/src/agents/codex.ts`）
 
@@ -684,7 +724,7 @@ packages/server/package.json 关键依赖:
 
 后续阶段按需补充：
 
-- `packages/daemon`：`node-pty`、`chokidar`、`unified-diff`、`@anthropic-ai/claude-agent-sdk`
+- `packages/daemon`：`node-pty`、`chokidar`、`@anthropic-ai/claude-agent-sdk`
 - `packages/server`：`apn`（进入推送阶段时补入）
 
 所有依赖版本固定（`packages/pnpm-lock.yaml` 提交入库），`pnpm audit` 纳入 CI。

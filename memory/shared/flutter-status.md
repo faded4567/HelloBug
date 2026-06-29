@@ -1,6 +1,6 @@
 # Flutter Status
 
-Updated: 2026-06-24
+Updated: 2026-06-27
 
 ## How To Use This File
 
@@ -37,11 +37,11 @@ Updated: 2026-06-24
 1. Security boundary is still incomplete:
    - app sends `Envelope`
    - server bridges envelope frames in development mode
-   - daemon still talks plain `Message`
-   - `noise_ik.dart` and `session_cipher.dart` are still stubs
+   - daemon already sends signed `Envelope`, and session-whitelisted traffic can use `noise_static_v1`
+   - `noise_ik.dart` and `session_cipher.dart` are implemented, but full opaque coverage and final relay boundary are still incomplete
 2. Push/pinning/runtime persistence are only partially done:
-   - push token reporting is not wired
-   - server pin persistence/use is not wired
+   - iOS push token bridge and Android native FCM token bridge are wired, but Android still needs runtime Firebase config and production push delivery is not done
+   - server pin persistence/use is partially wired
    - JWT refresh exists, but the full secure reconnect story is not finished
 3. Backend capability gaps still block Flutter pages:
    - daemon now has real `templates.list`
@@ -56,25 +56,34 @@ Updated: 2026-06-24
 
 - App skeleton is present: `main.dart`, `bootstrap.dart`, `app.dart`, router, models, theme, providers.
 - Transport scaffold is live enough for real development-mode pairing and session work:
-  - `WsClient` supports connect, reconnect, `auth.attach`, envelope/plain decode, and `session.resume`
+  - `WsClient` supports connect, reconnect, `auth.attach`, envelope/plain decode, `session.resume`, and `auth.token / device.list / device.rename / device.revoke / replay.done / device.status / error` placeholder decode via outer `routing_payload`
+  - `WsClient` now also decodes placeholder `session.start.result`, so envelope runtime can read server-generated rejected start results without falling back to plain inner payloads
+  - when a daemon-originated `session.start.result` is both encrypted and carries a minimal outer status hint, `WsClient` now prefers decrypting the real ciphertext whenever `sender_pubkey` is present instead of treating it like a placeholder
+  - `WsClient` now fails fast instead of silently sending plain envelopes when `workspace.* / history.get / slash.list / session.* / pty.*` runtime traffic has no configured transport crypto; only pairing/auth/device/session.resume placeholder paths can bypass per-session crypto
+  - relay/server now also rejects modern metadata-bearing plain runtime request envelopes, while older raw JSON / no-metadata compatibility still exists for transitional paths
   - runtime restore and live client injection both exist
   - resume reconnect observer is attached
   - `PinnedHttpClient` is still placeholder
 - Crypto is still partial:
   - `keys.dart`, `secure_store.dart`, `nonce_counter.dart`, `envelope_signer.dart` exist
-  - `noise_ik.dart` and `session_cipher.dart` are still stubs
-  - envelope `sig` is still empty
+  - `noise_ik.dart` and `session_cipher.dart` are implemented
+  - envelope `sig` is now signed by the paired runtime / pairing client
+  - direct `workspace.list / workspace.resolve / history.list / templates.list` messages now use reserved control channel `transport.control.v1`
+  - `session.resume` now sends outer `routing_payload` and stays on `noise_static_v1` without triggering session ratchet
+  - server-originated `device.status` / `error` now arrive as envelope placeholders instead of plain inner payloads on envelope clients
 - Pairing is partially real:
   - inline manual pairing happens in `pairing_entry_page.dart`
   - `manual_pair_page.dart` is still a standalone visual variant, not the active flow
   - daemon metadata such as `machineName` / `os` has started to persist
-  - missing pieces are push token, pin persistence, and real E2EE session setup
+  - missing pieces are fuller pinning strategy, production push delivery, and shrinking the remaining development-mode fallback paths
 - Unlock is intentionally relaxed right now:
   - `UnlockGate` wraps the router
   - app currently starts unlocked by default
   - timeout-based re-lock is effectively disabled for now
 - Devices are provider-backed:
   - `devicesProvider` listens to `device.status`
+  - server 现在会在会话启动确认和 `session.done` 时同步 `active_session_count`，且 daemon 离线后已完成会话仍可通过 `session.resume` 回放
+  - daemon 中途掉线时，挂起的 `session.start` / `workspace.list` / `workspace.resolve` / `history.list` / `templates.list` 现在会由 server 立即回失败，Flutter 不必再只能等超时
   - persisted paired daemon metadata can be restored into the list
 
 ## M2 Reality
@@ -91,7 +100,7 @@ Updated: 2026-06-24
 - `NewSessionFlow` no longer uses a dev fake-device fallback.
 - History already uses formal `history.list` / `history.get` and can parse basic Claude transcript JSONL.
 - `danger.pending` is already globally wired; the remaining gap is timeout/handled/error state cleanup.
-- Template UI still uses local/static data even though daemon template support now exists.
+- Template UI now reads daemon `templates.list` and layers local override/delete persistence on top of it.
 - Slash palette already has daemon backend support; remaining work is richer client behavior and multi-agent semantics.
 
 ## M3 Reality
@@ -117,7 +126,7 @@ Updated: 2026-06-24
 
 ## M4 Gaps
 
-- No push-token registration flow is wired yet.
+- iOS push-token registration and Android native FCM token registration are wired; Android still needs runtime Firebase config, and production push delivery is still unfinished.
 - No multi-session concurrent tab behavior is finished yet.
 - Terminal still lacks read-only / permission-denied / exited-state UX cleanup.
 - Security / relay / templates / notifications / device-detail pages still rely heavily on mock or local-only data.

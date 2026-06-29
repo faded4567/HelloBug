@@ -1,6 +1,6 @@
 # Claude Current
 
-Updated: 2026-06-24
+Updated: 2026-06-26
 
 ## Role
 
@@ -30,7 +30,7 @@ Claude 负责整个 Flutter 客户端：
 - 但现在第一 tab 仍是“工作区”文案 + `SessionsPage` 内容的过渡态，后续页面实现要注意这个事实
 - app 侧 `noise_ik.dart` / `session_cipher.dart` 仍未完成
 - app 侧 pinning、JWT 恢复仍未完成；前台重连观察器已接上，但超时锁定当前保持关闭
-- pairing 后 push token 正式上报仍未完成；`machineName / os` 已开始持久化
+- pairing 后 push token 已能自动上报；iOS native APNS bridge 与 Android native FCM bridge 都已接入，Android 当前按 `manufacturer=Other` 上报，运行时仍需 `app/android/app/google-services.json`，`machineName / os` 也已开始持久化
 - `danger.pending` 全局监听、弹层路由和正式 allow/deny payload 已接通，但 timeout / 已处理 / 失败状态仍未完成
 - 文件链路协议已基本收口：`fs.tree.req` / `fs.file.req` 正式字段、`data_base64url` 兼容、重试订阅回收、错误匹配 `request_id` 已接通；剩余主要是大文件 / 二进制 / 权限态
 - 历史记录已切到正式 `history.list { workspace_path }` / `history.get { session_id, offset, limit }`，并已能解析基础 Claude transcript（`user / assistant / thinking / tool_use / tool_result`）
@@ -38,7 +38,7 @@ Claude 负责整个 Flutter 客户端：
 - `session.event` 现在必须统一按 `payload.event.event_type` 读取，不要再写旧的扁平 `payload['event_type']` / `payload['text']`
 - new session 已改为正式 `session.start { session_id, workspace_path, agent_type, resume_session_id }`，shell 会话进入 `/terminal/:sessionId`
 - new session 的 dev fallback 测试设备入口已移除
-- daemon 已有 `slash.list` / `templates.list` 默认来源；下一步是把 Flutter 从静态 `kDefaultTemplates` 切到真实数据，不要再伪造新的协议或偷偷写死命令集
+- daemon 已有 `slash.list` / `templates.list` 默认来源；Flutter 模板已经切到真实 `templates.list`，后续不要再伪造新的协议或偷偷写死命令集
 - 启动加载、重连、设备吊销、配对过期、会话不存在等状态页
 - 工作区状态页：`49 / 50 / 51 / 60`
 - 推送落地页 `53`
@@ -51,5 +51,6 @@ Claude 负责整个 Flutter 客户端：
 
 - 不要把 `docs/claude-ui-tasks.md` 或 `docs/flutter-tasks.md` 当成完成状态真源。
 - 如果旧 wireframe 里还出现 3 个或 4 个底部 tab，把它视为历史残留，不要当成当前根导航真相。
+- `device.push_token` 现在是 runtime 自动上报，不要再把它当成手工配对步骤。
 - 尽量按需小片段读代码，不要反复整篇重读长文档。
 - 如果会话开始变重或出现 `Prompt is too long`，直接开新会话并从本文件开始，不要在超长上下文里继续堆。

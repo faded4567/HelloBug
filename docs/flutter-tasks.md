@@ -1,6 +1,6 @@
 # HelloBug — Flutter 任务清单
 
-> 本文件只包含 **Claude 负责的整个 Flutter 客户端任务，更新：2026-06-24**。
+> 本文件只包含 **Claude 负责的整个 Flutter 客户端任务，更新：2026-06-26**。
 > 任务完成状态以 `docs/app-remaining-work.md` 为准；本文档主要用于规划与验收。
 > 后端与基础设施由 Codex 负责，见 `docs/codex-tasks.md`。
 > 协议格式规范见 `docs/protocol.md`。
@@ -13,7 +13,7 @@
 | **Spike F1** E2EE 跨端互通 | ⬜ 未完成 | 阻塞：需 Node 端输出跨端 fixture，`noise_ik` / `session_cipher` 仍为占位 |
 | **Spike F2** iOS 后台保活验证 | ⬜ 未开始 | 可与 F1 并行启动；完整验证依赖 F1 完成（加密回放链路） |
 | **Spike F3** Diff 渲染可行性 | ⚠️ 已有 Demo，结论未冻结 | `screens/diff_spike/` 与 `screens/diff/` 已存在，但性能结论和最终路径未正式收口 |
-| **Spike F4** TLS Pinning + JWT 重连 | ⚠️ 骨架已落地，验证未完成 | `PinnedHttpClient`、`auth.attach`、replay 逻辑已在代码中，但 pin 与完整恢复链路未完成 |
+| **Spike F4** TLS Pinning + JWT 重连 | ⚠️ IO 侧已接入，完整验证未完成 | Flutter IO 已接入 TOFU + pin 持久化、`auth.attach` replay 恢复、`auth.refresh` 定时续期，以及 `DEVICE_REVOKED` / `auth.attach|auth.refresh -> AUTH_INVALID` 的 runtime reset；Web 端受浏览器限制仍无原生 pinning |
 | **M1** 安全骨架 | ⚠️ UI 骨架已深度落地，运行时未闭环 | crypto 仍有 stub；pairing 已部分联调但未闭环；`wsClientProvider` 仍默认 `null` 但 bootstrap / pairing 已能注入真实 client；unlock / devices 仍有未接线处 |
 | **M2** 聊天闭环 | ⚠️ 第一版页面与 Provider 已存在，未形成真实闭环 | sessions / new-session / chat / history / danger rules / workspace switch 等已在代码中，但大多仍缺真实 transport 接线 |
 | **M3** Diff + 文件树 | ⚠️ 第一版实现已存在，大文件与状态能力未收口 | diff、file tree、file preview 已有代码，文件预览正式协议已对齐，剩余主要是大文件/二进制/权限态 |
@@ -26,8 +26,8 @@
 - Claude 当前负责的是整个 Flutter 客户端，不只是页面层；因此这里的重点同时包含 `state / transport / crypto / bootstrap / router`。
 - 核心阻塞不是 UI 数量，而是：
   1. `wsClientProvider` 默认仍为 `null`，但 `bootstrap()` 与配对成功后都已能注入真实 `WsClient`
-  2. 前台 transport lifecycle observer 已接上，但 local auth 生命周期、pinning、超时重锁规则仍未收口
-  3. 配对流程已部分打通，但缺 `device.push_token`、pin 保存与 E2EE 握手
+  2. 前台 transport lifecycle observer 已接上，但 local auth 生命周期、Web 侧 pinning、超时重锁规则仍未收口
+  3. 配对流程已部分打通，server pin 持久化与 `device.push_token` 自动上报已补上，但仍缺真实平台推送接线与更完整的 E2EE 收口
   4. app 与 server / daemon 当前更主要的边界问题是安全链路未完成、模板仍未切到真实后端来源，以及 `session.agent.add` 还没有真正的多 agent runtime
 
 ---
@@ -38,7 +38,7 @@
 当前优先收口：
   ├── Spike F1（E2EE 跨端互通）
   ├── M1 运行时接线：真实 WsClient 注入、bootstrap 初始化、pairing 联调
-  ├── App 与 daemon 对接面：`slash.list` 错误态 / `templates.list` 本地覆盖语义 / `session.agent.add` / push token
+  ├── App 与 daemon 对接面：`slash.list` 错误态 / `templates.list` 本地覆盖语义 / `session.agent.add` / 真实平台 push token 接入
   ├── 现有页面接活：devices / danger.pending 状态收口 / file preview 补态 / history / reconnect
   └── Spike F4（pinning + JWT 恢复）
 
@@ -48,7 +48,7 @@
   └── 再进入 M4 后半段（voice / push / security / device detail / multi-tab）
 ```
 
-> **Spike F4 启动条件**：服务器证书 pin bytes 就绪后随时可开始，不依赖其他 Spike，但须在 M4 开始前完成。
+> **Spike F4 现状**：Flutter IO 已切到“首次连接记住证书（TOFU）+ 后续严格校验”的开发态方案；若后续需要生产化轮换，还要再补多 pin / 证书轮换策略与 Web 端约束说明。
 
 ---
 
@@ -94,7 +94,7 @@
 - 产出：一个静态 demo 页面，确认移动端最终走自写渲染而非桌面 diff 组件
 
 ### ⬜ Spike F4：TLS Pinning + JWT 重连恢复（1-2 天）
-> **阻塞说明**：`PinnedHttpClient` 当前为占位实现，pin bytes 未设置；`auth.attach` / `auth.refresh` 流程仍为 stub。Spike F4 完成后填入真实 pin 材料并补全连接恢复逻辑。
+> **现状说明**：Flutter IO 已接上 `PinnedHttpClient`、证书观察与 pin 持久化，`auth.attach` / `auth.refresh` / `session.resume` 也已具备基础闭环；剩余主要是完整集成验证、生产化轮换策略和 Web 侧能力边界收口。
 **目标**：验证服务器证书 pin、JWT 续期和恢复连接的完整路径。
 
 - Flutter 端：`dio` + `http_certificate_pinning` + `SecurityContext`
@@ -222,7 +222,7 @@ app/lib/crypto/
   - 文案要和真实能力对齐，不提前承诺未做完的多人协作或云端持久化
 
 ### ⚠️ 1.6 `app/lib/screens/pairing/` — 配对页（扫码 + 手动）与 SAS 核对页
-> **现状补充**：配对页骨架已齐，且 `pairing_controller.dart` 已经会发送 `device.pair`、等待 `device.pair.sas`、发送 `device.pair.confirm`、等待 `auth.token`、持久化 runtime 并安装 live `WsClient`。未完成项主要是 `device.push_token`、pin 持久化、设备元数据持久化与真实 E2EE 握手。另：`manual_pair_page.dart` 当前仍是命名/职责错位的占位页，真实手输流程已内嵌在 `pairing_entry_page.dart`。
+> **现状补充**：配对页骨架已齐，且 `pairing_controller.dart` 已经会发送 `device.pair`、等待 `device.pair.sas`、发送 `device.pair.confirm`、等待 `auth.token`、持久化 runtime 并安装 live `WsClient`。App runtime 现在也会在 pairing 成功装载 live client 后，或后续收到 `auth.token` 时，自动上报当前本地 `device.push_token`。未完成项主要是真实平台 token 初始化、设备元数据持久化与更广泛的 E2EE 收口。另：`manual_pair_page.dart` 当前仍是命名/职责错位的占位页，真实手输流程已内嵌在 `pairing_entry_page.dart`。
 
 文件结构：
 ```
@@ -239,7 +239,7 @@ app/lib/screens/pairing/
 - `qr_scan_page.dart`：用 `mobile_scanner` 扫 daemon 输出的二维码或配对链接
 - `manual_pair_page.dart`：输入配对码、服务器地址、可选高级选项；有效期文案需跟随 daemon 当前配置，避免硬编码
 - `sas_verify_page.dart`：显示 5 个 emoji / 5 个词的 SAS，明确“不一致立即取消”
-- `pairing_controller.dart`：串起 `device.pair`、`device.pair.sas`、`device.pair.confirm`、`auth.token`、`device.push_token`、pin 保存、E2EE 握手
+- `pairing_controller.dart`：串起 `device.pair`、`device.pair.sas`、`device.pair.confirm`、`auth.token`、pin 保存、E2EE 握手；`device.push_token` 改由 app runtime 在 pairing/auth 成功后自动上报
 - 错误态必须完整：
   - 配对码过期
   - 服务器证书 pin 不匹配
@@ -261,7 +261,7 @@ app/lib/screens/pairing/
   - 解锁成功后恢复上一页状态，不清空当前会话草稿
 
 ### ⚠️ 1.8 `app/lib/screens/devices/` — 设备列表页与根 Tab 壳
-> **现状补充**：`devices_provider.dart` 已存在并可消费 `device.status`，`devices_page.dart` 也已经使用 provider 数据渲染设备卡片；同时根导航壳已经从旧的 3-tab 假设切到 2-tab 方向。当前缺口主要在设备详情入口、解绑/吊销流、刷新与错误态，以及新 2-tab 信息架构下的页面语义收口。
+> **现状补充**：`devices_provider.dart` 现在已经会拉 `device.list`、持续消费 `device.status`，`devices_page.dart` / `device_detail_page.dart` 也已接上 `device.rename`、`device.revoke(mode=unlink|revoke)`、真实 `daemon_version / paired_at / last_seen_at`、本地会话数与 daemon 返回的工作区列表。当前缺口主要剩设备页刷新 affordance、失败视觉、更多多设备语义与已吊销态的最终收口。
 
 - `devices_page.dart`：显示已绑定设备、在线/离线、系统版本、活跃会话数、最近在线时间
 - `device_card.dart`：设备卡片样式统一，在线状态与颜色来自 token，不在业务层硬编码
@@ -272,6 +272,7 @@ app/lib/screens/pairing/
   - 离线设备显示最近在线时间
   - 右滑解绑或进入详情页的入口留好位置
   - 没有设备时给出重新配对 CTA，而不是空白页
+  - 设备详情页中的“重命名 / 解绑 / 吊销”分别对接 `device.rename`、`device.revoke(mode=unlink)`、`device.revoke(mode=revoke)`
 
 ---
 
@@ -402,7 +403,7 @@ app/lib/widgets/
 - 后续 M4 的图片、语音、斜杠入口在这里扩展，M2 先把插槽和布局留好
 
 ### ⚠️ 2.7 `app/lib/widgets/danger_confirm/` 与 `workspace_switch/`
-> **现状补充**：`danger_confirm_sheet.dart`、`workspace_switch_sheet.dart` 与工作区历史持久化都已存在；`danger.pending` 现在已经有全局监听并能自动弹出确认框，剩余主要是 timeout / 已处理 / 失败状态收口，以及工作区切换与聊天 / 文件树 / 分支上下文的完整联动。
+> **现状补充**：`danger_confirm_sheet.dart`、`workspace_switch_sheet.dart` 与工作区历史持久化都已存在；`danger.pending` 现在已经有全局监听并能自动弹出确认框。工作区切换 sheet 现已优先使用 `workspace.list`，并会对手输路径与本地历史路径调用 `workspace.resolve` 做预检；剩余主要是与聊天 / 文件树 / 分支上下文的更深联动，以及工作区主页体系的最终收口。
 
 文件结构：
 ```
@@ -424,6 +425,7 @@ app/lib/widgets/workspace_switch/
 - 注意事项：
   - `danger.pending` 到来时要能从任何前台页弹出，不要求用户先回聊天页
   - 超时 60 秒自动拒绝的 UI 反馈要明显，不能用户以为还在等待
+  - 手输路径前可先调 `workspace.resolve` 做预检；工作区列表页和切换 sheet 应优先使用 `workspace.list`
 
 ### ⚠️ 2.8 `app/lib/screens/settings/danger_rules_page.dart` — 危险规则设置页
 > **现状补充**：页面、增删改 UI 与正则基础校验已存在；当前规则仍主要存于 app 侧内存 settings state，尚未完成持久化深度与 daemon 侧同步约定。
@@ -532,7 +534,7 @@ app/lib/screens/filetree/
   - 内容只读，不开放编辑入口，避免越过项目边界
 
 ### ⚠️ 3.5 工作区切换与聊天 / 文件树联动补全
-> **现状补充**：工作区切换 sheet 与 `workspace_history_provider.dart` 已存在，并且最近 / 置顶历史与 `currentPath` 都可持久化；聊天页选择其他工作区后，当前实现会保留旧会话并带新路径进入 `NewSessionFlow`，历史页也会优先读取当前工作区，文件树 / 文件预览 / diff / 终端打开时也会回写当前工作区。文件树、Diff、分支上下文之间的完整联动仍是半成品。
+> **现状补充**：工作区切换 sheet 与 `workspace_history_provider.dart` 已存在，并且最近 / 置顶历史与 `currentPath` 都可持久化；切换 sheet 现已接到 `workspace.list / workspace.resolve`，聊天页选择其他工作区后会保留旧会话并带新路径进入 `NewSessionFlow`，历史页也会优先读取当前工作区，文件树 / 文件预览 / diff / 终端打开时也会回写当前工作区。文件树、Diff、分支上下文之间的完整联动仍是半成品。
 
 - 把 M2 的 `workspace_switch_sheet.dart` 扩展成完整工作区上下文入口
 - 聊天页、文件树页、Diff 页都要感知当前工作区与当前分支
