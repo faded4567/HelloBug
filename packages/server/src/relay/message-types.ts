@@ -12,6 +12,8 @@ export const AppToDaemonMessageTypes = new Set<string>([
   "danger.deny",
   "fs.tree.req",
   "fs.file.req",
+  "workspace.list",
+  "workspace.resolve",
   "history.list",
   "history.get",
   "templates.list",

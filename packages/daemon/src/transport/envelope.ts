@@ -24,6 +24,8 @@ export function encodeEnvelope(
     messageType?: string;
     cipherMode?: CipherMode;
     senderPubkey?: string;
+    requestId?: string;
+    routingPayload?: string;
     ciphertext?: string;
   },
 ): Envelope {
@@ -42,6 +44,10 @@ export function encodeEnvelope(
     message_type: options.messageType ?? message.type,
     cipher_mode: options.cipherMode ?? "plain",
     ...(options.senderPubkey ? { sender_pubkey: options.senderPubkey } : {}),
+    ...(options.requestId ? { request_id: options.requestId } : {}),
+    ...(options.routingPayload
+      ? { routing_payload: options.routingPayload }
+      : {}),
   };
 
   const payload = createEnvelopeSigningPayload(envelope);
@@ -58,7 +64,9 @@ export function decodeEnvelope(raw: string | Buffer): Message {
   const parsed = JSON.parse(raw.toString()) as unknown;
   const envelope = validateEnvelope(parsed);
   if (envelope.cipher_mode === "noise_static_v1") {
-    throw new Error("Encrypted envelopes must be decrypted before decodeEnvelope");
+    throw new Error(
+      "Encrypted envelopes must be decrypted before decodeEnvelope",
+    );
   }
   const innerRaw = JSON.parse(
     Buffer.from(envelope.ciphertext, "base64url").toString("utf8"),

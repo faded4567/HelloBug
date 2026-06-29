@@ -5,7 +5,10 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { SessionImageUploadStore } from "../src/fs/image.js";
+import {
+  DefaultSessionImageUploadMaxBytes,
+  SessionImageUploadStore,
+} from "../src/fs/image.js";
 import { toBase64Url } from "../src/lib/base64url.js";
 
 describe("session image upload store", () => {
@@ -65,5 +68,60 @@ describe("session image upload store", () => {
         data: toBase64Url(Buffer.from("part-2")),
       }),
     ).rejects.toThrow("total_chunks changed");
+  });
+
+  it("rejects non-image mime types", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "hellobug-image-store-"));
+    const store = new SessionImageUploadStore(rootDir);
+
+    await expect(
+      store.appendChunk({
+        session_id: "session-3",
+        image_id: "image-3",
+        chunk_index: 0,
+        total_chunks: 1,
+        mime_type: "text/plain",
+        data: toBase64Url(Buffer.from("not an image")),
+      }),
+    ).rejects.toThrow("mime_type must be image/*");
+  });
+
+  it("rejects uploads that exceed the byte limit", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "hellobug-image-store-"));
+    const store = new SessionImageUploadStore({
+      rootDir,
+      maxBytes: 8,
+    });
+
+    await expect(
+      store.appendChunk({
+        session_id: "session-4",
+        image_id: "image-4",
+        chunk_index: 0,
+        total_chunks: 1,
+        mime_type: "image/png",
+        data: toBase64Url(Buffer.alloc(9, 1)),
+      }),
+    ).rejects.toThrow(`exceeds ${8} bytes limit`);
+  });
+
+  it("uses the default max upload size when not overridden", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "hellobug-image-store-"));
+    const store = new SessionImageUploadStore(rootDir);
+
+    await expect(
+      store.appendChunk({
+        session_id: "session-5",
+        image_id: "image-5",
+        chunk_index: 0,
+        total_chunks: 1,
+        mime_type: "image/jpeg",
+        data: toBase64Url(
+          Buffer.alloc(DefaultSessionImageUploadMaxBytes + 1, 2),
+        ),
+      }),
+    ).rejects.toThrow(
+      `exceeds ${DefaultSessionImageUploadMaxBytes} bytes limit`,
+    );
   });
 });

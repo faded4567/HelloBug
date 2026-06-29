@@ -7,7 +7,12 @@
     "test": "npm --prefix ./protocol run test && npm --prefix ./server run test && npm --prefix ./daemon run test",
     "lint": "npm --prefix ./protocol run lint && npm --prefix ./server run lint && npm --prefix ./daemon run lint",
     "dev:server": "npm --prefix ./server run dev",
-    "dev:daemon": "npm --prefix ./daemon run dev"
+    "dev:daemon": "npm --prefix ./daemon run dev",
+    "build:server": "npm --prefix ./server run build",
+    "build:daemon": "npm --prefix ./daemon run build",
+    "test:server:relay": "npm --prefix ./server run test -- server.test.ts framing.test.ts message-types.test.ts",
+    "test:daemon:v1": "npm --prefix ./daemon run test -- daemon.test.ts history.test.ts workspace.test.ts file-change.test.ts",
+    "test:v1:backend": "npm run test:server:relay && npm run test:daemon:v1"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",

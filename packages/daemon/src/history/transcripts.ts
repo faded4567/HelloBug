@@ -91,6 +91,7 @@ export class DaemonTranscriptService {
 
     return {
       v: 1,
+      id: message.id,
       type: "history.list",
       payload: {
         items,
@@ -110,6 +111,7 @@ export class DaemonTranscriptService {
 
     return {
       v: 1,
+      id: message.id,
       type: "history.get",
       payload: {
         session_id: message.payload.session_id,

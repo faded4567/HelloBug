@@ -2,7 +2,7 @@ export interface PresenceRecord {
   deviceId: string;
   machineName: string;
   online: boolean;
-  ts: number;
+  lastSeenAt: number | null;
 }
 
 export class PresenceService {
@@ -13,21 +13,31 @@ export class PresenceService {
       deviceId,
       machineName,
       online: true,
-      ts: Date.now(),
+      lastSeenAt: Date.now(),
     };
     this.devices.set(deviceId, record);
     return record;
   }
 
-  markOffline(deviceId: string): PresenceRecord | undefined {
+  markOffline(deviceId: string, machineName = "unknown"): PresenceRecord {
     const current = this.devices.get(deviceId);
-    if (!current) {
-      return undefined;
-    }
-    const next = {
-      ...current,
+    const next: PresenceRecord = {
+      deviceId,
+      machineName: current?.machineName ?? machineName,
       online: false,
-      ts: Date.now(),
+      lastSeenAt: current?.online ? Date.now() : (current?.lastSeenAt ?? null),
+    };
+    this.devices.set(deviceId, next);
+    return next;
+  }
+
+  rename(deviceId: string, machineName: string): PresenceRecord {
+    const current = this.devices.get(deviceId);
+    const next: PresenceRecord = {
+      deviceId,
+      machineName,
+      online: current?.online ?? false,
+      lastSeenAt: current?.lastSeenAt ?? null,
     };
     this.devices.set(deviceId, next);
     return next;
@@ -37,4 +47,3 @@ export class PresenceService {
     return this.devices.get(deviceId);
   }
 }
-

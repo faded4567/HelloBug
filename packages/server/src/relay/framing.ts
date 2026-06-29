@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 
 import {
+  TransportControlSessionId,
   validateEnvelope,
   validateMessage,
   type Envelope,
@@ -16,6 +16,7 @@ export type RelayWireFormat = "plain" | "envelope";
 
 interface RelayEnvelopeState {
   nextSeq: number;
+  lastInboundSeq: number | null;
 }
 
 interface DecodeRelayFrameResult {
@@ -25,9 +26,28 @@ interface DecodeRelayFrameResult {
   forwardEnvelope?: Envelope;
 }
 
+interface RelayFrameErrorContext {
+  request_id?: string | null;
+  session_id?: string | null;
+}
+
 const socketWireFormats = new WeakMap<WebSocket, RelayWireFormat>();
 const socketEnvelopeStates = new WeakMap<WebSocket, RelayEnvelopeState>();
 const EncryptedRoutableMessageTypes = new Set<string>([
+  "auth.attach",
+  "auth.refresh",
+  "auth.token",
+  "daemon.hello",
+  "device.pair.ready",
+  "device.pair",
+  "device.pair.sas",
+  "device.pair.confirm",
+  "device.push_token",
+  "device.list",
+  "device.rename",
+  "device.revoke",
+  "device.status",
+  "session.resume",
   "session.start",
   "session.agent.add",
   "session.input",
@@ -39,19 +59,185 @@ const EncryptedRoutableMessageTypes = new Set<string>([
   "danger.deny",
   "fs.tree.req",
   "fs.file.req",
+  "workspace.list",
+  "workspace.resolve",
+  "history.list",
   "history.get",
+  "templates.list",
   "slash.list",
   "pty.input",
   "pty.resize",
+  "key.ratchet",
+  "key.ratchet_ack",
+  "session.start.result",
+  "session.event",
+  "replay.done",
+  "danger.pending",
+  "danger.result",
+  "push.trigger",
+  "fs.tree",
+  "fs.file",
+  "slash.list",
+  "error",
+]);
+const TransportControlMessageTypes = new Set<string>([
+  "auth.attach",
+  "auth.refresh",
+  "auth.token",
+  "device.push_token",
+  "device.list",
+  "device.rename",
+  "device.revoke",
+  "session.start",
+  "workspace.list",
+  "workspace.resolve",
+  "history.list",
+  "templates.list",
+]);
+const RoutingPayloadPlaceholderMessageTypes = new Set<string>([
+  "auth.attach",
+  "auth.refresh",
+  "auth.token",
+  "daemon.hello",
+  "device.pair.ready",
+  "device.pair",
+  "device.pair.sas",
+  "device.pair.confirm",
+  "device.push_token",
+  "device.list",
+  "device.rename",
+  "device.revoke",
+  "device.status",
+  "error",
+  "session.resume",
+  "session.start.result",
+  "replay.done",
+]);
+const StateTrackingRoutingPayloadMessageTypes = new Set<string>([
+  "session.start",
+  "session.event",
+  "danger.pending",
+  "danger.result",
+  "push.trigger",
+  "danger.allow",
+  "danger.deny",
+  "error",
+]);
+const NoiseRequiredEnvelopeMessageTypes = new Set<string>([
+  "auth.attach",
+  "auth.refresh",
+  "daemon.hello",
+  "device.pair.ready",
+  "device.pair",
+  "device.pair.sas",
+  "device.pair.confirm",
+  "device.push_token",
+  "push.trigger",
+  "device.list",
+  "device.rename",
+  "device.revoke",
+  "session.resume",
+  "session.start",
+  "session.agent.add",
+  "session.input",
+  "session.input.image",
+  "session.input.voice_text",
+  "session.command.slash",
+  "session.cancel",
+  "danger.allow",
+  "danger.deny",
+  "fs.tree.req",
+  "fs.file.req",
+  "pty.input",
+  "pty.resize",
+  "key.ratchet",
+  "key.ratchet_ack",
+]);
+const DisallowedLegacyPlainMessageTypes = new Set<string>([
+  "auth.attach",
+  "auth.refresh",
+  "daemon.hello",
+  "device.push_token",
+  "push.trigger",
+  "device.list",
+  "device.rename",
+  "device.revoke",
+  "session.resume",
+  "session.start",
+  "session.agent.add",
+  "session.input",
+  "session.input.image",
+  "session.input.voice_text",
+  "session.command.slash",
+  "session.cancel",
+  "danger.allow",
+  "danger.deny",
+  "danger.pending",
+  "danger.result",
+  "device.pair.ready",
+  "device.pair",
+  "device.pair.sas",
+  "device.pair.confirm",
+  "session.event",
+  "fs.tree.req",
+  "fs.file.req",
+  "fs.tree",
+  "fs.file",
+  "workspace.list",
+  "workspace.resolve",
+  "history.list",
+  "history.get",
+  "templates.list",
+  "slash.list",
+  "pty.input",
+  "pty.resize",
+  "key.ratchet",
+  "key.ratchet_ack",
+  "session.start.result",
+  "replay.done",
+  "error",
+]);
+const MetadataRequiredPlainEnvelopeMessageTypes = new Set<string>([
+  ...NoiseRequiredEnvelopeMessageTypes,
+  "workspace.list",
+  "workspace.resolve",
+  "history.list",
+  "history.get",
+  "templates.list",
+  "slash.list",
   "session.start.result",
   "session.event",
   "danger.pending",
   "danger.result",
   "fs.tree",
   "fs.file",
-  "slash.list",
+  "replay.done",
   "error",
 ]);
+
+export class RelayFrameDecodeError extends Error {
+  constructor(
+    message: string,
+    codeOrContext:
+      | "AUTH_INVALID"
+      | "PROTOCOL_VERSION"
+      | RelayFrameErrorContext = "PROTOCOL_VERSION",
+    maybeContext?: RelayFrameErrorContext,
+  ) {
+    super(message);
+    this.name = "RelayFrameDecodeError";
+    if (typeof codeOrContext === "string") {
+      this.code = codeOrContext;
+      this.context = maybeContext;
+    } else {
+      this.code = "PROTOCOL_VERSION";
+      this.context = codeOrContext;
+    }
+  }
+
+  readonly code: "AUTH_INVALID" | "PROTOCOL_VERSION";
+  readonly context?: RelayFrameErrorContext;
+}
 
 export function decodeRelayFrame(
   socket: WebSocket,
@@ -62,12 +248,17 @@ export function decodeRelayFrame(
 
   if (envelope) {
     socketWireFormats.set(socket, "envelope");
+    assertInboundEnvelopeSequence(socket, envelope);
     const cipherMode = envelope.cipher_mode ?? "plain";
+    assertNoiseRequiredCipherMode(envelope, cipherMode);
+    assertEncryptedEnvelopeSenderPubkey(envelope);
 
     if (cipherMode === "noise_static_v1") {
       return {
         envelope,
-        forwardEnvelope: canForwardSourceEnvelope(envelope) ? envelope : undefined,
+        forwardEnvelope: canForwardSourceEnvelope(envelope)
+          ? envelope
+          : undefined,
         wireFormat: "envelope",
         message: createEncryptedEnvelopePlaceholder(envelope),
       };
@@ -76,22 +267,36 @@ export function decodeRelayFrame(
     const innerRaw = JSON.parse(
       Buffer.from(envelope.ciphertext, "base64url").toString("utf8"),
     ) as unknown;
-    const normalizedInner = normalizeLegacyMessage(innerRaw);
+    const innerMessage = validateMessage(innerRaw);
+    assertLegacyPlainEnvelopeMetadata(envelope, innerMessage);
+    assertNoiseRequiredPlainEnvelopeMessage(envelope, innerMessage);
 
     return {
       envelope,
-      forwardEnvelope: canForwardSourceEnvelope(envelope, innerRaw)
+      forwardEnvelope: canForwardSourceEnvelope(
+        envelope,
+        innerRaw,
+        innerMessage,
+      )
         ? envelope
         : undefined,
       wireFormat: "envelope",
-      message: validateMessage(normalizedInner),
+      message: innerMessage,
     };
   }
 
+  const existingWireFormat = socketWireFormats.get(socket);
+  if (existingWireFormat === "envelope") {
+    throw new RelayFrameDecodeError(
+      "Relay connection cannot switch from envelopes back to plain messages",
+    );
+  }
+  const plainMessage = validateMessage(parsed);
+  assertLegacyPlainRelayMessageAllowed(plainMessage);
   socketWireFormats.set(socket, "plain");
   return {
     wireFormat: "plain",
-    message: validateMessage(normalizeLegacyMessage(parsed)),
+    message: plainMessage,
   };
 }
 
@@ -113,9 +318,37 @@ export function sendRelayMessage(
 
   if (
     options.sourceEnvelope &&
-    canReuseSourceEnvelope(options.sourceEnvelope, message, wireMessage, options)
+    canReuseSourceEnvelope(
+      options.sourceEnvelope,
+      message,
+      wireMessage,
+      options,
+    )
   ) {
+    rememberSentEnvelopeSequence(socket, options.sourceEnvelope.seq);
     sendJson(socket, options.sourceEnvelope);
+    return;
+  }
+
+  const opaqueRoutingPayload = getOpaqueRoutingPayload(message);
+  if (opaqueRoutingPayload) {
+    const envelope = {
+      from: options.from ?? "hellobug-server",
+      to: options.to ?? "",
+      session_id: getEnvelopeSessionId(message),
+      seq: getEnvelopeSequence(socket, message),
+      ts: Date.now(),
+      sig: "",
+      ciphertext: Buffer.from("opaque", "utf8").toString("base64url"),
+      message_type: message.type,
+      cipher_mode: "noise_static_v1",
+      ...(getEnvelopeRequestId(message)
+        ? { request_id: getEnvelopeRequestId(message) }
+        : {}),
+      routing_payload: opaqueRoutingPayload,
+    } satisfies Envelope;
+
+    sendJson(socket, envelope);
     return;
   }
 
@@ -132,6 +365,9 @@ export function sendRelayMessage(
     ),
     message_type: message.type,
     cipher_mode: "plain",
+    ...(getEnvelopeRequestId(message)
+      ? { request_id: getEnvelopeRequestId(message) }
+      : {}),
   } satisfies Envelope;
 
   sendJson(socket, envelope);
@@ -140,12 +376,15 @@ export function sendRelayMessage(
 function canForwardSourceEnvelope(
   envelope: Envelope,
   innerRaw?: unknown,
+  message?: Message,
 ): boolean {
   if ((envelope.cipher_mode ?? "plain") === "noise_static_v1") {
     return canRouteEncryptedEnvelope(envelope);
   }
 
-  return isDeepStrictEqual(normalizeLegacyMessage(innerRaw), innerRaw);
+  return innerRaw !== undefined && message !== undefined
+    ? isDeepStrictEqual(innerRaw, message)
+    : false;
 }
 
 function canReuseSourceEnvelope(
@@ -175,7 +414,11 @@ function canReuseSourceEnvelope(
     if (getEnvelopeSessionId(message) !== envelope.session_id) {
       return false;
     }
-    if (message.type === "session.event" && message.payload.seq !== envelope.seq) {
+    const requestId = getEnvelopeRequestId(message);
+    if (
+      envelope.request_id !== undefined &&
+      envelope.request_id !== (requestId ?? "")
+    ) {
       return false;
     }
     return true;
@@ -196,6 +439,166 @@ function tryValidateEnvelope(raw: unknown): Envelope | null {
   }
 }
 
+function assertNoiseRequiredCipherMode(
+  envelope: Envelope,
+  cipherMode: string,
+): void {
+  if (cipherMode === "noise_static_v1") {
+    return;
+  }
+
+  if (
+    typeof envelope.message_type !== "string" ||
+    !NoiseRequiredEnvelopeMessageTypes.has(envelope.message_type)
+  ) {
+    return;
+  }
+
+  throw new RelayFrameDecodeError(
+    `Envelope plaintext downgrade is not allowed for ${envelope.message_type}`,
+    {
+      request_id: envelope.request_id ?? envelope.message_type,
+      session_id: normalizeEnvelopeErrorSessionId(envelope.session_id),
+    },
+  );
+}
+
+function assertLegacyPlainEnvelopeMetadata(
+  envelope: Envelope,
+  message: Message,
+): void {
+  if (
+    typeof envelope.message_type === "string" &&
+    envelope.message_type.length > 0 &&
+    envelope.message_type !== message.type
+  ) {
+    throw new RelayFrameDecodeError(
+      `Envelope message_type does not match inner message type for ${message.type}`,
+      {
+        request_id: envelope.request_id ?? message.id ?? message.type,
+        session_id: normalizeEnvelopeErrorSessionId(envelope.session_id),
+      },
+    );
+  }
+
+  if (!MetadataRequiredPlainEnvelopeMessageTypes.has(message.type)) {
+    return;
+  }
+
+  if (
+    typeof envelope.message_type === "string" &&
+    envelope.message_type.length > 0 &&
+    envelope.cipher_mode !== undefined
+  ) {
+    return;
+  }
+
+  throw new RelayFrameDecodeError(
+    `Legacy plain envelopes without outer metadata are no longer allowed for ${message.type}`,
+    {
+      request_id: envelope.request_id ?? message.id ?? message.type,
+      session_id: normalizeEnvelopeErrorSessionId(envelope.session_id),
+    },
+  );
+}
+
+function assertNoiseRequiredPlainEnvelopeMessage(
+  envelope: Envelope,
+  message: Message,
+): void {
+  if ((envelope.cipher_mode ?? "plain") === "noise_static_v1") {
+    return;
+  }
+
+  if (typeof envelope.message_type !== "string") {
+    return;
+  }
+
+  if (!requiresNoiseForPlainEnvelopeMessage(message)) {
+    return;
+  }
+
+  throw new RelayFrameDecodeError(
+    `Envelope plaintext downgrade is not allowed for ${message.type}`,
+    {
+      request_id: envelope.request_id ?? message.id ?? message.type,
+      session_id: normalizeEnvelopeErrorSessionId(envelope.session_id),
+    },
+  );
+}
+
+function requiresNoiseForPlainEnvelopeMessage(message: Message): boolean {
+  switch (message.type) {
+    case "workspace.list":
+    case "history.list":
+    case "templates.list":
+      return !("items" in message.payload) && !("templates" in message.payload);
+    case "workspace.resolve":
+      return !("resolved_path" in message.payload) && !("status" in message.payload);
+    case "history.get":
+      return "limit" in message.payload;
+    case "slash.list":
+      return !("commands" in message.payload);
+    default:
+      return false;
+  }
+}
+
+function assertLegacyPlainRelayMessageAllowed(message: Message): void {
+  if (!DisallowedLegacyPlainMessageTypes.has(message.type)) {
+    return;
+  }
+
+  throw new RelayFrameDecodeError(
+    `Legacy raw relay messages are no longer allowed for ${message.type}`,
+    {
+      request_id: getEnvelopeRequestId(message) ?? message.type,
+      session_id: getSessionIdForRelayError(message),
+    },
+  );
+}
+
+function assertEncryptedEnvelopeSenderPubkey(envelope: Envelope): void {
+  if ((envelope.cipher_mode ?? "plain") !== "noise_static_v1") {
+    return;
+  }
+
+  if (!requiresEncryptedSenderPubkey(envelope)) {
+    return;
+  }
+
+  if (
+    typeof envelope.sender_pubkey === "string" &&
+    envelope.sender_pubkey.length > 0
+  ) {
+    return;
+  }
+
+  throw new RelayFrameDecodeError(
+    `Encrypted ${envelope.message_type ?? "envelope"} requires sender_pubkey`,
+    {
+      request_id: envelope.request_id ?? envelope.message_type,
+      session_id: normalizeEnvelopeErrorSessionId(envelope.session_id),
+    },
+  );
+}
+
+function requiresEncryptedSenderPubkey(envelope: Envelope): boolean {
+  if (!envelope.message_type) {
+    return false;
+  }
+
+  if (!EncryptedRoutableMessageTypes.has(envelope.message_type)) {
+    return false;
+  }
+
+  if (RoutingPayloadPlaceholderMessageTypes.has(envelope.message_type)) {
+    return false;
+  }
+
+  return true;
+}
+
 function canRouteEncryptedEnvelope(envelope: Envelope): boolean {
   return (
     (envelope.cipher_mode ?? "plain") === "noise_static_v1" &&
@@ -209,16 +612,58 @@ function createEncryptedEnvelopePlaceholder(envelope: Envelope): Message {
     throw new Error("Encrypted envelope is missing routable metadata");
   }
 
+  const prefersRoutingPayload =
+    RoutingPayloadPlaceholderMessageTypes.has(envelope.message_type) ||
+    StateTrackingRoutingPayloadMessageTypes.has(envelope.message_type);
+  const requiresRoutingPayload = requiresEncryptedRoutingPayload(envelope);
+  const routingPayload =
+    prefersRoutingPayload ? tryDecodeRoutingPayload(envelope) : null;
+
+  if (requiresRoutingPayload && routingPayload === null) {
+    throw new RelayFrameDecodeError(
+      `Encrypted ${envelope.message_type} requires routing_payload`,
+      "PROTOCOL_VERSION",
+      {
+        request_id: envelope.request_id ?? envelope.message_type,
+        session_id: normalizeEnvelopeErrorSessionId(envelope.session_id),
+      },
+    );
+  }
+
   const message = {
     v: 1,
+    ...(envelope.request_id ? { id: envelope.request_id } : {}),
     type: envelope.message_type,
-    payload: createEncryptedPayload(envelope),
+    payload:
+      envelope.message_type === "session.start.result"
+        ? createSessionStartResultPlaceholderPayload(envelope, routingPayload)
+        : routingPayload ?? createEncryptedPayload(envelope),
   };
   return validateMessage(message);
 }
 
+function requiresEncryptedRoutingPayload(envelope: Envelope): boolean {
+  if (!envelope.message_type) {
+    return false;
+  }
+
+  if (StateTrackingRoutingPayloadMessageTypes.has(envelope.message_type)) {
+    return true;
+  }
+
+  if (!RoutingPayloadPlaceholderMessageTypes.has(envelope.message_type)) {
+    return false;
+  }
+
+  return true;
+}
+
 function createEncryptedPayload(envelope: Envelope): Record<string, unknown> {
   switch (envelope.message_type) {
+    case "session.resume":
+      throw new Error("Encrypted session.resume requires routing_payload");
+    case "device.status":
+      throw new Error("Encrypted device.status requires routing_payload");
     case "session.start":
       return {
         session_id: envelope.session_id,
@@ -285,12 +730,34 @@ function createEncryptedPayload(envelope: Envelope): Record<string, unknown> {
         file_path: "encrypted",
         chunk_index: 0,
       };
+    case "workspace.list":
+      return {
+        default_path: null,
+        items: [],
+      };
+    case "workspace.resolve":
+      return {
+        workspace_path: "",
+        resolved_path: "/encrypted",
+        name: "encrypted",
+        status: "ready",
+        is_default: false,
+        entry_count: null,
+      };
+    case "history.list":
+      return {
+        items: [],
+      };
     case "history.get":
       return {
         session_id: envelope.session_id,
         offset: 0,
         total: 0,
         lines: [],
+      };
+    case "templates.list":
+      return {
+        templates: [],
       };
     case "slash.list":
       return {
@@ -308,9 +775,18 @@ function createEncryptedPayload(envelope: Envelope): Record<string, unknown> {
         cols: 1,
         rows: 1,
       };
+    case "key.ratchet":
+      return {
+        session_id: envelope.session_id,
+        next_pubkey: "encrypted-next-pubkey",
+      };
+    case "key.ratchet_ack":
+      return {
+        session_id: envelope.session_id,
+      };
     case "session.start.result":
       return {
-        request_id: "encrypted-request",
+        request_id: envelope.request_id ?? "encrypted-request",
         session_id: envelope.session_id,
         agent_type: "claude_code",
         workspace_path: "",
@@ -328,6 +804,8 @@ function createEncryptedPayload(envelope: Envelope): Record<string, unknown> {
           text: "",
         },
       };
+    case "replay.done":
+      throw new Error("Encrypted replay.done requires routing_payload");
     case "danger.pending":
       return {
         danger_id: "encrypted-danger",
@@ -358,6 +836,7 @@ function createEncryptedPayload(envelope: Envelope): Record<string, unknown> {
       return {
         session_id: envelope.session_id,
         file_path: "encrypted",
+        status: "ready",
         mime_type: "application/octet-stream",
         chunk_index: 0,
         total_chunks: 1,
@@ -366,120 +845,133 @@ function createEncryptedPayload(envelope: Envelope): Record<string, unknown> {
       };
     case "error":
       return {
-        request_id: "encrypted-request",
-        session_id: envelope.session_id,
+        request_id: envelope.request_id ?? "encrypted-request",
+        session_id:
+          envelope.session_id === TransportControlSessionId
+            ? null
+            : envelope.session_id.length > 0
+              ? envelope.session_id
+              : null,
         code: "PROTOCOL_VERSION",
         message: "encrypted",
       };
     default:
-      throw new Error(`Encrypted envelope type is not supported: ${envelope.message_type}`);
+      throw new RelayFrameDecodeError(
+        `Encrypted envelope type is not supported: ${envelope.message_type}`,
+        "PROTOCOL_VERSION",
+        {
+          request_id: envelope.request_id ?? envelope.message_type,
+          session_id: normalizeEnvelopeErrorSessionId(envelope.session_id),
+        },
+      );
   }
 }
 
-function normalizeLegacyMessage(raw: unknown): unknown {
-  if (!raw || typeof raw !== "object") {
-    return raw;
+function tryDecodeRoutingPayload(
+  envelope: Envelope,
+): Record<string, unknown> | null {
+  if (!envelope.routing_payload) {
+    return null;
   }
 
-  const record = raw as Record<string, unknown>;
-  const type = record.type;
-  if (type === "session.replay") {
-    return {
-      ...record,
-      type: "session.resume",
-      payload: normalizeSessionResumePayload(record.payload),
-    };
+  const decoded = JSON.parse(
+    Buffer.from(envelope.routing_payload, "base64url").toString("utf8"),
+  ) as unknown;
+  if (!decoded || typeof decoded !== "object" || Array.isArray(decoded)) {
+    throw new RelayFrameDecodeError(
+      "Envelope routing_payload must decode to an object",
+      "PROTOCOL_VERSION",
+      {
+        request_id: envelope.request_id ?? envelope.message_type,
+        session_id: normalizeEnvelopeErrorSessionId(envelope.session_id),
+      },
+    );
   }
 
-  if (type === "session.resume") {
-    return {
-      ...record,
-      payload: normalizeSessionResumePayload(record.payload),
-    };
-  }
-
-  if (type === "session.start") {
-    return {
-      ...record,
-      payload: normalizeLegacySessionStartPayload(record.payload),
-    };
-  }
-
-  if (type === "session.command.slash") {
-    return {
-      ...record,
-      payload: normalizeLegacySlashPayload(record.payload),
-    };
-  }
-
-  if (type === "fs.read") {
-    return {
-      ...record,
-      type: "fs.file.req",
-    };
-  }
-
-  if (type === "fs.tree.req") {
-    return {
-      ...record,
-      payload: normalizeLegacyFsTreePayload(record.payload),
-    };
-  }
-
-  return raw;
+  return decoded as Record<string, unknown>;
 }
 
-function normalizeSessionResumePayload(payload: unknown): unknown {
-  if (!payload || typeof payload !== "object") {
-    return payload;
+function createSessionStartResultPlaceholderPayload(
+  envelope: Envelope,
+  routingPayload: Record<string, unknown> | null,
+): Record<string, unknown> {
+  const status = routingPayload?.status;
+  if (status === "rejected") {
+    return {
+      request_id: envelope.request_id ?? "encrypted-request",
+      session_id: envelope.session_id,
+      agent_type: "claude_code",
+      workspace_path: "",
+      status: "rejected",
+      code: isKnownErrorCode(routingPayload?.code)
+        ? routingPayload.code
+        : "PROTOCOL_VERSION",
+      message:
+        typeof routingPayload?.message === "string" &&
+        routingPayload.message.length > 0
+          ? routingPayload.message
+          : "encrypted",
+    };
   }
 
-  const record = payload as Record<string, unknown>;
+  return {
+    request_id: envelope.request_id ?? "encrypted-request",
+    session_id: envelope.session_id,
+    agent_type: "claude_code",
+    workspace_path: "",
+    status: "started",
+    message:
+      typeof routingPayload?.message === "string" &&
+      routingPayload.message.length > 0
+        ? routingPayload.message
+        : "encrypted",
+  };
+}
+
+function isKnownErrorCode(
+  code: unknown,
+): code is
+  | "AUTH_EXPIRED"
+  | "AUTH_INVALID"
+  | "DEVICE_REVOKED"
+  | "SESSION_NOT_FOUND"
+  | "RATE_LIMITED"
+  | "WORKSPACE_FORBIDDEN"
+  | "CHUNK_MISSING"
+  | "PROTOCOL_VERSION" {
+  return (
+    code === "AUTH_EXPIRED" ||
+    code === "AUTH_INVALID" ||
+    code === "DEVICE_REVOKED" ||
+    code === "SESSION_NOT_FOUND" ||
+    code === "RATE_LIMITED" ||
+    code === "WORKSPACE_FORBIDDEN" ||
+    code === "CHUNK_MISSING" ||
+    code === "PROTOCOL_VERSION"
+  );
+}
+
+function getOpaqueRoutingPayload(message: Message): string | undefined {
   if (
-    typeof record.from_seq !== "number" ||
-    typeof record.last_seq === "number"
+    message.type === "auth.token" ||
+    message.type === "device.pair.ready" ||
+    message.type === "device.pair" ||
+    message.type === "device.pair.sas" ||
+    message.type === "device.pair.confirm" ||
+    message.type === "device.list" ||
+    message.type === "device.rename" ||
+    message.type === "device.revoke" ||
+    message.type === "session.start.result" ||
+    message.type === "replay.done" ||
+    message.type === "device.status" ||
+    message.type === "error"
   ) {
-    return payload;
+    return Buffer.from(JSON.stringify(message.payload), "utf8").toString(
+      "base64url",
+    );
   }
 
-  const { from_seq, ...rest } = record;
-  return {
-    ...rest,
-    last_seq: from_seq,
-  };
-}
-
-function normalizeLegacySessionStartPayload(payload: unknown): unknown {
-  if (!payload || typeof payload !== "object") {
-    return payload;
-  }
-
-  const record = payload as Record<string, unknown>;
-  if ("resume_session_id" in record) {
-    return payload;
-  }
-
-  return {
-    ...record,
-    resume_session_id: null,
-  };
-}
-
-function normalizeLegacySlashPayload(payload: unknown): unknown {
-  if (!payload || typeof payload !== "object") {
-    return payload;
-  }
-
-  const record = payload as Record<string, unknown>;
-  if (Array.isArray(record.args)) {
-    return payload;
-  }
-
-  const rawArgs = typeof record.args === "string" ? record.args.trim() : "";
-  return {
-    ...record,
-    args: rawArgs.length == 0 ? [] : rawArgs.split(/\s+/),
-  };
+  return undefined;
 }
 
 function ensureWireMessageId(
@@ -505,101 +997,112 @@ function getEnvelopeSessionId(message: Message): string {
     return message.payload.session_id;
   }
 
+  if (TransportControlMessageTypes.has(message.type)) {
+    return TransportControlSessionId;
+  }
+
+  if (
+    message.type === "error" &&
+    typeof message.payload.request_id === "string" &&
+    message.payload.request_id.length > 0 &&
+    (message.payload.session_id === null ||
+      message.payload.session_id === TransportControlSessionId)
+  ) {
+    return TransportControlSessionId;
+  }
+
   return "";
 }
 
-function getEnvelopeSequence(socket: WebSocket, message: Message): number {
-  if (message.type === "session.event") {
-    return message.payload.seq;
+function getEnvelopeRequestId(message: Message): string | undefined {
+  if (typeof message.id === "string" && message.id.length > 0) {
+    return message.id;
   }
 
-  if (message.type === "replay.done") {
-    return message.payload.current_seq;
+  if (
+    typeof message.payload === "object" &&
+    message.payload !== null &&
+    "request_id" in message.payload &&
+    typeof message.payload.request_id === "string" &&
+    message.payload.request_id.length > 0
+  ) {
+    return message.payload.request_id;
   }
 
-  const state = socketEnvelopeStates.get(socket) ?? { nextSeq: 0 };
-  state.nextSeq += 1;
-  socketEnvelopeStates.set(socket, state);
-  return state.nextSeq;
+  return undefined;
 }
 
-function normalizeLegacyFsTreePayload(payload: unknown): unknown {
-  if (!payload || typeof payload !== "object") {
-    return payload;
+function normalizeEnvelopeErrorSessionId(sessionId: string): string | null {
+  if (sessionId.length === 0 || sessionId === TransportControlSessionId) {
+    return null;
   }
 
-  const record = payload as Record<string, unknown>;
+  return sessionId;
+}
+
+function getSessionIdForRelayError(message: Message): string | null {
   if (
-    typeof record.path === "string" &&
-    typeof record.workspace_path !== "string" &&
-    typeof record.dir_path !== "string"
+    typeof message.payload === "object" &&
+    message.payload !== null &&
+    "session_id" in message.payload &&
+    typeof message.payload.session_id === "string"
   ) {
-    return {
-      session_id: record.session_id,
-      workspace_path: record.path,
-      dir_path: "",
-    };
+    return normalizeEnvelopeErrorSessionId(message.payload.session_id);
   }
 
-  return payload;
+  return null;
+}
+
+function getEnvelopeSequence(socket: WebSocket, message: Message): number {
+  const state = socketEnvelopeStates.get(socket) ?? {
+    nextSeq: 0,
+    lastInboundSeq: null,
+  };
+  const nextSeq =
+    message.type === "session.event" ? message.payload.seq : state.nextSeq + 1;
+  state.nextSeq = Math.max(state.nextSeq, nextSeq);
+  socketEnvelopeStates.set(socket, state);
+  return nextSeq;
+}
+
+function assertInboundEnvelopeSequence(
+  socket: WebSocket,
+  envelope: Envelope,
+): void {
+  const state = socketEnvelopeStates.get(socket) ?? {
+    nextSeq: 0,
+    lastInboundSeq: null,
+  };
+
+  if (
+    state.lastInboundSeq !== null &&
+    envelope.seq <= state.lastInboundSeq
+  ) {
+    throw new RelayFrameDecodeError(
+      `Envelope seq must strictly increase (last=${state.lastInboundSeq}, next=${envelope.seq})`,
+      "PROTOCOL_VERSION",
+      {
+        request_id: envelope.request_id ?? envelope.message_type,
+        session_id: normalizeEnvelopeErrorSessionId(envelope.session_id),
+      },
+    );
+  }
+
+  state.lastInboundSeq = envelope.seq;
+  socketEnvelopeStates.set(socket, state);
+}
+
+function rememberSentEnvelopeSequence(socket: WebSocket, seq: number): void {
+  const state = socketEnvelopeStates.get(socket) ?? {
+    nextSeq: 0,
+    lastInboundSeq: null,
+  };
+  state.nextSeq = Math.max(state.nextSeq, seq);
+  socketEnvelopeStates.set(socket, state);
 }
 
 function toLegacyCompatibleWireMessage(
   message: Message,
 ): Record<string, unknown> {
-  if (message.type === "fs.tree") {
-    const dirPath = resolve(
-      message.payload.workspace_path,
-      message.payload.dir_path || ".",
-    );
-    return {
-      ...message,
-      payload: {
-        ...message.payload,
-        path: dirPath,
-        items: message.payload.entries.map((entry) => ({
-          name: entry.name,
-          path: resolve(message.payload.workspace_path, entry.path),
-          is_dir: entry.type === "dir",
-          modified: entry.modified,
-          size: entry.size,
-        })),
-      },
-    };
-  }
-
-  if (message.type === "fs.file") {
-    let content = "";
-    try {
-      content = Buffer.from(message.payload.data, "base64url").toString("utf8");
-    } catch {
-      content = "";
-    }
-
-    return {
-      ...message,
-      payload: {
-        ...message.payload,
-        data: content,
-        data_base64url: message.payload.data,
-        content,
-      },
-    };
-  }
-
-  if (message.type === "slash.list" && "commands" in message.payload) {
-    const { commands } = message.payload;
-    return {
-      ...message,
-      payload: {
-        ...message.payload,
-        commands: commands.map((command) => ({
-          ...command,
-          description: command.desc,
-        })),
-      },
-    };
-  }
-
   return message as unknown as Record<string, unknown>;
 }

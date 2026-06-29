@@ -6,6 +6,7 @@ export interface RelayReplayEntry {
   message: SessionEventMessage;
   envelope?: Envelope;
   storedAt: number;
+  replaySeq: number;
 }
 
 export interface RelayReplayResult {
@@ -50,11 +51,13 @@ export class RelayReplayBuffer {
     };
 
     buffer.updatedAt = ts;
-    buffer.currentSeq = Math.max(buffer.currentSeq, message.payload.seq);
+    const replaySeq = envelope?.seq ?? message.payload.seq;
+    buffer.currentSeq = Math.max(buffer.currentSeq, replaySeq);
     buffer.entries.push({
       message,
       envelope,
       storedAt: ts,
+      replaySeq,
     });
 
     if (buffer.entries.length > this.capacity) {
@@ -78,8 +81,8 @@ export class RelayReplayBuffer {
     }
 
     const entries = buffer.entries
-      .filter((entry) => entry.message.payload.seq > lastSeq)
-      .sort((left, right) => left.message.payload.seq - right.message.payload.seq)
+      .filter((entry) => entry.replaySeq > lastSeq)
+      .sort((left, right) => left.replaySeq - right.replaySeq)
       .map((entry) => ({
         ...entry,
       }));

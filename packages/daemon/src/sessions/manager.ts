@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-
 import type {
   AgentType,
   ErrorCode,
@@ -13,6 +12,11 @@ import { WorkspaceFence } from "../guard/fence.js";
 import type { DangerApprovalInterceptor } from "../guard/interceptor.js";
 import { resolveUserPath } from "../lib/user-path.js";
 import { SessionEventEmitter } from "./events.js";
+import {
+  buildFileChangedEvent,
+  capturePendingFileChange,
+  type PendingFileChange,
+} from "./file-change.js";
 import type { SessionRuntimeFactory } from "./runtime.js";
 import { createMemorySessionRuntime } from "./memory-runtime.js";
 
@@ -48,6 +52,7 @@ interface InternalSessionHandle extends SessionHandle {
   runtime: ReturnType<SessionRuntimeFactory>;
   eventQueue: Promise<void>;
   suppressedToolUseIds: Set<string>;
+  pendingFileChanges: Map<string, PendingFileChange>;
 }
 
 export interface DaemonSessionManagerOptions {
@@ -155,6 +160,7 @@ export class DaemonSessionManager {
       runtime,
       eventQueue: Promise.resolve(),
       suppressedToolUseIds: new Set<string>(),
+      pendingFileChanges: new Map<string, PendingFileChange>(),
     };
 
     this.sessions.set(sessionId, handle);
@@ -376,6 +382,7 @@ export class DaemonSessionManager {
     event: SessionEventBody,
   ): Promise<void> {
     if (event.event_type === "tool.use") {
+      await this.captureFileChangeSnapshot(handle, event);
       const decision = await this.dangerInterceptor?.requestApproval({
         sessionId: handle.sessionId,
         workspacePath: handle.workspacePath,
@@ -392,6 +399,7 @@ export class DaemonSessionManager {
 
       if (decision && !decision.allowed) {
         handle.suppressedToolUseIds.add(event.tool_use_id);
+        handle.pendingFileChanges.delete(event.tool_use_id);
         this.eventEmitter.emitSessionEvent({
           sessionId: handle.sessionId,
           seq: this.nextSeq(handle),
@@ -417,6 +425,7 @@ export class DaemonSessionManager {
       event.event_type === "tool.result" &&
       handle.suppressedToolUseIds.delete(event.tool_use_id)
     ) {
+      handle.pendingFileChanges.delete(event.tool_use_id);
       return;
     }
 
@@ -427,13 +436,62 @@ export class DaemonSessionManager {
       agentType: handle.agentType,
     });
 
+    if (event.event_type === "tool.result") {
+      await this.emitDerivedFileChange(handle, event);
+    }
+
     await this.auditRuntimeEvent(handle, event);
 
     if (event.event_type === "session.done") {
       await this.dangerInterceptor?.clearSession(handle.sessionId);
       await this.imageUploadStore.cleanupSession(handle.sessionId);
+      handle.pendingFileChanges.clear();
       this.sessions.delete(handle.sessionId);
     }
+  }
+
+  private async captureFileChangeSnapshot(
+    handle: InternalSessionHandle,
+    event: Extract<SessionEventBody, { event_type: "tool.use" }>,
+  ): Promise<void> {
+    const pending = await capturePendingFileChange(
+      handle.workspacePath,
+      event.tool_name,
+      event.tool_input,
+    );
+    if (!pending) {
+      handle.pendingFileChanges.delete(event.tool_use_id);
+      return;
+    }
+    handle.pendingFileChanges.set(event.tool_use_id, pending);
+  }
+
+  private async emitDerivedFileChange(
+    handle: InternalSessionHandle,
+    event: Extract<SessionEventBody, { event_type: "tool.result" }>,
+  ): Promise<void> {
+    const pending = handle.pendingFileChanges.get(event.tool_use_id);
+    if (!pending) {
+      return;
+    }
+
+    handle.pendingFileChanges.delete(event.tool_use_id);
+    if (event.is_error) {
+      return;
+    }
+
+    const fileChangedEvent = await buildFileChangedEvent(pending);
+    if (!fileChangedEvent) {
+      return;
+    }
+
+    this.eventEmitter.emitSessionEvent({
+      sessionId: handle.sessionId,
+      seq: this.nextSeq(handle),
+      event: fileChangedEvent,
+      agentType: handle.agentType,
+    });
+    await this.auditRuntimeEvent(handle, fileChangedEvent);
   }
 
   private async auditRuntimeEvent(
@@ -449,6 +507,15 @@ export class DaemonSessionManager {
         session_id: handle.sessionId,
         event_type: "tool.result",
         summary: `tool=${event.tool_name} is_error=${event.is_error}`,
+      });
+      return;
+    }
+
+    if (event.event_type === "file.changed") {
+      await this.auditLogger.appendAuditEntry({
+        session_id: handle.sessionId,
+        event_type: "file.changed",
+        summary: `file=${event.file_path} added=${event.added} removed=${event.removed}`,
       });
       return;
     }

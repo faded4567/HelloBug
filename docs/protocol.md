@@ -1,7 +1,7 @@
 # HelloBug 消息协议规范
 
 > 本文档定义 App ↔ 云服务器 ↔ Daemon 之间的完整消息格式。  
-> 更新：2026-06-22
+> 更新：2026-06-29
 
 ---
 
@@ -11,15 +11,12 @@
 
 ```
 WebSocket Frame (binary / text)
-└── Envelope (JSON, 明文)          ← 服务器可见，用于路由
-    ├── routing fields
+└── Envelope (JSON, 外层元数据服务器可见)
+    ├── routing fields / message_type / request_id / routing_payload?
     ├── sig  (Ed25519, base64url)   ← 对 envelope 字段的签名
-    └── ciphertext (base64url)      ← 端到端加密的 payload，服务器不可见
-        └── InnerMessage (JSON)
-            ├── v    (protocol version)
-            ├── id   (message UUID)
-            ├── type (消息类型字符串)
-            └── payload (具体业务字段)
+    └── ciphertext (base64url)
+        ├── 常规模式：真实 InnerMessage（可为 plain 或 noise_static_v1 密文）
+        └── placeholder 模式：固定 "opaque"，真实 payload 放到 outer routing_payload
 ```
 
 ### 1.1 Envelope 字段
@@ -29,12 +26,33 @@ WebSocket Frame (binary / text)
 | `from`       | string       | 发送方 `device_id`（UUID）                                                      |
 | `to`         | string       | 接收方 `device_id`（UUID），服务器内部路由用                                    |
 | `session_id` | string       | 会话 UUID（无关联会话时传空字符串）                                             |
-| `seq`        | number (u64) | 单 session 内严格递增，从 1 开始；无会话上下文的消息（如 auth）使用全局递增序列 |
+| `seq`        | number (u64) | 发送方 envelope 传输序号；同一发送连接上的 envelope 必须严格递增。业务层如 `session.event.payload.seq` 继续作为独立事件序号使用 |
 | `ts`         | number       | Unix 毫秒时间戳                                                                 |
-| `sig`        | string       | 对 `from+to+session_id+seq+ts` 拼接后的 Ed25519 签名（base64url），防篡改与重放 |
+| `sig`        | string       | 对 envelope 路由字段与 `ciphertext` 的签名（当前覆盖 `from/to/session_id/seq/ts/ciphertext/message_type/cipher_mode/sender_pubkey/request_id/routing_payload`） |
 | `ciphertext` | string       | base64url 编码的 AEAD 密文（InnerMessage 加密后）                               |
 
-> 服务器拒绝条件：sig 无效 / seq 重复或回退 / ts 偏差超过 ±5 分钟。
+> 服务器拒绝条件：sig 无效 / 同一连接上 seq 重复或回退 / ts 偏差超过 ±5 分钟 / 同一份已签名 envelope 在有效时间窗内被原样重放。
+
+补充：
+- 对 server 需要直接处理、但又不想退回 plain inner message 的控制消息，envelope client 现在会使用 `noise_static_v1 + routing_payload` 的 placeholder 形式。
+- 当前已使用 placeholder 的主要消息包括：`daemon.hello`、`auth.attach`、`auth.refresh`、`auth.token`、`device.push_token`、`device.list`、`device.rename`、`device.revoke`、`device.pair.ready`、`device.pair`、`device.pair.sas`、`device.pair.confirm`、`session.resume`、`session.start.result`、`replay.done`、`device.status`，以及控制通道 `error`。另外，`push.trigger` 现在也会保留真实 envelope 外层路由提示，但方向固定为 `daemon -> server`，不会再回发给 App。
+- `session.start`、`danger.allow`、`danger.deny`、`session.event`、`danger.pending` 与 `danger.result` 现在都会在保留真实密文的同时携带 outer `routing_payload`；这不再只是“可选提示”，而是 server 维护 pending-start / pending-danger / session.done 等状态机所依赖的必需路由提示。daemon / App 仍以真实 ciphertext 为准。
+- `session.start.result` 现在分两类处理：server 自产的 rejected 结果仍走完整 placeholder；daemon 发回的加密 `session.start.result` 则保留真实密文，同时必须在 outer `routing_payload` 暴露最小 `status/code` 提示供 server 路由，App 若检测到 `sender_pubkey` 存在则必须优先解密真实 ciphertext，而不是直接消费该提示。
+- daemon 发回的加密 `error` 现在也同样必须携带 outer `routing_payload`；server 不再接受“只有 `message_type/session_id`、但缺少结构化错误提示”的旧开发态兼容。
+- 对真正需要终端对端解密的 `noise_static_v1` envelope，server 现在也会把 `sender_pubkey` 视为必需字段；仅有 placeholder 语义、由 outer `routing_payload` 承载真实 payload 的控制消息仍可不带该字段。这样 relay 不会再把“目标端根本无法解密”的坏包盲目转发出去。
+- pre-pair bootstrap 仍处于最终会话密钥建立前，但现在也统一使用 outer metadata + `routing_payload` 的 placeholder envelope，而不是回退成 plain inner message。
+- relay 一旦在某条连接上进入 envelope 模式，就不再接受该连接回退到 plain inner message。
+- relay 对 legacy raw JSON 的入口也已继续收紧：`auth.attach`、`auth.refresh`、`daemon.hello`、`device.push_token`、`push.trigger`、`device.list`、`device.rename`、`device.revoke`、`session.resume`、`session.start`、`session.agent.add`、`session.input*`、`session.command.slash`、`session.cancel`、`danger.allow`、`danger.deny`、`workspace.list`、`workspace.resolve`、`history.list`、`history.get`、`templates.list`、`key.ratchet`、`key.ratchet_ack`、`danger.pending`、`danger.result`、`session.event`、`fs.tree.req`、`fs.file.req`、`fs.tree`、`fs.file`、`slash.list`、`pty.input`、`pty.resize` 已不再接受无 envelope 的旧报文；V1 主路径里的 raw JSON bootstrap / 直连控制流已基本清空，剩余兼容主要收敛到少量更早期开发态 plain envelope 分支。
+- 服务器现在也不再接受 raw JSON 的 `session.start.result`、`replay.done` 与 `error`；这些回包路径已完全收口到 envelope 主链路。
+- plain envelope 的 outer metadata 现在也继续收紧：`auth.attach`、`auth.refresh`、`daemon.hello`、`device.pair.*`、`device.push_token`、`device.list`、`device.rename`、`device.revoke`、`session.resume`、`session.start`、`session.agent.add`、`session.input*`、`session.command.slash`、`session.cancel`、`danger.allow`、`danger.deny`、`workspace.list`、`workspace.resolve`、`history.list`、`history.get`、`templates.list`、`slash.list`、`session.start.result`、`session.event`、`danger.pending`、`danger.result`、`fs.tree`、`fs.file`、`replay.done` 若仍走 plain envelope，必须显式携带 outer `message_type + cipher_mode=plain`；同时 outer `message_type` 必须与 inner `Message.type` 一致，不再接受无 outer metadata 的 legacy plain envelope。
+- 对已带现代 outer metadata 的 `auth.attach`、`auth.refresh`、`daemon.hello`、`device.pair.ready`、`device.pair`、`device.pair.sas`、`device.pair.confirm`、`device.push_token`、`device.list`、`device.rename`、`device.revoke`、`session.resume`、`key.ratchet`、`key.ratchet_ack`，server 现在也会拒绝 `cipher_mode=plain` 的 envelope downgrade；其他旧 plain envelope / raw JSON relay 兼容仍暂时保留。
+- 对已带现代 outer metadata 的 app runtime request envelope，server 现在也会拒绝 `cipher_mode=plain` 的 downgrade，包括 `session.start / session.agent.add / session.input* / session.command.slash / session.cancel / danger.allow / danger.deny / fs.tree.req / fs.file.req / pty.input / pty.resize`，以及直连/utility request 变体 `workspace.list / workspace.resolve / history.list / history.get / templates.list / slash.list`；但无 outer metadata 的旧 plain envelope / raw JSON 兼容入口仍暂时保留。
+- 对无会话直连控制请求 `workspace.list / workspace.resolve / history.list / templates.list`，以及带真实 `session_id` 的 session utility 请求 `history.get / slash.list`，如果 app 已发出 `noise_static_v1` 请求，server 现在也会要求 daemon 侧回包继续保持 `noise_static_v1`；daemon 的 plain downgrade response 会被 server 拦截并改为结构化 `error(PROTOCOL_VERSION)`，并尽量保留原始 `session_id`。
+- 对 `session.start` 也是同样原则：如果 app 的 `session.start` 已走 `noise_static_v1`，daemon 回 `session.start.result` 时也必须继续保持 `noise_static_v1`；若 daemon 退回 plain，server 不会转发该结果，而会改回结构化 `session.start.result { status: "rejected", code: "PROTOCOL_VERSION" }`。
+- 对关键加密会话消息，server 现在也要求 outer `routing_payload` 继续存在，而不再接受“仅有 `message_type/session_id`、由 relay 伪造 placeholder payload 猜业务状态”的旧开发态兼容。当前已强制覆盖 `session.start`、`session.start.result`、`session.event`、`danger.allow`、`danger.deny`、`danger.pending`、`danger.result`；缺失时会在入站 framing 阶段直接拒绝。
+- 同一个已确认的加密 session 进入运行态后，daemon→app 的后续 session-scoped 消息也必须继续保持 `noise_static_v1`，当前已覆盖 `session.event`、`danger.pending`、`danger.result`、`fs.tree`、`fs.file`、`history.get`、`slash.list`、`key.ratchet`、`key.ratchet_ack`，以及带真实 `session_id` 的 `error`；若 daemon 对这些消息退回 plain，server 会拦下并改回结构化 `error(PROTOCOL_VERSION)`。
+- daemon 发出的加密 `error` 现在也会补 outer `routing_payload` placeholder，便于 server / 客户端在不退回 plain inner message 的前提下继续消费结构化错误。
+- daemon 发给 server 的 `push.trigger` 现在也会补 outer `routing_payload`，server 会在不解密正文的前提下只把它当成“离线推送提示”，并校验该 `session_id` 的归属后再触发推送调度。
 
 ### 1.2 InnerMessage 字段
 
@@ -68,7 +86,7 @@ derive session keys
 
 - **静态密钥**：Ed25519（签名用）+ Curve25519（Noise 用），配对时交换公钥
 - **会话密钥**：ChaCha20-Poly1305，sending_key / receiving_key 各一
-- **密钥轮换**：每 100 条消息**或** 10 分钟（双条件取先到者）触发一次 ratchet（`type: key.ratchet`），发起方发送 `key.ratchet`，接收方立即切换密钥并回复 `key.ratchet_ack`；ratchet 后消息计数器和时间计时器同时重置，旧密钥立即销毁
+- **密钥轮换**：每 100 条消息**或** 10 分钟（双条件取先到者）触发一次 ratchet（`type: key.ratchet`）；`key.ratchet` / `key.ratchet_ack` 这两个控制消息本身也走加密 session transport。发起方先用“当前旧密钥”发送 `key.ratchet`，接收方切换到新密钥后立即回复 `key.ratchet_ack`，发起方收到 `ack` 后才销毁旧密钥；ratchet 后消息计数器和时间计时器同时重置
 - **nonce**：12 字节（96 bit），格式 `session_id_hash[0..3] || msg_counter[0..7]`，前 4 字节为 session_id 的 SHA-256 前 4 字节，后 8 字节为 uint64 big-endian 消息计数器（从 0 开始）；ratchet 后计数器重置为 0；uint64 耗尽（2^64 条消息）视为严重错误，立即终止会话并提示重新配对
 
 ### 2.2 `key.ratchet` 消息
@@ -77,17 +95,20 @@ derive session keys
 {
   "type": "key.ratchet",
   "payload": {
+    "session_id": "<session uuid>",
     "next_pubkey": "<base64url Curve25519 新临时公钥>"
   }
 }
 ```
 
-收到后接收方切换密钥，并立即回复 `key.ratchet_ack`，发起方收到 `ack` 后才销毁旧密钥。
+`key.ratchet` 必须继续使用 ratchet 前的旧 cipher 发送，因为对端在收到前还没有切到新密钥。收到后接收方切换密钥，并立即用新 cipher 回复 `key.ratchet_ack`；发起方收到 `ack` 后才销毁旧密钥。
 
 ```json
 {
   "type": "key.ratchet_ack",
-  "payload": {}
+  "payload": {
+    "session_id": "<session uuid>"
+  }
 }
 ```
 
@@ -129,7 +150,7 @@ derive session keys
 | ----------------- | ------------------------------------------------------------------ |
 | `server.hello`    | 连接建立后服务器第一条消息                                         |
 | `auth.token`      | `auth.attach` / `auth.refresh` 的响应，返回新 JWT                  |
-| `device.status`   | 设备在线状态变更                                                   |
+| `device.status`   | 设备在线状态与实时元数据变更                                       |
 | `device.pair.sas` | 配对 SAS 核对词（daemon 通过 server 中继返回）                     |
 | `session.start.result` | `session.start` 的结构化成功/失败回执                          |
 | `session.event`   | agent 事件流（见 §4），M5 起每个事件携带 `agent_id` / `agent_type` |
@@ -179,7 +200,7 @@ App 收到后检查 `protocol_version`，若低于 `min_client_version` 则提�
 
 ### 4.2 daemon.hello
 
-mTLS 握手完成后 daemon 立即发送（方向：Daemon→Server，不加密，服务器可见）。
+mTLS 握手完成后 daemon 立即发送（方向：Daemon→Server）。业务 payload 如下；对 envelope client，当前会以 `noise_static_v1` placeholder 形式承载到 outer `routing_payload`。
 
 ```json
 {
@@ -198,7 +219,7 @@ mTLS 握手完成后 daemon 立即发送（方向：Daemon→Server，不加密�
 
 ### 4.3 device.pair.ready
 
-daemon 在 `daemon.hello` ACK 后发送，上报当前配对槽，服务器建立 `pairing_id → daemon_connection` 映射（默认 TTL 30 秒，可由 daemon 配置覆盖）。
+daemon 在 `daemon.hello` ACK 后发送，上报当前配对槽，服务器建立 `pairing_id → daemon_connection` 映射（默认 TTL 30 秒，可由 daemon 配置覆盖）。对 envelope client，当前会以 `noise_static_v1` placeholder 形式承载到 outer `routing_payload`。
 
 ```json
 {
@@ -227,6 +248,7 @@ App 重连时发送（方向：App→Server），只做连接鉴权，不携带�
 ```
 
 Server 验证 JWT 后回复 `auth.token`（含新 JWT）。连接恢复后 App 按需逐会话发送 `session.resume`。
+对 envelope client，`auth.attach / auth.refresh / auth.token` 当前都走 outer `routing_payload` placeholder，而不是回退成 plain inner message。
 
 ---
 
@@ -260,6 +282,8 @@ JWT 即将过期时 App 主动续期（方向：App→Server），不依赖重�
 ---
 
 ### 4.6 device.pair
+
+`device.pair / device.pair.sas / device.pair.confirm` 对 envelope client 当前都走 `noise_static_v1` placeholder + outer `routing_payload`。它们仍属于 pre-session bootstrap，不依赖最终业务会话密钥。
 
 ```json
 {
@@ -324,7 +348,115 @@ JWT 即将过期时 App 主动续期（方向：App→Server），不依赖重�
 
 `agent_type` 枚举：`claude_code` / `codex` / `shell`  
 `workspace_path`：可为空字符串；为空时表示“使用 daemon 默认工作区”  
-`resume_session_id`：非空时 daemon 用 `claude --resume <id>` 续接历史会话。
+`resume_session_id`：必须显式传 `null` 或非空字符串；非空时 daemon 用 `claude --resume <id>` 续接历史会话。Relay 不再为旧客户端自动补这个字段。
+
+### 4.7.0 workspace.list / workspace.resolve
+
+`workspace.list` 用于列出 daemon 允许访问的工作区根；`workspace.resolve` 用于校验某个候选路径，并返回 daemon 看到的真实状态。
+
+`workspace.list` 响应示例：
+
+```json
+{
+  "type": "workspace.list",
+  "payload": {
+    "default_path": "/Users/me/projects/hello",
+    "items": [
+      {
+        "path": "/Users/me/projects/hello",
+        "name": "hello",
+        "status": "ready",
+        "status_reason": "ok",
+        "is_default": true,
+        "entry_count": 12,
+        "is_empty": false,
+        "repo_root": "/Users/me/projects/hello",
+        "git_branch": "main",
+        "access_mode": "read_write"
+      }
+    ]
+  }
+}
+```
+
+`workspace.resolve` 请求示例：
+
+```json
+{
+  "type": "workspace.resolve",
+  "payload": {
+    "workspace_path": "/Users/me/projects/old-app"
+  }
+}
+```
+
+`workspace.resolve` 成功响应示例：
+
+```json
+{
+  "type": "workspace.resolve",
+  "payload": {
+    "workspace_path": "/Users/me/projects/hello",
+    "resolved_path": "/Users/me/projects/hello",
+    "name": "hello",
+    "status": "ready",
+    "status_reason": "ok",
+    "is_default": true,
+    "entry_count": 12,
+    "is_empty": false,
+    "repo_root": "/Users/me/projects/hello",
+    "git_branch": "main",
+    "access_mode": "read_write"
+  }
+}
+```
+
+`workspace.resolve` 失败但可修复的响应示例：
+
+```json
+{
+  "type": "workspace.resolve",
+  "payload": {
+    "workspace_path": "/Users/me/projects/old-app/src",
+    "resolved_path": "/Users/me/projects/old-app/src",
+    "name": "src",
+    "status": "missing",
+    "status_reason": "not_found",
+    "is_default": false,
+    "entry_count": null,
+    "is_empty": null,
+    "repo_root": null,
+    "git_branch": null,
+    "access_mode": "unknown",
+    "repair_hint": {
+      "reason": "nearest_existing_ancestor",
+      "suggested_path": "/Users/me/projects",
+      "message": "Requested path is unavailable. Try the nearest existing directory instead."
+    }
+  }
+}
+```
+
+字段说明：
+
+- `status`：工作区整体状态，当前为 `ready / missing / forbidden / not_dir`
+- `status_reason`：更细原因，当前为：
+  - `ok`
+  - `not_found`
+  - `not_directory`
+  - `outside_allowed_paths`
+  - `permission_denied`
+- `access_mode`：
+  - `read_write`：daemon 可读写
+  - `read_only`：daemon 可读但不可写
+  - `no_access`：daemon 无法访问
+  - `unknown`：当前无法可靠判断
+- `repair_hint`：可选修复提示；当前可能值包括：
+  - `default_workspace`
+  - `nearest_existing_ancestor`
+  - `first_allowed_workspace`
+  - `same_name_match`
+  - `fix_permissions`
 
 ### 4.7.1 session.start.result
 
@@ -474,7 +606,8 @@ PTY 会话的逐键输入统一走 `pty.input`，`session.input` 仍保留给普
 }
 ```
 
-App 侧 `command` 发送裸命令名，不带前导 `/`；UI 自己负责展示 `/compact` 这样的样式。
+App 侧 `command` 发送裸命令名，不带前导 `/`；UI 自己负责展示 `/compact` 这样的样式。  
+`args` 必须是 `string[]`；relay 不再接受旧版单字符串 `args`。
 Daemon 会在目标 runtime 需要时再补前导 `/`（例如 Claude Code），shell agent 则可直接使用原始命令名。
 
 ---
@@ -646,7 +779,13 @@ App 在发送 `danger.allow` / `danger.deny` 后，应该等待对应 `danger_id
 }
 ```
 
-`diff` 为 unified diff 格式字符串（`git diff` 输出），App 展示 diff 卡片。  
+`diff` 为 unified diff 格式字符串，App 展示 diff 卡片。  
+当前 daemon V1 语义：
+
+- 成功的 Claude `Write / Edit / MultiEdit` 工具结果会尝试基于前后文件快照派生 `file.changed`
+- 仅对工作区内、可解析为 UTF-8 文本、且在当前 daemon 限额内（`<= 256KB`、`<= 2000` 行）的文件生成 diff
+- 越界路径、非文本、超大文件、无实际变更、工具失败时不发送 `file.changed`
+
 文件归属使用外层 `session.event.payload.agent_id` / `agent_type` 标识，不在 `file.changed` 事件体内重复定义。
 
 #### session.usage
@@ -701,6 +840,8 @@ App 端 xterm.dart 直接写入。
 }
 ```
 
+`workspace_path + dir_path` 是正式字段；relay 不再接受旧版只传 `path` 的请求体。
+
 响应：
 
 ```json
@@ -736,7 +877,7 @@ App 端 xterm.dart 直接写入。
 }
 ```
 
-`modified`：对应 `git status` 中出现的文件为 `true`，App 用橙色标记。
+`modified`：git 工作区内，对应 `git status` 中出现的文件为 `true`；同级目录下若包含已修改文件，也会标记为 `true`。git 工作区里其余条目为 `false`；非 git 工作区返回 `null`，App 用中性状态处理。
 
 ---
 
@@ -755,13 +896,14 @@ App 端 xterm.dart 直接写入。
 }
 ```
 
-响应（单片或分片第一片）：
+响应（文本文件，单片或分片第一片）：
 
 ```json
 {
   "type": "fs.file",
   "payload": {
     "file_path": "src/auth/login.ts",
+    "status": "ready",
     "mime_type": "text/typescript",
     "chunk_index": 0,
     "total_chunks": 1,
@@ -772,6 +914,44 @@ App 端 xterm.dart 直接写入。
 ```
 
 文件超过 200KB 时分片，每片最大 200KB（base64 前），App 按 `chunk_index` 顺序拼接。
+
+当 daemon 不适合返回文本内容时，`fs.file` 也会返回 metadata-only 状态：
+
+- `status = "binary"`：二进制文件，不做文本预览
+- `status = "too_large"`：文件超过内联预览阈值；当前 daemon 阈值为 1MB，并返回 `max_preview_size`
+- `status = "permission_denied"`：文件存在但当前不可读
+- `status = "not_found"`：文件不存在，或目标路径不是可预览文件
+
+二进制文件示例：
+
+```json
+{
+  "type": "fs.file",
+  "payload": {
+    "file_path": "assets/logo.png",
+    "status": "binary",
+    "mime_type": "application/octet-stream",
+    "total_size": 4096,
+    "message": "Binary file cannot be previewed as text: assets/logo.png"
+  }
+}
+```
+
+过大文件示例：
+
+```json
+{
+  "type": "fs.file",
+  "payload": {
+    "file_path": "logs/daemon.log",
+    "status": "too_large",
+    "mime_type": "text/plain",
+    "total_size": 1048577,
+    "max_preview_size": 1048576,
+    "message": "File is too large to preview: logs/daemon.log"
+  }
+}
+```
 
 ---
 
@@ -784,12 +964,18 @@ App 端 xterm.dart 直接写入。
     "device_id": "daemon-device-uuid",
     "online": true,
     "machine_name": "MacBook-Pro-M3",
-    "ts": 1718956800000
+    "ts": 1718956800000,
+    "os": "darwin",
+    "daemon_version": "0.2.0",
+    "paired_at": 1718956700000,
+    "last_seen_at": 1718956800000,
+    "revoked_at": null,
+    "active_session_count": 1
   }
 }
 ```
 
-设备连接/断开时服务器立即推送给该设备关联的所有 App 连接。
+服务器会在设备连接/断开、设备重命名，以及活跃会话计数变化后，立即推送给该设备关联的所有 App 连接。`ts` 表示这次状态广播时间；`last_seen_at` 为服务器记录的最近一次“设备真实在线”的时间，不会因为重命名或会话计数变化而单独刷新。
 
 ---
 
@@ -971,6 +1157,8 @@ App 收到后结束"重播中"状态，恢复正常 UI。
 }
 ```
 
+对 envelope client，`device.push_token` 当前也走 outer `routing_payload` placeholder。
+
 ```json
 {
   "type": "device.push_token",
@@ -989,7 +1177,38 @@ App 收到后结束"重播中"状态，恢复正常 UI。
 
 ---
 
-### 4.25 notification.push（推送 payload 详细格式）
+### 4.25 push.trigger
+
+`push.trigger` 是 daemon 发给 server 的最小推送提示消息，仍走正式 relay / envelope 通道，而不是直接调用 APNS / 厂商接口。
+
+```json
+{
+  "type": "push.trigger",
+  "payload": {
+    "session_id": "sess-uuid",
+    "event_type": "task_done"
+  }
+}
+```
+
+`event_type` 枚举：`task_done` / `danger_pending` / `session_error`
+
+当前约束：
+
+- 方向固定为 `daemon -> server`
+- 复用真实 `session_id`
+- 若该 session 已要求 `noise_static_v1`，`push.trigger` 也必须继续走加密 envelope
+- server 依赖 outer `routing_payload` 做路由与最小校验，不解密业务正文
+
+当前第一版触发集合：
+
+- `session.event(event_type=session.done)` -> `task_done`
+- `danger.pending` -> `danger_pending`
+- `error(session-scoped)` -> `session_error`
+
+---
+
+### 4.26 notification.push（推送 payload 详细格式）
 
 此消息不走 E2EE 通道，由服务器直接向 APNS / 厂商推送平台投递：
 
@@ -1016,9 +1235,10 @@ App 重连流程：
 2. App 发送 `auth.attach { jwt }`
 3. Server 回复 `auth.token`（必要时返回续期后的 JWT）
 4. App 按需逐会话发送 `session.resume { session_id, last_seq }`
-5. 服务器推送 `[last_seq+1, current_seq]` 的所有密文 envelope
-6. 服务器发送 `replay.done { status, message }`
-7. App 解密重放消息，恢复 UI 状态
+5. 其中 `last_seq` / `current_seq` 指 session replay 流里的 envelope 传输序号，而不是 `session.event.payload.seq`
+6. 服务器推送 `(last_seq, current_seq]` 范围内的所有密文 envelope
+7. 服务器发送 `replay.done { status, message }`
+8. App 解密重放消息，恢复 UI 状态
 ```
 
 ```json

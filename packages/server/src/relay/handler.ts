@@ -5,18 +5,54 @@ import {
   type ErrorCode,
   type Envelope,
   type Message,
+  validateNotificationPushPayload,
 } from "@hellobug/protocol";
 import { WebSocket, type RawData } from "ws";
 
 import type { AppDeviceRecord } from "../auth/device-registry.js";
 import type { ServerServices } from "../lib/services.js";
-import { decodeRelayFrame, sendRelayMessage } from "./framing.js";
+import {
+  RelayFrameDecodeError,
+  decodeRelayFrame,
+  sendRelayMessage,
+} from "./framing.js";
 import {
   AppToDaemonMessageTypes,
   DaemonBroadcastMessageTypes,
   getSessionId,
 } from "./message-types.js";
+import type { RelayPendingRequestRecord } from "./requests.js";
+import type {
+  RelayPendingSessionRecord,
+  RelaySessionRecord,
+} from "./sessions.js";
 import { sendJson } from "./socket.js";
+
+const MaxEnvelopeClockSkewMs = 5 * 60 * 1000;
+const NoiseRequiredDirectDaemonRequestTypes = new Set<string>([
+  "history.list",
+  "templates.list",
+  "workspace.list",
+  "workspace.resolve",
+]);
+const NoiseRequiredSessionUtilityRequestTypes = new Set<string>([
+  "history.get",
+  "slash.list",
+  "fs.tree.req",
+  "fs.file.req",
+]);
+const NoiseRequiredDaemonSessionResponseTypes = new Set<string>([
+  "session.event",
+  "danger.pending",
+  "danger.result",
+  "fs.tree",
+  "fs.file",
+  "history.get",
+  "slash.list",
+  "key.ratchet",
+  "key.ratchet_ack",
+  "error",
+]);
 
 export class RelayConnectionHandler {
   private daemonDeviceId: string | null = null;
@@ -59,7 +95,13 @@ export class RelayConnectionHandler {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Invalid message";
-      this.sendError("relay", "AUTH_INVALID", message);
+      this.sendError(
+        error instanceof RelayFrameDecodeError && error.context
+          ? error.context
+          : "relay",
+        error instanceof RelayFrameDecodeError ? error.code : "AUTH_INVALID",
+        message,
+      );
     }
   }
 
@@ -67,6 +109,7 @@ export class RelayConnectionHandler {
     this.services.pairing.clearAppSocket(this.socket);
 
     if (this.appDeviceId) {
+      this.services.requestRegistry.clearForAppDevice(this.appDeviceId);
       this.services.relayRegistry.detachApp(this.appDeviceId, this.socket);
     }
 
@@ -74,12 +117,23 @@ export class RelayConnectionHandler {
       return;
     }
 
+    const pendingStarts = this.services.sessionRegistry.takePendingForDaemon(
+      this.daemonDeviceId,
+    );
+    const pendingRequests = this.services.requestRegistry.drainForDaemonDevice(
+      this.daemonDeviceId,
+    );
     this.services.relayRegistry.unregisterDaemon(
       this.daemonDeviceId,
       this.socket,
     );
     this.services.pendingDangers.removeForDaemon(this.daemonDeviceId);
     this.services.pairing.clearDaemon(this.daemonDeviceId);
+    this.failPendingDaemonWork(
+      this.daemonDeviceId,
+      pendingStarts,
+      pendingRequests,
+    );
     this.services.sessionRegistry.clearDaemon(this.daemonDeviceId);
     this.services.presence.markOffline(this.daemonDeviceId);
     this.broadcastPresence(this.daemonDeviceId);
@@ -129,8 +183,87 @@ export class RelayConnectionHandler {
       return;
     }
 
+    if (message.type === "push.trigger") {
+      await this.handlePushTrigger(message);
+      return;
+    }
+
+    if (message.type === "device.list") {
+      this.handleDeviceList(message);
+      return;
+    }
+
+    if (message.type === "device.rename") {
+      await this.handleDeviceRename(
+        message as Extract<
+          Message,
+          {
+            type: "device.rename";
+            payload: {
+              device_id: string;
+              machine_name: string;
+            };
+          }
+        >,
+      );
+      return;
+    }
+
+    if (message.type === "device.revoke") {
+      await this.handleDeviceRevoke(
+        message as Extract<
+          Message,
+          {
+            type: "device.revoke";
+            payload: {
+              device_id: string;
+              mode: "unlink" | "revoke";
+            };
+          }
+        >,
+      );
+      return;
+    }
+
     if (this.isDaemonRelayResponse(message)) {
-      if (DaemonBroadcastMessageTypes.has(message.type) && !getSessionId(message)) {
+      if (message.type === "replay.done") {
+        this.sendError(
+          message,
+          "PROTOCOL_VERSION",
+          "replay.done is server-generated and cannot originate from daemon",
+        );
+        return;
+      }
+
+      const directRequest = this.takePendingRequest(message);
+      if (directRequest) {
+        if (
+          directRequest.requiresEncryptedResponse &&
+          !this.isNoiseStaticEnvelope(forwardEnvelope)
+        ) {
+          this.rejectDowngradedDirectResponse(directRequest, message);
+          return;
+        }
+
+        this.handleDaemonToAppMessage(
+          message,
+          forwardEnvelope,
+          directRequest.appDeviceId,
+        );
+        return;
+      }
+
+      if (this.isExpiredDirectDaemonResponse(message)) {
+        console.warn(
+          `[relay] drop stale daemon response type=${message.type} request=${this.getDirectRequestId(message) ?? "unknown"}`,
+        );
+        return;
+      }
+
+      if (
+        DaemonBroadcastMessageTypes.has(message.type) &&
+        !getSessionId(message)
+      ) {
         this.handleDaemonBroadcast(message, forwardEnvelope);
         return;
       }
@@ -176,7 +309,7 @@ export class RelayConnectionHandler {
     }
 
     this.sendError(
-      message.type,
+      message,
       "PROTOCOL_VERSION",
       `Unsupported relay message: ${message.type}`,
     );
@@ -193,11 +326,11 @@ export class RelayConnectionHandler {
         verified.deviceId,
       );
       if (!appDevice) {
-        this.sendError(message.type, "AUTH_INVALID", "Unknown app device");
+        this.sendError(message, "AUTH_INVALID", "Unknown app device");
         return;
       }
       if (this.services.deviceRegistry.isRevoked(appDevice.deviceId)) {
-        this.sendError(message.type, "DEVICE_REVOKED", "Device revoked");
+        this.sendError(message, "DEVICE_REVOKED", "Device revoked");
         return;
       }
 
@@ -227,7 +360,7 @@ export class RelayConnectionHandler {
       }
     } catch (error) {
       const text = error instanceof Error ? error.message : "Invalid JWT";
-      this.sendError(message.type, "AUTH_INVALID", text);
+      this.sendError(message, "AUTH_INVALID", text);
     }
   }
 
@@ -238,17 +371,21 @@ export class RelayConnectionHandler {
       message.payload.device_id,
     );
     if (!daemonDevice) {
-      this.sendError(message.type, "AUTH_INVALID", "Unknown daemon device");
+      this.sendError(message, "AUTH_INVALID", "Unknown daemon device");
       this.socket.close();
       return;
     }
     if (this.services.deviceRegistry.isRevoked(daemonDevice.deviceId)) {
-      this.sendError(message.type, "DEVICE_REVOKED", "Device revoked");
+      this.sendError(message, "DEVICE_REVOKED", "Device revoked");
       this.socket.close();
       return;
     }
 
     this.daemonDeviceId = daemonDevice.deviceId;
+    this.services.deviceRegistry.updateDaemonMetadata(daemonDevice.deviceId, {
+      daemonVersion: message.payload.daemon_version,
+      supportedFeatures: message.payload.supported_features,
+    });
     this.services.relayRegistry.registerDaemon(
       daemonDevice.deviceId,
       this.socket,
@@ -258,17 +395,14 @@ export class RelayConnectionHandler {
       daemonDevice.machineName ?? "unknown",
     );
     this.broadcastPresence(daemonDevice.deviceId);
+    void this.services.persistState();
   }
 
   private handlePairReady(
     message: Extract<Message, { type: "device.pair.ready" }>,
   ): void {
     if (!this.daemonDeviceId) {
-      this.sendError(
-        message.type,
-        "AUTH_INVALID",
-        "daemon.hello required first",
-      );
+      this.sendError(message, "AUTH_INVALID", "daemon.hello required first");
       return;
     }
 
@@ -296,7 +430,7 @@ export class RelayConnectionHandler {
 
     if (!attempt) {
       this.sendError(
-        message.type,
+        message,
         "SESSION_NOT_FOUND",
         "Pairing slot not found or expired",
       );
@@ -311,11 +445,7 @@ export class RelayConnectionHandler {
     );
     if (!daemonSocket) {
       this.services.pairing.completeAttemptForAppSocket(this.socket);
-      this.sendError(
-        message.type,
-        "SESSION_NOT_FOUND",
-        "Target daemon is offline",
-      );
+      this.sendError(message, "SESSION_NOT_FOUND", "Target daemon is offline");
       return;
     }
 
@@ -330,11 +460,7 @@ export class RelayConnectionHandler {
     forwardEnvelope?: Envelope,
   ): void {
     if (!this.daemonDeviceId) {
-      this.sendError(
-        message.type,
-        "AUTH_INVALID",
-        "Unregistered daemon connection",
-      );
+      this.sendError(message, "AUTH_INVALID", "Unregistered daemon connection");
       return;
     }
 
@@ -343,7 +469,7 @@ export class RelayConnectionHandler {
     );
     if (!attempt) {
       this.sendError(
-        message.type,
+        message,
         "SESSION_NOT_FOUND",
         "No pairing attempt waiting for SAS",
       );
@@ -377,16 +503,12 @@ export class RelayConnectionHandler {
     );
     const attempt = this.services.pairing.getAttemptByAppSocket(this.socket);
     if (!attempt) {
-      this.sendError(
-        message.type,
-        "SESSION_NOT_FOUND",
-        "No active pairing attempt",
-      );
+      this.sendError(message, "SESSION_NOT_FOUND", "No active pairing attempt");
       return;
     }
     if (message.payload.confirmed && !message.payload.noise_handshake) {
       this.sendError(
-        message.type,
+        message,
         "PROTOCOL_VERSION",
         "device.pair.confirm requires noise_handshake when confirmed=true",
       );
@@ -397,11 +519,7 @@ export class RelayConnectionHandler {
       attempt.daemonDeviceId,
     );
     if (!daemonSocket) {
-      this.sendError(
-        message.type,
-        "SESSION_NOT_FOUND",
-        "Target daemon is offline",
-      );
+      this.sendError(message, "SESSION_NOT_FOUND", "Target daemon is offline");
       return;
     }
 
@@ -448,14 +566,16 @@ export class RelayConnectionHandler {
     message: Extract<Message, { type: "session.resume" }>,
   ): void {
     if (!this.appDeviceId) {
-      this.sendError(message.type, "AUTH_INVALID", "App is not authenticated");
+      this.sendError(message, "AUTH_INVALID", "App is not authenticated");
       return;
     }
 
     console.log(
       `[relay] session resume session=${message.payload.session_id} last_seq=${message.payload.last_seq}`,
     );
-    const session = this.services.sessionRegistry.get(message.payload.session_id);
+    const session = this.services.sessionRegistry.get(
+      message.payload.session_id,
+    );
     if (!session || session.appDeviceId !== this.appDeviceId) {
       this.sendToSelf({
         v: 1,
@@ -499,7 +619,7 @@ export class RelayConnectionHandler {
     message: Extract<Message, { type: "device.push_token" }>,
   ): Promise<void> {
     if (!this.appDeviceId) {
-      this.sendError(message.type, "AUTH_INVALID", "App is not authenticated");
+      this.sendError(message, "AUTH_INVALID", "App is not authenticated");
       return;
     }
 
@@ -516,11 +636,182 @@ export class RelayConnectionHandler {
           });
 
     if (!updated) {
-      this.sendError(message.type, "AUTH_INVALID", "Unknown app device");
+      this.sendError(message, "AUTH_INVALID", "Unknown app device");
       return;
     }
 
     await this.services.persistState();
+  }
+
+  private handleDeviceList(
+    message: Extract<Message, { type: "device.list" }>,
+  ): void {
+    if (!this.appDeviceId) {
+      this.sendError(message, "AUTH_INVALID", "App is not authenticated");
+      return;
+    }
+
+    const appDevice = this.getAppRecord(this.appDeviceId);
+    if (!appDevice) {
+      this.sendError(message, "AUTH_INVALID", "Unknown app device");
+      return;
+    }
+
+    const daemonDevice = this.services.deviceRegistry.getDaemonDevice(
+      appDevice.linkedDaemonId,
+    );
+    const devices = daemonDevice
+      ? [this.buildDeviceListItem(daemonDevice.deviceId)]
+      : [];
+
+    this.sendToSelf({
+      v: 1,
+      id: message.id,
+      type: "device.list",
+      payload: {
+        devices,
+      },
+    });
+  }
+
+  private async handleDeviceRename(
+    message: Extract<
+      Message,
+      {
+        type: "device.rename";
+        payload: {
+          device_id: string;
+          machine_name: string;
+        };
+      }
+    >,
+  ): Promise<void> {
+    if (!this.appDeviceId) {
+      this.sendError(message, "AUTH_INVALID", "App is not authenticated");
+      return;
+    }
+
+    const appDevice = this.getAppRecord(this.appDeviceId);
+    if (!appDevice || appDevice.linkedDaemonId !== message.payload.device_id) {
+      this.sendError(
+        message,
+        "AUTH_INVALID",
+        "Device is not linked to this app",
+      );
+      return;
+    }
+
+    const renamed = this.services.deviceRegistry.renameDaemonDevice(
+      message.payload.device_id,
+      message.payload.machine_name,
+    );
+    if (!renamed) {
+      this.sendError(message, "SESSION_NOT_FOUND", "Device not found");
+      return;
+    }
+
+    this.services.presence.rename(
+      message.payload.device_id,
+      message.payload.machine_name,
+    );
+    await this.services.persistState();
+    this.broadcastPresence(message.payload.device_id);
+    this.sendToSelf({
+      v: 1,
+      id: message.id,
+      type: "device.rename",
+      payload: {
+        device: this.buildDeviceListItem(message.payload.device_id),
+      },
+    });
+  }
+
+  private async handleDeviceRevoke(
+    message: Extract<
+      Message,
+      {
+        type: "device.revoke";
+        payload: {
+          device_id: string;
+          mode: "unlink" | "revoke";
+        };
+      }
+    >,
+  ): Promise<void> {
+    if (!this.appDeviceId) {
+      this.sendError(message, "AUTH_INVALID", "App is not authenticated");
+      return;
+    }
+
+    const appDevice = this.getAppRecord(this.appDeviceId);
+    if (!appDevice || appDevice.linkedDaemonId !== message.payload.device_id) {
+      this.sendError(
+        message,
+        "AUTH_INVALID",
+        "Device is not linked to this app",
+      );
+      return;
+    }
+
+    const revokedAt = Date.now();
+    let disconnected = false;
+
+    if (message.payload.mode === "unlink") {
+      this.services.deviceRegistry.revokeDevice(this.appDeviceId);
+      await this.services.persistState();
+      this.sendToSelf({
+        v: 1,
+        id: message.id,
+        type: "device.revoke",
+        payload: {
+          device_id: message.payload.device_id,
+          mode: "unlink",
+          revoked_at: revokedAt,
+          disconnected: true,
+        },
+      });
+      disconnected = true;
+      for (const socket of this.services.relayRegistry.getAppSockets(
+        this.appDeviceId,
+      )) {
+        socket.close();
+      }
+      return;
+    }
+
+    const daemonDevice = this.services.deviceRegistry.getDaemonDevice(
+      message.payload.device_id,
+    );
+    if (!daemonDevice) {
+      this.sendError(message, "SESSION_NOT_FOUND", "Device not found");
+      return;
+    }
+
+    this.services.deviceRegistry.revokeDevice(daemonDevice.deviceId);
+    const daemonSocket = this.services.relayRegistry.getDaemon(
+      daemonDevice.deviceId,
+    );
+    await this.services.persistState();
+    this.sendToSelf({
+      v: 1,
+      id: message.id,
+      type: "device.revoke",
+      payload: {
+        device_id: daemonDevice.deviceId,
+        mode: "revoke",
+        revoked_at: daemonDevice.revokedAt ?? revokedAt,
+        disconnected: Boolean(daemonSocket),
+      },
+    });
+    if (daemonSocket) {
+      disconnected = true;
+      daemonSocket.close();
+    }
+
+    if (!disconnected) {
+      this.services.presence.markOffline(daemonDevice.deviceId);
+      this.broadcastPresence(daemonDevice.deviceId);
+    }
   }
 
   private handleAppToDaemonMessage(
@@ -536,7 +827,16 @@ export class RelayConnectionHandler {
         );
         return;
       }
-      this.sendError(message.type, "AUTH_INVALID", "App is not authenticated");
+      this.sendError(message, "AUTH_INVALID", "App is not authenticated");
+      return;
+    }
+
+    if (this.shouldRejectDirectDaemonRequestDowngrade(message, forwardEnvelope)) {
+      this.sendError(
+        message,
+        "PROTOCOL_VERSION",
+        `Envelope plaintext downgrade is not allowed for ${message.type}`,
+      );
       return;
     }
 
@@ -550,11 +850,7 @@ export class RelayConnectionHandler {
         );
         return;
       }
-      this.sendError(
-        message.type,
-        "SESSION_NOT_FOUND",
-        "Session is not registered",
-      );
+      this.sendError(message, "SESSION_NOT_FOUND", "Session is not registered");
       return;
     }
 
@@ -568,11 +864,7 @@ export class RelayConnectionHandler {
         );
         return;
       }
-      this.sendError(
-        message.type,
-        "SESSION_NOT_FOUND",
-        "Target daemon is offline",
-      );
+      this.sendError(message, "SESSION_NOT_FOUND", "Target daemon is offline");
       return;
     }
 
@@ -582,6 +874,15 @@ export class RelayConnectionHandler {
         this.appDeviceId,
         daemonId,
         message.id ?? `${message.type}:${Date.now()}`,
+        message.payload.agent_type,
+        message.payload.workspace_path,
+        this.isNoiseStaticEnvelope(forwardEnvelope),
+        (pending) => {
+          this.failPendingSessionStart(
+            pending,
+            "Target daemon timed out before session started",
+          );
+        },
       );
       console.log(
         `[relay] session start pending session=${message.payload.session_id} app=${this.appDeviceId} daemon=${daemonId} workspace=${message.payload.workspace_path} agent=${message.payload.agent_type}`,
@@ -599,6 +900,43 @@ export class RelayConnectionHandler {
       this.services.pendingDangers.remove(message.payload.danger_id);
     }
 
+    if (this.shouldTrackDirectDaemonRequest(message) && message.id) {
+      this.services.requestRegistry.register(
+        message.id,
+        this.appDeviceId,
+        daemonId,
+        message.type,
+        {
+          requiresEncryptedResponse: this.isNoiseStaticEnvelope(forwardEnvelope),
+          onTimeout: (pending) => {
+            this.failPendingDirectRequest(
+              pending,
+              "Target daemon timed out before responding",
+            );
+          },
+        },
+      );
+    }
+
+    if (this.shouldTrackSessionUtilityRequest(message) && message.id) {
+      this.services.requestRegistry.register(
+        message.id,
+        this.appDeviceId,
+        daemonId,
+        message.type,
+        {
+          requiresEncryptedResponse: this.isNoiseStaticEnvelope(forwardEnvelope),
+          onTimeout: (pending) => {
+            this.failPendingSessionUtilityRequest(
+              pending,
+              message,
+              "Target daemon timed out before responding",
+            );
+          },
+        },
+      );
+    }
+
     this.sendToSocket(daemonSocket, message, {
       to: daemonId,
       sourceEnvelope: forwardEnvelope,
@@ -608,13 +946,10 @@ export class RelayConnectionHandler {
   private handleDaemonToAppMessage(
     message: Message,
     forwardEnvelope?: Envelope,
+    targetAppDeviceId?: string,
   ): void {
     if (!this.daemonDeviceId) {
-      this.sendError(
-        message.type,
-        "AUTH_INVALID",
-        "Unregistered daemon connection",
-      );
+      this.sendError(message, "AUTH_INVALID", "Unregistered daemon connection");
       return;
     }
 
@@ -622,9 +957,23 @@ export class RelayConnectionHandler {
       const pending = this.services.sessionRegistry.getPending(
         message.payload.session_id,
       );
+      if (!pending) {
+        console.warn(
+          `[relay] drop stale daemon response type=session.start.result session=${message.payload.session_id}`,
+        );
+        return;
+      }
+      if (
+        pending.requiresEncryptedTransport &&
+        !this.isNoiseStaticEnvelope(forwardEnvelope)
+      ) {
+        this.rejectDowngradedSessionStartResponse(pending, message);
+        return;
+      }
       const targetAppDeviceId =
         pending?.appDeviceId ??
         this.resolveAppOwnerForSession(message.payload.session_id);
+      const started = message.payload.status === "started";
       if (message.payload.status === "started") {
         this.services.sessionRegistry.confirmPendingStart(
           message.payload.session_id,
@@ -643,6 +992,22 @@ export class RelayConnectionHandler {
         forwardEnvelope,
         targetAppDeviceId ?? undefined,
       );
+      if (started) {
+        this.broadcastPresence(this.daemonDeviceId);
+      }
+      return;
+    }
+
+    const encryptedSession = this.getEncryptedSessionTransportRecord(message);
+    if (
+      encryptedSession &&
+      !this.isNoiseStaticEnvelope(forwardEnvelope)
+    ) {
+      this.rejectDowngradedSessionMessage(
+        encryptedSession,
+        message,
+        targetAppDeviceId,
+      );
       return;
     }
 
@@ -652,7 +1017,9 @@ export class RelayConnectionHandler {
         `[relay] route daemon->app type=session.event session=${message.payload.session_id} seq=${message.payload.seq} event=${message.payload.event.event_type}`,
       );
     } else if (message.type === "danger.pending") {
-      const appDeviceId = this.resolveAppOwnerForSession(message.payload.session_id);
+      const appDeviceId = this.resolveAppOwnerForSession(
+        message.payload.session_id,
+      );
       if (appDeviceId) {
         this.services.pendingDangers.upsert(
           appDeviceId,
@@ -682,7 +1049,45 @@ export class RelayConnectionHandler {
       );
     }
 
-    this.routeDaemonMessageToApp(this.daemonDeviceId, message, forwardEnvelope);
+    this.routeDaemonMessageToApp(
+      this.daemonDeviceId,
+      message,
+      forwardEnvelope,
+      targetAppDeviceId,
+    );
+    if (
+      message.type === "session.event" &&
+      message.payload.event.event_type === "session.done"
+    ) {
+      this.services.sessionRegistry.complete(message.payload.session_id);
+      this.broadcastPresence(this.daemonDeviceId);
+    }
+  }
+
+  private async handlePushTrigger(
+    message: Extract<Message, { type: "push.trigger" }>,
+  ): Promise<void> {
+    if (!this.daemonDeviceId || this.appDeviceId) {
+      this.sendError(message, "AUTH_INVALID", "push.trigger is daemon-only");
+      return;
+    }
+
+    const session = this.services.sessionRegistry.get(message.payload.session_id);
+    if (!session || session.daemonDeviceId !== this.daemonDeviceId) {
+      console.warn(
+        `[relay] drop push.trigger daemon=${this.daemonDeviceId} session=${message.payload.session_id} reason=unknown_or_unowned_session`,
+      );
+      return;
+    }
+
+    const payload = this.createPushNotificationPayload(message);
+    const dispatched = await this.services.push.dispatchToLinkedOfflineApps(
+      this.daemonDeviceId,
+      payload,
+    );
+    console.log(
+      `[relay] push.trigger daemon=${this.daemonDeviceId} session=${message.payload.session_id} event=${message.payload.event_type} dispatched=${dispatched.length}`,
+    );
   }
 
   private handleDaemonBroadcast(
@@ -690,11 +1095,7 @@ export class RelayConnectionHandler {
     forwardEnvelope?: Envelope,
   ): void {
     if (!this.daemonDeviceId) {
-      this.sendError(
-        message.type,
-        "AUTH_INVALID",
-        "Unregistered daemon connection",
-      );
+      this.sendError(message, "AUTH_INVALID", "Unregistered daemon connection");
       return;
     }
 
@@ -725,16 +1126,7 @@ export class RelayConnectionHandler {
     }
 
     this.sendToSelf(
-      {
-        v: 1,
-        type: "device.status",
-        payload: {
-          device_id: presence.deviceId,
-          online: presence.online,
-          machine_name: presence.machineName,
-          ts: presence.ts,
-        },
-      },
+      this.createDeviceStatusMessage(presence.deviceId, presence),
       { from: presence.deviceId },
     );
   }
@@ -753,16 +1145,7 @@ export class RelayConnectionHandler {
     for (const socket of sockets) {
       this.sendToSocket(
         socket,
-        {
-          v: 1,
-          type: "device.status",
-          payload: {
-            device_id: presence.deviceId,
-            online: presence.online,
-            machine_name: presence.machineName,
-            ts: presence.ts,
-          },
-        },
+        this.createDeviceStatusMessage(presence.deviceId, presence),
         { from: presence.deviceId },
       );
     }
@@ -791,11 +1174,44 @@ export class RelayConnectionHandler {
       return null;
     }
 
+    if (!session.active) {
+      return message.type === "session.start" ? appDevice.linkedDaemonId : null;
+    }
+
     return session.daemonDeviceId;
   }
 
   private resolveAppOwnerForSession(sessionId: string): string | null {
     return this.services.sessionRegistry.get(sessionId)?.appDeviceId ?? null;
+  }
+
+  private createPushNotificationPayload(
+    message: Extract<Message, { type: "push.trigger" }>,
+  ) {
+    const alert =
+      message.payload.event_type === "task_done"
+        ? {
+            title: "HelloBug",
+            body: "任务已完成",
+          }
+        : message.payload.event_type === "danger_pending"
+          ? {
+              title: "HelloBug",
+              body: "需要确认危险操作",
+            }
+          : {
+              title: "HelloBug",
+              body: "任务出现异常",
+            };
+
+    return validateNotificationPushPayload({
+      aps: {
+        alert,
+        sound: "default",
+      },
+      session_id: message.payload.session_id,
+      event_type: message.payload.event_type,
+    });
   }
 
   private isDaemonRelayResponse(message: Message): boolean {
@@ -818,10 +1234,7 @@ export class RelayConnectionHandler {
       return true;
     }
 
-    if (
-      message.type === "history.list" &&
-      "items" in message.payload
-    ) {
+    if (message.type === "history.list" && "items" in message.payload) {
       return true;
     }
 
@@ -833,21 +1246,351 @@ export class RelayConnectionHandler {
       return true;
     }
 
-    if (
-      message.type === "templates.list" &&
-      "templates" in message.payload
-    ) {
+    if (message.type === "templates.list" && "templates" in message.payload) {
+      return true;
+    }
+
+    if (message.type === "workspace.list" && "items" in message.payload) {
       return true;
     }
 
     if (
-      message.type === "slash.list" &&
-      "commands" in message.payload
+      message.type === "workspace.resolve" &&
+      "resolved_path" in message.payload &&
+      "status" in message.payload
     ) {
+      return true;
+    }
+
+    if (message.type === "slash.list" && "commands" in message.payload) {
       return true;
     }
 
     return false;
+  }
+
+  private shouldTrackDirectDaemonRequest(message: Message): boolean {
+    return (
+      !getSessionId(message) &&
+      NoiseRequiredDirectDaemonRequestTypes.has(message.type)
+    );
+  }
+
+  private shouldTrackSessionUtilityRequest(message: Message): boolean {
+    return (
+      !!getSessionId(message) &&
+      NoiseRequiredSessionUtilityRequestTypes.has(message.type)
+    );
+  }
+
+  private takePendingRequest(message: Message): RelayPendingRequestRecord | null {
+    if (message.id) {
+      const pending = this.isStreamingDirectResponse(message)
+        ? this.peekPendingStreamingRequest(message)
+        : this.services.requestRegistry.take(message.id);
+      if (pending) {
+        return pending;
+      }
+    }
+
+    if (message.type === "error") {
+      const pending = this.services.requestRegistry.take(
+        message.payload.request_id,
+      );
+      if (pending) {
+        return pending;
+      }
+    }
+
+    return null;
+  }
+
+  private isExpiredDirectDaemonResponse(message: Message): boolean {
+    const requestId = this.getDirectRequestId(message);
+    if (!requestId) {
+      return false;
+    }
+
+    if (message.type === "error") {
+      return this.services.requestRegistry.wasRecentlyExpired(requestId);
+    }
+
+    return (
+      message.type === "history.list" ||
+      message.type === "history.get" ||
+      message.type === "templates.list" ||
+      message.type === "workspace.list" ||
+      message.type === "workspace.resolve" ||
+      message.type === "slash.list" ||
+      message.type === "fs.tree" ||
+      message.type === "fs.file"
+    );
+  }
+
+  private isStreamingDirectResponse(message: Message): boolean {
+    return message.type === "fs.file";
+  }
+
+  private peekPendingStreamingRequest(
+    message: Message,
+  ): RelayPendingRequestRecord | null {
+    if (message.type !== "fs.file") {
+      return null;
+    }
+
+    if (!message.id) {
+      return null;
+    }
+
+    const pending = this.services.requestRegistry.get(message.id);
+    if (!pending) {
+      return null;
+    }
+
+    if (
+      message.payload.status !== "ready" ||
+      message.payload.chunk_index + 1 >= message.payload.total_chunks
+    ) {
+      return this.services.requestRegistry.take(message.id) ?? pending;
+    }
+
+    return pending;
+  }
+
+  private getDirectRequestId(message: Message): string | null {
+    if (message.id) {
+      return message.id;
+    }
+
+    if (message.type === "error") {
+      return message.payload.request_id;
+    }
+
+    return null;
+  }
+
+  private shouldRejectDirectDaemonRequestDowngrade(
+    message: Message,
+    forwardEnvelope?: Envelope,
+  ): boolean {
+    return (
+      this.shouldTrackDirectDaemonRequest(message) &&
+      this.isPlainMetadataEnvelope(forwardEnvelope)
+    );
+  }
+
+  private isNoiseStaticEnvelope(envelope?: Envelope): boolean {
+    return (envelope?.cipher_mode ?? "plain") === "noise_static_v1";
+  }
+
+  private isPlainMetadataEnvelope(envelope?: Envelope): boolean {
+    return (
+      !!envelope &&
+      !this.isNoiseStaticEnvelope(envelope) &&
+      typeof envelope.message_type === "string"
+    );
+  }
+
+  private rejectDowngradedDirectResponse(
+    pending: RelayPendingRequestRecord,
+    message: Message,
+  ): void {
+    if (!this.daemonDeviceId) {
+      return;
+    }
+
+    const sessionId = getSessionId(message);
+    console.warn(
+      `[relay] reject downgraded direct response type=${pending.messageType} request=${pending.requestId} session=${sessionId ?? "none"} daemon=${this.daemonDeviceId}`,
+    );
+    this.routeDaemonMessageToApp(
+      this.daemonDeviceId,
+      {
+        v: 1,
+        type: "error",
+        payload: {
+          request_id: pending.requestId,
+          session_id: sessionId,
+          code: "PROTOCOL_VERSION",
+          message: `Encrypted request requires noise_static_v1 response for ${pending.messageType}`,
+        },
+      },
+      undefined,
+      pending.appDeviceId,
+    );
+  }
+
+  private rejectDowngradedSessionStartResponse(
+    pending: RelayPendingSessionRecord,
+    message: Extract<Message, { type: "session.start.result" }>,
+  ): void {
+    if (!this.daemonDeviceId) {
+      return;
+    }
+
+    console.warn(
+      `[relay] reject downgraded session.start.result request=${pending.requestId} session=${pending.sessionId} daemon=${this.daemonDeviceId}`,
+    );
+    this.services.sessionRegistry.discardPendingStart(pending.sessionId);
+    this.routeDaemonMessageToApp(
+      this.daemonDeviceId,
+      {
+        v: 1,
+        type: "session.start.result",
+        payload: {
+          request_id: pending.requestId,
+          session_id: pending.sessionId,
+          agent_type: message.payload.agent_type,
+          workspace_path: message.payload.workspace_path,
+          status: "rejected",
+          code: "PROTOCOL_VERSION",
+          message:
+            "Encrypted session.start requires noise_static_v1 session.start.result",
+        },
+      },
+      undefined,
+      pending.appDeviceId,
+    );
+  }
+
+  private getEncryptedSessionTransportRecord(
+    message: Message,
+  ): RelaySessionRecord | null {
+    const sessionId = getSessionId(message);
+    if (!sessionId) {
+      return null;
+    }
+
+    if (!NoiseRequiredDaemonSessionResponseTypes.has(message.type)) {
+      return null;
+    }
+
+    const session = this.services.sessionRegistry.get(sessionId);
+    if (!session?.requiresEncryptedTransport) {
+      return null;
+    }
+
+    return session;
+  }
+
+  private rejectDowngradedSessionMessage(
+    session: RelaySessionRecord,
+    message: Message,
+    targetAppDeviceId?: string,
+  ): void {
+    if (!this.daemonDeviceId) {
+      return;
+    }
+
+    const requestId =
+      message.type === "error"
+        ? message.payload.request_id
+        : message.id ?? message.type;
+    console.warn(
+      `[relay] reject downgraded session message type=${message.type} request=${requestId} session=${session.sessionId} daemon=${this.daemonDeviceId}`,
+    );
+    this.routeDaemonMessageToApp(
+      this.daemonDeviceId,
+      {
+        v: 1,
+        type: "error",
+        payload: {
+          request_id: requestId,
+          session_id: session.sessionId,
+          code: "PROTOCOL_VERSION",
+          message: `Encrypted session requires noise_static_v1 transport for ${message.type}`,
+        },
+      },
+      undefined,
+      targetAppDeviceId ?? session.appDeviceId,
+    );
+  }
+
+  private failPendingSessionUtilityRequest(
+    pending: RelayPendingRequestRecord,
+    request: Message,
+    message: string,
+  ): void {
+    for (const socket of this.services.relayRegistry.getAppSockets(
+      pending.appDeviceId,
+    )) {
+      this.sendToSocket(
+        socket,
+        {
+          v: 1,
+          type: "error",
+          payload: {
+            request_id: pending.requestId,
+            session_id: getSessionId(request),
+            code: "SESSION_NOT_FOUND",
+            message,
+          },
+        },
+        {
+          from: pending.daemonDeviceId,
+        },
+      );
+    }
+  }
+
+  private buildDeviceListItem(deviceId: string): {
+    device_id: string;
+    machine_name: string;
+    os: string | null;
+    daemon_version: string | null;
+    online: boolean;
+    paired_at: number;
+    last_seen_at: number | null;
+    revoked_at: number | null;
+    active_session_count: number;
+  } {
+    const device = this.services.deviceRegistry.getDaemonDevice(deviceId);
+    if (!device) {
+      throw new Error(`Unknown daemon device: ${deviceId}`);
+    }
+
+    const presence = this.services.presence.get(deviceId);
+    return {
+      device_id: device.deviceId,
+      machine_name: device.machineName ?? "unknown",
+      os: device.os ?? null,
+      daemon_version: device.daemonVersion ?? null,
+      online: presence?.online ?? false,
+      paired_at: device.registeredAt,
+      last_seen_at: presence?.lastSeenAt ?? null,
+      revoked_at: device.revokedAt ?? null,
+      active_session_count: this.services.sessionRegistry.countForDaemon(
+        device.deviceId,
+      ),
+    };
+  }
+
+  private createDeviceStatusMessage(
+    daemonDeviceId: string,
+    presence = this.services.presence.get(daemonDeviceId),
+  ): Extract<Message, { type: "device.status" }> {
+    if (!presence) {
+      throw new Error(`Missing presence for device: ${daemonDeviceId}`);
+    }
+
+    const daemon = this.services.deviceRegistry.getDaemonDevice(daemonDeviceId);
+    return {
+      v: 1,
+      type: "device.status",
+      payload: {
+        device_id: daemonDeviceId,
+        online: presence.online,
+        machine_name: daemon?.machineName ?? presence.machineName,
+        ts: Date.now(),
+        os: daemon?.os ?? null,
+        daemon_version: daemon?.daemonVersion ?? null,
+        paired_at: daemon?.registeredAt ?? null,
+        last_seen_at: presence.lastSeenAt,
+        revoked_at: daemon?.revokedAt ?? null,
+        active_session_count:
+          this.services.sessionRegistry.countForDaemon(daemonDeviceId),
+      },
+    };
   }
 
   private routeDaemonMessageToApp(
@@ -895,6 +1638,11 @@ export class RelayConnectionHandler {
         }
         return;
       }
+
+      console.warn(
+        `[relay] drop unroutable daemon session message type=${message.type} session=${sessionId}`,
+      );
+      return;
     }
 
     for (const socket of this.services.relayRegistry.getAppSocketsForDaemon(
@@ -915,6 +1663,81 @@ export class RelayConnectionHandler {
         from: entry.daemonDeviceId,
         sourceEnvelope: entry.envelope,
       });
+    }
+  }
+
+  private failPendingDaemonWork(
+    daemonDeviceId: string,
+    pendingStarts: RelayPendingSessionRecord[],
+    pendingRequests: RelayPendingRequestRecord[],
+  ): void {
+    for (const pending of pendingStarts) {
+      this.failPendingSessionStart(
+        pending,
+        "Target daemon went offline before session started",
+      );
+    }
+
+    for (const pending of pendingRequests) {
+      this.failPendingDirectRequest(
+        pending,
+        "Target daemon went offline before responding",
+      );
+    }
+  }
+
+  private failPendingSessionStart(
+    pending: RelayPendingSessionRecord,
+    message: string,
+  ): void {
+    for (const socket of this.services.relayRegistry.getAppSockets(
+      pending.appDeviceId,
+    )) {
+      this.sendToSocket(
+        socket,
+        {
+          v: 1,
+          type: "session.start.result",
+          payload: {
+            request_id: pending.requestId,
+            session_id: pending.sessionId,
+            agent_type: pending.agentType,
+            workspace_path: pending.workspacePath,
+            status: "rejected",
+            code: "SESSION_NOT_FOUND",
+            message,
+          },
+        },
+        {
+          from: pending.daemonDeviceId,
+        },
+      );
+    }
+  }
+
+  private failPendingDirectRequest(
+    pending: RelayPendingRequestRecord,
+    message: string,
+  ): void {
+    for (const socket of this.services.relayRegistry.getAppSockets(
+      pending.appDeviceId,
+    )) {
+      this.sendToSocket(
+        socket,
+        {
+          v: 1,
+          type: "error",
+          payload: {
+            request_id: pending.requestId,
+            session_id: null,
+            code: "SESSION_NOT_FOUND",
+            message,
+          },
+        },
+        {
+          from: pending.daemonDeviceId,
+        },
+      );
     }
   }
 
@@ -943,7 +1766,13 @@ export class RelayConnectionHandler {
   }
 
   private sendError(
-    requestId: string,
+    request:
+      | string
+      | Message
+      | {
+          request_id?: string | null;
+          session_id?: string | null;
+        },
     code:
       | "AUTH_INVALID"
       | "AUTH_EXPIRED"
@@ -952,12 +1781,25 @@ export class RelayConnectionHandler {
       | "PROTOCOL_VERSION",
     message: string,
   ): void {
+    let requestId = "relay";
+    let sessionId: string | null = null;
+
+    if (typeof request === "string") {
+      requestId = request;
+    } else if ("type" in request) {
+      requestId = request.id ?? request.type;
+      sessionId = getSessionId(request);
+    } else {
+      requestId = request.request_id || "relay";
+      sessionId = request.session_id ?? null;
+    }
+
     this.sendToSelf({
       v: 1,
       type: "error",
       payload: {
         request_id: requestId,
-        session_id: null,
+        session_id: sessionId,
         code,
         message,
       },
@@ -991,6 +1833,7 @@ export class RelayConnectionHandler {
     if (!envelope) {
       return;
     }
+    this.assertEnvelopeTimestamp(envelope);
     if (envelope.sig.length === 0) {
       throw new Error("Missing envelope signature");
     }
@@ -1006,8 +1849,23 @@ export class RelayConnectionHandler {
       publicKey,
       Buffer.from(envelope.sig, "base64url"),
     );
+
     if (!verified) {
       throw new Error("Invalid envelope signature");
+    }
+
+    this.assertEnvelopeReplay(envelope);
+  }
+
+  private assertEnvelopeTimestamp(envelope: Envelope): void {
+    if (Math.abs(Date.now() - envelope.ts) > MaxEnvelopeClockSkewMs) {
+      throw new Error("Envelope timestamp exceeds allowed skew");
+    }
+  }
+
+  private assertEnvelopeReplay(envelope: Envelope): void {
+    if (!this.services.envelopeReplays.remember(envelope)) {
+      throw new Error("Envelope replay detected");
     }
   }
 

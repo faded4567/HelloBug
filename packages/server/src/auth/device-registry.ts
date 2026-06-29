@@ -8,6 +8,8 @@ export interface DaemonDeviceRecord {
   registeredAt: number;
   machineName?: string;
   os?: string;
+  daemonVersion?: string;
+  supportedFeatures?: string[];
   revokedAt?: number;
 }
 
@@ -23,6 +25,7 @@ export interface AppDeviceRecord {
   manufacturer?: "Xiaomi" | "OPPO" | "vivo" | "Other";
   vendorToken?: string;
   pushTokenUpdatedAt?: number;
+  pushTokenInvalidatedAt?: number;
   revokedAt?: number;
 }
 
@@ -104,7 +107,12 @@ export class DeviceRegistry {
 
   updateDaemonMetadata(
     deviceId: string,
-    metadata: { machineName?: string; os?: string },
+    metadata: {
+      machineName?: string;
+      os?: string;
+      daemonVersion?: string;
+      supportedFeatures?: string[];
+    },
   ): DaemonDeviceRecord | undefined {
     const record = this.daemonDevices.get(deviceId);
     if (!record) {
@@ -117,7 +125,26 @@ export class DeviceRegistry {
     if (metadata.os) {
       record.os = metadata.os;
     }
+    if (metadata.daemonVersion) {
+      record.daemonVersion = metadata.daemonVersion;
+    }
+    if (metadata.supportedFeatures) {
+      record.supportedFeatures = [...metadata.supportedFeatures];
+    }
 
+    return record;
+  }
+
+  renameDaemonDevice(
+    deviceId: string,
+    machineName: string,
+  ): DaemonDeviceRecord | undefined {
+    const record = this.daemonDevices.get(deviceId);
+    if (!record) {
+      return undefined;
+    }
+
+    record.machineName = machineName;
     return record;
   }
 
@@ -141,6 +168,7 @@ export class DeviceRegistry {
 
     record.pushPlatform = token.platform;
     record.pushTokenUpdatedAt = Date.now();
+    delete record.pushTokenInvalidatedAt;
 
     if (token.platform === "ios") {
       record.apnsToken = token.apnsToken;
@@ -155,6 +183,20 @@ export class DeviceRegistry {
     return record;
   }
 
+  clearAppPushToken(deviceId: string): AppDeviceRecord | undefined {
+    const record = this.appDevices.get(deviceId);
+    if (!record) {
+      return undefined;
+    }
+
+    delete record.pushPlatform;
+    delete record.apnsToken;
+    delete record.manufacturer;
+    delete record.vendorToken;
+    record.pushTokenInvalidatedAt = Date.now();
+    return record;
+  }
+
   revokeDevice(deviceId: string): void {
     const daemon = this.daemonDevices.get(deviceId);
     if (daemon) {
@@ -166,6 +208,19 @@ export class DeviceRegistry {
     if (app) {
       app.revokedAt = Date.now();
     }
+  }
+
+  listDaemonDevices(): DaemonDeviceRecord[] {
+    return Array.from(this.daemonDevices.values(), (record) => ({
+      ...record,
+      supportedFeatures: record.supportedFeatures
+        ? [...record.supportedFeatures]
+        : undefined,
+    }));
+  }
+
+  listAppDevices(): AppDeviceRecord[] {
+    return Array.from(this.appDevices.values(), (record) => ({ ...record }));
   }
 
   isRevoked(deviceId: string): boolean {

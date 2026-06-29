@@ -40,6 +40,7 @@ describe("daemon transcript service", () => {
     });
 
     expect(response).toMatchObject({
+      id: "history-list-1",
       type: "history.list",
       payload: {
         items: [
@@ -82,6 +83,7 @@ describe("daemon transcript service", () => {
 
     expect(response).toEqual({
       v: 1,
+      id: "history-get-1",
       type: "history.get",
       payload: {
         session_id: "sess-old",

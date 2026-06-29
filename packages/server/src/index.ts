@@ -1,6 +1,24 @@
 import { buildServer } from "./app.js";
 import { ServerStateStore } from "./lib/state-store.js";
 
+function readOptionalNumber(...names: string[]): number | undefined {
+  for (const name of names) {
+    const raw = process.env[name];
+    if (raw === undefined || raw.length === 0) {
+      continue;
+    }
+
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) {
+      throw new Error(`${name} must be a finite number`);
+    }
+
+    return parsed;
+  }
+
+  return undefined;
+}
+
 async function main(): Promise<void> {
   const bootstrapAdminToken =
     process.env.HELLOBUG_BOOTSTRAP_ADMIN_TOKEN ?? process.env.BOOTSTRAP_ADMIN_TOKEN;
@@ -9,6 +27,14 @@ async function main(): Promise<void> {
     jwtSecret: process.env.HELLOBUG_JWT_SECRET ?? process.env.JWT_SECRET,
     stateStore: new ServerStateStore(
       process.env.HELLOBUG_SERVER_STATE_FILE ?? process.env.SERVER_STATE_FILE,
+    ),
+    relayPendingRequestTimeoutMs: readOptionalNumber(
+      "HELLOBUG_RELAY_PENDING_REQUEST_TIMEOUT_MS",
+      "RELAY_PENDING_REQUEST_TIMEOUT_MS",
+    ),
+    relayPendingSessionStartTimeoutMs: readOptionalNumber(
+      "HELLOBUG_RELAY_PENDING_SESSION_START_TIMEOUT_MS",
+      "RELAY_PENDING_SESSION_START_TIMEOUT_MS",
     ),
     logger: true,
   });

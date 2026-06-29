@@ -79,6 +79,7 @@ describe("protocol message validation", () => {
       payload: {
         session_id: "sess-1",
         file_path: "README.md",
+        status: "ready",
         mime_type: "text/markdown",
         chunk_index: 0,
         total_chunks: 1,
@@ -93,6 +94,44 @@ describe("protocol message validation", () => {
     }
     expect(message.payload.data).toBe("");
     expect(message.payload.total_size).toBe(0);
+  });
+
+  it("accepts fs.file metadata-only states for binary and oversized files", () => {
+    const binary = validateMessage({
+      type: "fs.file",
+      payload: {
+        session_id: "sess-1",
+        file_path: "logo.png",
+        status: "binary",
+        mime_type: "application/octet-stream",
+        total_size: 4096,
+        message: "Binary file cannot be previewed as text: logo.png",
+      },
+    });
+    const tooLarge = validateMessage({
+      type: "fs.file",
+      payload: {
+        session_id: "sess-1",
+        file_path: "huge.log",
+        status: "too_large",
+        mime_type: "text/plain",
+        total_size: 2_000_000,
+        max_preview_size: 1_048_576,
+        message: "File is too large to preview: huge.log",
+      },
+    });
+
+    expect(binary.type).toBe("fs.file");
+    if (binary.type !== "fs.file") {
+      throw new Error("expected fs.file");
+    }
+    expect(binary.payload.status).toBe("binary");
+
+    expect(tooLarge.type).toBe("fs.file");
+    if (tooLarge.type !== "fs.file") {
+      throw new Error("expected fs.file");
+    }
+    expect(tooLarge.payload.status).toBe("too_large");
   });
 
   it("accepts pty.input frames with base64 payload bytes", () => {
@@ -194,6 +233,127 @@ describe("protocol message validation", () => {
 
     expect(request.type).toBe("history.list");
     expect(response.type).toBe("history.list");
+  });
+
+  it("accepts device management request and response variants", () => {
+    const listRequest = validateMessage({
+      type: "device.list",
+      payload: {},
+    });
+    const listResponse = validateMessage({
+      type: "device.list",
+      payload: {
+        devices: [
+          {
+            device_id: "daemon-1",
+            machine_name: "MacBook Pro",
+            os: "darwin",
+            daemon_version: "0.1.0",
+            online: true,
+            paired_at: 1718956800000,
+            last_seen_at: 1718956805000,
+            revoked_at: null,
+            active_session_count: 2,
+          },
+        ],
+      },
+    });
+    const rename = validateMessage({
+      type: "device.rename",
+      payload: {
+        device_id: "daemon-1",
+        machine_name: "Office Mac",
+      },
+    });
+    const revoke = validateMessage({
+      type: "device.revoke",
+      payload: {
+        device_id: "daemon-1",
+        mode: "revoke",
+      },
+    });
+
+    expect(listRequest.type).toBe("device.list");
+    expect(listResponse.type).toBe("device.list");
+    expect(rename.type).toBe("device.rename");
+    expect(revoke.type).toBe("device.revoke");
+  });
+
+  it("accepts workspace discovery request and response variants", () => {
+    const listRequest = validateMessage({
+      type: "workspace.list",
+      payload: {},
+    });
+    const listResponse = validateMessage({
+      type: "workspace.list",
+      payload: {
+        default_path: "/tmp/work",
+        items: [
+          {
+            path: "/tmp/work",
+            name: "work",
+            status: "ready",
+            status_reason: "ok",
+            is_default: true,
+            entry_count: 3,
+            is_empty: false,
+            repo_root: "/tmp/work",
+            git_branch: "main",
+            access_mode: "read_write",
+          },
+        ],
+      },
+    });
+    const resolveRequest = validateMessage({
+      type: "workspace.resolve",
+      payload: {
+        workspace_path: "",
+      },
+    });
+    const resolveResponse = validateMessage({
+      type: "workspace.resolve",
+      payload: {
+        workspace_path: "",
+        resolved_path: "/tmp/work",
+        name: "work",
+        status: "ready",
+        status_reason: "ok",
+        is_default: true,
+        entry_count: 3,
+        is_empty: false,
+        repo_root: "/tmp/work",
+        git_branch: "main",
+        access_mode: "read_write",
+      },
+    });
+    const resolveMissing = validateMessage({
+      type: "workspace.resolve",
+      payload: {
+        workspace_path: "/tmp/work-old/src",
+        resolved_path: "/tmp/work-old/src",
+        name: "src",
+        status: "missing",
+        status_reason: "not_found",
+        is_default: false,
+        entry_count: null,
+        is_empty: null,
+        repo_root: null,
+        git_branch: null,
+        access_mode: "unknown",
+        repair_hint: {
+          reason: "nearest_existing_ancestor",
+          suggested_path: "/tmp",
+          message:
+            "Requested path is unavailable. Try the nearest existing directory instead.",
+        },
+      },
+    });
+
+    expect(listRequest.type).toBe("workspace.list");
+    expect(listResponse.type).toBe("workspace.list");
+    expect(resolveRequest.type).toBe("workspace.resolve");
+    expect(resolveResponse.type).toBe("workspace.resolve");
+    expect(resolveMissing.type).toBe("workspace.resolve");
   });
 
   it("accepts session-scoped slash.list responses and danger approvals", () => {
@@ -309,6 +469,23 @@ describe("protocol message validation", () => {
     expect(payload.event_type).toBe("task_done");
   });
 
+  it("accepts push.trigger runtime messages for daemon initiated push hints", () => {
+    const message = validateMessage({
+      type: "push.trigger",
+      payload: {
+        session_id: "sess-push-1",
+        event_type: "danger_pending",
+      },
+    });
+
+    expect(message.type).toBe("push.trigger");
+    if (message.type !== "push.trigger") {
+      throw new Error("expected push.trigger");
+    }
+    expect(message.payload.session_id).toBe("sess-push-1");
+    expect(message.payload.event_type).toBe("danger_pending");
+  });
+
   it("builds a stable signing payload for envelopes", () => {
     const envelope = validateEnvelope({
       from: "app-1",
@@ -323,7 +500,7 @@ describe("protocol message validation", () => {
     expect(
       Buffer.from(createEnvelopeSigningPayload(envelope)).toString("utf8"),
     ).toBe(
-      '["app-1","","",1,1718956800000,"eyJ0eXBlIjoiYXV0aC5hdHRhY2gifQ","","",""]',
+      '["app-1","","",1,1718956800000,"eyJ0eXBlIjoiYXV0aC5hdHRhY2gifQ","","","","",""]',
     );
   });
 
@@ -344,7 +521,29 @@ describe("protocol message validation", () => {
     expect(
       Buffer.from(createEnvelopeSigningPayload(envelope)).toString("utf8"),
     ).toBe(
-      '["app-1","daemon-1","sess-1",9,1718956800001,"ciphertext","session.start","noise_static_v1","sender-pubkey"]',
+      '["app-1","daemon-1","sess-1",9,1718956800001,"ciphertext","session.start","noise_static_v1","sender-pubkey","",""]',
+    );
+  });
+
+  it("includes routing_payload in the stable signing payload when present", () => {
+    const envelope = validateEnvelope({
+      from: "app-1",
+      to: "",
+      session_id: "sess-2",
+      seq: 5,
+      ts: 1718956800002,
+      sig: "signature",
+      ciphertext: "ciphertext",
+      message_type: "session.resume",
+      cipher_mode: "noise_static_v1",
+      request_id: "resume-1",
+      routing_payload: "eyJsYXN0X3NlcSI6Mn0",
+    });
+
+    expect(
+      Buffer.from(createEnvelopeSigningPayload(envelope)).toString("utf8"),
+    ).toBe(
+      '["app-1","","sess-2",5,1718956800002,"ciphertext","session.resume","noise_static_v1","","resume-1","eyJsYXN0X3NlcSI6Mn0"]',
     );
   });
 

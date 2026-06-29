@@ -45,6 +45,14 @@ const createMessageSchema = <
     payload,
   });
 
+export const PushTriggerSchema = createMessageSchema(
+  "push.trigger",
+  z.object({
+    session_id: StringIdSchema,
+    event_type: PushEventTypeSchema,
+  }),
+);
+
 export const ServerHelloSchema = createMessageSchema(
   "server.hello",
   z.object({
@@ -334,17 +342,58 @@ export const FsFileReqSchema = createMessageSchema(
   }),
 );
 
+const FsFileBasePayloadSchema = z.object({
+  session_id: StringIdSchema,
+  file_path: z.string().min(1),
+});
+
+const FsFileReadyPayloadSchema = FsFileBasePayloadSchema.extend({
+  status: z.literal("ready"),
+  mime_type: z.string().min(1),
+  chunk_index: z.number().int().nonnegative(),
+  total_chunks: z.number().int().positive(),
+  data: z.string(),
+  total_size: z.number().int().nonnegative(),
+});
+
+const FsFileBinaryPayloadSchema = FsFileBasePayloadSchema.extend({
+  status: z.literal("binary"),
+  mime_type: z.string().min(1),
+  total_size: z.number().int().nonnegative(),
+  message: z.string().min(1),
+});
+
+const FsFileTooLargePayloadSchema = FsFileBasePayloadSchema.extend({
+  status: z.literal("too_large"),
+  mime_type: z.string().min(1),
+  total_size: z.number().int().nonnegative(),
+  max_preview_size: z.number().int().positive(),
+  message: z.string().min(1),
+});
+
+const FsFilePermissionDeniedPayloadSchema = FsFileBasePayloadSchema.extend({
+  status: z.literal("permission_denied"),
+  mime_type: z.string().min(1).nullable(),
+  total_size: z.number().int().nonnegative().nullable(),
+  message: z.string().min(1),
+});
+
+const FsFileNotFoundPayloadSchema = FsFileBasePayloadSchema.extend({
+  status: z.literal("not_found"),
+  mime_type: z.string().min(1).nullable(),
+  total_size: z.number().int().nonnegative().nullable(),
+  message: z.string().min(1),
+});
+
 export const FsFileSchema = createMessageSchema(
   "fs.file",
-  z.object({
-    session_id: StringIdSchema,
-    file_path: z.string().min(1),
-    mime_type: z.string().min(1),
-    chunk_index: z.number().int().nonnegative(),
-    total_chunks: z.number().int().positive(),
-    data: z.string(),
-    total_size: z.number().int().nonnegative(),
-  }),
+  z.discriminatedUnion("status", [
+    FsFileReadyPayloadSchema,
+    FsFileBinaryPayloadSchema,
+    FsFileTooLargePayloadSchema,
+    FsFilePermissionDeniedPayloadSchema,
+    FsFileNotFoundPayloadSchema,
+  ]),
 );
 
 export const DeviceStatusSchema = createMessageSchema(
@@ -354,6 +403,71 @@ export const DeviceStatusSchema = createMessageSchema(
     online: z.boolean(),
     machine_name: z.string().min(1),
     ts: TimestampMsSchema,
+    os: z.string().min(1).nullable().optional(),
+    daemon_version: z.string().min(1).nullable().optional(),
+    paired_at: TimestampMsSchema.nullable().optional(),
+    last_seen_at: TimestampMsSchema.nullable().optional(),
+    revoked_at: TimestampMsSchema.nullable().optional(),
+    active_session_count: z.number().int().nonnegative().optional(),
+  }),
+);
+
+export const DeviceListItemSchema = z.object({
+  device_id: StringIdSchema,
+  machine_name: z.string().min(1),
+  os: z.string().min(1).nullable(),
+  daemon_version: z.string().min(1).nullable(),
+  online: z.boolean(),
+  paired_at: TimestampMsSchema,
+  last_seen_at: TimestampMsSchema.nullable(),
+  revoked_at: TimestampMsSchema.nullable(),
+  active_session_count: z.number().int().nonnegative(),
+});
+
+export const DeviceListRequestSchema = createMessageSchema(
+  "device.list",
+  z.object({}),
+);
+
+export const DeviceListResponseSchema = createMessageSchema(
+  "device.list",
+  z.object({
+    devices: z.array(DeviceListItemSchema),
+  }),
+);
+
+export const DeviceRenameRequestSchema = createMessageSchema(
+  "device.rename",
+  z.object({
+    device_id: StringIdSchema,
+    machine_name: z.string().min(1),
+  }),
+);
+
+export const DeviceRenameResponseSchema = createMessageSchema(
+  "device.rename",
+  z.object({
+    device: DeviceListItemSchema,
+  }),
+);
+
+const DeviceRevokeModeSchema = z.enum(["unlink", "revoke"]);
+
+export const DeviceRevokeRequestSchema = createMessageSchema(
+  "device.revoke",
+  z.object({
+    device_id: StringIdSchema,
+    mode: DeviceRevokeModeSchema,
+  }),
+);
+
+export const DeviceRevokeResponseSchema = createMessageSchema(
+  "device.revoke",
+  z.object({
+    device_id: StringIdSchema,
+    mode: DeviceRevokeModeSchema,
+    revoked_at: TimestampMsSchema,
+    disconnected: z.boolean(),
   }),
 );
 
@@ -378,6 +492,91 @@ export const HistoryListRequestSchema = createMessageSchema(
   "history.list",
   z.object({
     workspace_path: z.string().min(1),
+  }),
+);
+
+const WorkspaceStatusSchema = z.enum([
+  "ready",
+  "missing",
+  "forbidden",
+  "not_dir",
+]);
+
+const WorkspaceStatusReasonSchema = z.enum([
+  "ok",
+  "not_found",
+  "not_directory",
+  "outside_allowed_paths",
+  "permission_denied",
+]);
+
+const WorkspaceAccessModeSchema = z.enum([
+  "read_write",
+  "read_only",
+  "no_access",
+  "unknown",
+]);
+
+const WorkspaceRepairHintSchema = z.object({
+  reason: z.enum([
+    "default_workspace",
+    "nearest_existing_ancestor",
+    "first_allowed_workspace",
+    "same_name_match",
+    "fix_permissions",
+  ]),
+  suggested_path: z.string().min(1).nullable(),
+  message: z.string().min(1),
+});
+
+export const WorkspaceSummarySchema = z.object({
+  path: z.string().min(1),
+  name: z.string().min(1),
+  status: WorkspaceStatusSchema,
+  status_reason: WorkspaceStatusReasonSchema.optional(),
+  is_default: z.boolean(),
+  entry_count: z.number().int().nonnegative().nullable(),
+  is_empty: z.boolean().nullable().optional(),
+  repo_root: z.string().min(1).nullable().optional(),
+  git_branch: z.string().min(1).nullable().optional(),
+  access_mode: WorkspaceAccessModeSchema.optional(),
+});
+
+export const WorkspaceListRequestSchema = createMessageSchema(
+  "workspace.list",
+  z.object({}),
+);
+
+export const WorkspaceListResponseSchema = createMessageSchema(
+  "workspace.list",
+  z.object({
+    default_path: z.string().min(1).nullable(),
+    items: z.array(WorkspaceSummarySchema),
+  }),
+);
+
+export const WorkspaceResolveRequestSchema = createMessageSchema(
+  "workspace.resolve",
+  z.object({
+    workspace_path: z.string(),
+  }),
+);
+
+export const WorkspaceResolveResponseSchema = createMessageSchema(
+  "workspace.resolve",
+  z.object({
+    workspace_path: z.string(),
+    resolved_path: z.string().min(1),
+    name: z.string().min(1),
+    status: WorkspaceStatusSchema,
+    status_reason: WorkspaceStatusReasonSchema.optional(),
+    is_default: z.boolean(),
+    entry_count: z.number().int().nonnegative().nullable(),
+    is_empty: z.boolean().nullable().optional(),
+    repo_root: z.string().min(1).nullable().optional(),
+    git_branch: z.string().min(1).nullable().optional(),
+    access_mode: WorkspaceAccessModeSchema.optional(),
+    repair_hint: WorkspaceRepairHintSchema.optional(),
   }),
 );
 
@@ -547,8 +746,25 @@ export const messageSchemasByType = {
   "fs.file.req": FsFileReqSchema,
   "fs.file": FsFileSchema,
   "device.status": DeviceStatusSchema,
+  "device.list": z.union([DeviceListResponseSchema, DeviceListRequestSchema]),
+  "device.rename": z.union([
+    DeviceRenameResponseSchema,
+    DeviceRenameRequestSchema,
+  ]),
+  "device.revoke": z.union([
+    DeviceRevokeResponseSchema,
+    DeviceRevokeRequestSchema,
+  ]),
   "pty.input": PtyInputSchema,
   "pty.resize": PtyResizeSchema,
+  "workspace.list": z.union([
+    WorkspaceListResponseSchema,
+    WorkspaceListRequestSchema,
+  ]),
+  "workspace.resolve": z.union([
+    WorkspaceResolveResponseSchema,
+    WorkspaceResolveRequestSchema,
+  ]),
   "history.list": z.union([
     HistoryListResponseSchema,
     HistoryListRequestSchema,
@@ -561,6 +777,7 @@ export const messageSchemasByType = {
   "slash.list": z.union([SlashListResponseSchema, SlashListRequestSchema]),
   "replay.done": ReplayDoneSchema,
   "device.push_token": DevicePushTokenSchema,
+  "push.trigger": PushTriggerSchema,
   "key.ratchet": KeyRatchetSchema,
   "key.ratchet_ack": KeyRatchetAckSchema,
   error: ErrorSchema,
@@ -595,8 +812,18 @@ export const MessageSchema = z.union([
   FsFileReqSchema,
   FsFileSchema,
   DeviceStatusSchema,
+  DeviceListRequestSchema,
+  DeviceListResponseSchema,
+  DeviceRenameRequestSchema,
+  DeviceRenameResponseSchema,
+  DeviceRevokeRequestSchema,
+  DeviceRevokeResponseSchema,
   PtyInputSchema,
   PtyResizeSchema,
+  WorkspaceListRequestSchema,
+  WorkspaceListResponseSchema,
+  WorkspaceResolveRequestSchema,
+  WorkspaceResolveResponseSchema,
   HistoryListRequestSchema,
   HistoryListResponseSchema,
   HistoryGetRequestSchema,
@@ -607,6 +834,7 @@ export const MessageSchema = z.union([
   SlashListResponseSchema,
   ReplayDoneSchema,
   DevicePushTokenSchema,
+  PushTriggerSchema,
   KeyRatchetSchema,
   KeyRatchetAckSchema,
   ErrorSchema,

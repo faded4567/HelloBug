@@ -6,6 +6,8 @@ import type { Message } from "@hellobug/protocol";
 
 type SessionInputImagePayload = Extract<Message, { type: "session.input.image" }>["payload"];
 
+export const DefaultSessionImageUploadMaxBytes = 2 * 1024 * 1024;
+
 export interface CompletedImageUpload {
   filePath: string;
   imageId: string;
@@ -23,18 +25,42 @@ interface PendingImageUpload {
   totalSize: number;
 }
 
+export interface SessionImageUploadStoreOptions {
+  rootDir?: string;
+  maxBytes?: number;
+}
+
 export class SessionImageUploadStore {
   private readonly uploads = new Map<string, PendingImageUpload>();
   private readonly rootDir: string;
+  private readonly maxBytes: number;
 
-  constructor(rootDir = join(tmpdir(), "hellobug")) {
-    this.rootDir = resolve(rootDir);
+  constructor(
+    rootDirOrOptions: string | SessionImageUploadStoreOptions = join(
+      tmpdir(),
+      "hellobug",
+    ),
+  ) {
+    if (typeof rootDirOrOptions === "string") {
+      this.rootDir = resolve(rootDirOrOptions);
+      this.maxBytes = DefaultSessionImageUploadMaxBytes;
+      return;
+    }
+
+    this.rootDir = resolve(rootDirOrOptions.rootDir ?? join(tmpdir(), "hellobug"));
+    this.maxBytes =
+      rootDirOrOptions.maxBytes ?? DefaultSessionImageUploadMaxBytes;
   }
 
   async appendChunk(payload: SessionInputImagePayload): Promise<CompletedImageUpload | null> {
     if (payload.chunk_index >= payload.total_chunks) {
       throw new Error(
         `Image chunk index ${payload.chunk_index} is outside total_chunks ${payload.total_chunks}`,
+      );
+    }
+    if (!payload.mime_type.startsWith("image/")) {
+      throw new Error(
+        `Image upload mime_type must be image/* for ${payload.image_id}`,
       );
     }
 
@@ -52,12 +78,16 @@ export class SessionImageUploadStore {
 
     const chunk = Buffer.from(payload.data, "base64url");
     const existing = upload.chunks[payload.chunk_index];
-    if (existing) {
-      upload.totalSize -= existing.byteLength;
+    const nextTotalSize =
+      upload.totalSize - (existing?.byteLength ?? 0) + chunk.byteLength;
+    if (nextTotalSize > this.maxBytes) {
+      throw new Error(
+        `Image upload exceeds ${this.maxBytes} bytes limit for ${payload.image_id}`,
+      );
     }
 
     upload.chunks[payload.chunk_index] = chunk;
-    upload.totalSize += chunk.byteLength;
+    upload.totalSize = nextTotalSize;
     this.uploads.set(key, upload);
 
     if (upload.chunks.some((item) => item === undefined)) {

@@ -1,11 +1,16 @@
 import { z } from "zod";
 
 export const ProtocolVersion = 1;
+export const TransportControlSessionId = "transport.control.v1";
 
 export const StringIdSchema = z.string().min(1);
 export const TimestampMsSchema = z.number().int().nonnegative();
 export const SequenceSchema = z.number().int().nonnegative();
-export const OptionalNullableStringSchema = z.string().min(1).nullable().optional();
+export const OptionalNullableStringSchema = z
+  .string()
+  .min(1)
+  .nullable()
+  .optional();
 export const CipherModeSchema = z.enum(["plain", "noise_static_v1"]);
 
 export const EnvelopeSchema = z.object({
@@ -19,6 +24,8 @@ export const EnvelopeSchema = z.object({
   message_type: z.string().min(1).optional(),
   cipher_mode: CipherModeSchema.optional(),
   sender_pubkey: z.string().min(1).optional(),
+  request_id: z.string().min(1).optional(),
+  routing_payload: z.string().min(1).optional(),
 });
 
 export const InnerMessageSchema = z.object({
@@ -41,6 +48,8 @@ export type EnvelopeSigningFields = Pick<
   | "message_type"
   | "cipher_mode"
   | "sender_pubkey"
+  | "request_id"
+  | "routing_payload"
 >;
 export type CipherMode = z.infer<typeof CipherModeSchema>;
 
@@ -66,6 +75,8 @@ export function createEnvelopeSigningPayload(
       envelope.message_type ?? "",
       envelope.cipher_mode ?? "",
       envelope.sender_pubkey ?? "",
+      envelope.request_id ?? "",
+      envelope.routing_payload ?? "",
     ]),
   );
 }

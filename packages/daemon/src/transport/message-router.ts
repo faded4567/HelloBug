@@ -56,6 +56,8 @@ export function createDaemonMessageRouter(options: DaemonMessageRouterOptions) {
       message.type === "pty.resize" ||
       message.type === "danger.allow" ||
       message.type === "danger.deny" ||
+      message.type === "workspace.list" ||
+      message.type === "workspace.resolve" ||
       message.type === "fs.tree.req" ||
       message.type === "fs.file.req" ||
       message.type === "history.list" ||
@@ -159,6 +161,37 @@ export function createDaemonMessageRouter(options: DaemonMessageRouterOptions) {
             `[daemon-router] fs.tree.req session=${message.payload.session_id} workspace=${message.payload.workspace_path} dir=${message.payload.dir_path || "."}`,
           );
           const response = await options.workspace?.handleTreeRequest(message);
+          if (!response) {
+            throw new DaemonSessionError(
+              "PROTOCOL_VERSION",
+              "Workspace service is not configured",
+            );
+          }
+          connection.sendMessage(response);
+          return;
+        }
+
+        if (message.type === "workspace.list") {
+          console.log("[daemon-router] workspace.list");
+          const response = await options.workspace?.handleWorkspaceListRequest(
+            message,
+          );
+          if (!response) {
+            throw new DaemonSessionError(
+              "PROTOCOL_VERSION",
+              "Workspace service is not configured",
+            );
+          }
+          connection.sendMessage(response);
+          return;
+        }
+
+        if (message.type === "workspace.resolve") {
+          console.log(
+            `[daemon-router] workspace.resolve path=${message.payload.workspace_path || "<default>"}`,
+          );
+          const response =
+            await options.workspace?.handleWorkspaceResolveRequest(message);
           if (!response) {
             throw new DaemonSessionError(
               "PROTOCOL_VERSION",
@@ -313,7 +346,21 @@ export function createDaemonMessageRouter(options: DaemonMessageRouterOptions) {
           return;
         }
 
-        throw error;
+        connection.sendMessage({
+          v: 1,
+          type: "error",
+          payload: {
+            request_id: message.id ?? `${message.type}:${Date.now()}`,
+            session_id:
+              "session_id" in message.payload &&
+              typeof message.payload.session_id === "string"
+                ? message.payload.session_id
+                : null,
+            code: "PROTOCOL_VERSION",
+            message: normalizeUnexpectedRuntimeError(error),
+          },
+        });
+        return;
       }
 
       return;
@@ -355,4 +402,15 @@ export function createDaemonMessageRouter(options: DaemonMessageRouterOptions) {
 
     await options.onUnhandledMessage?.(message);
   };
+}
+
+function normalizeUnexpectedRuntimeError(error: unknown): string {
+  if (error instanceof Error) {
+    const text = error.message.trim();
+    if (text.length > 0) {
+      return text;
+    }
+  }
+
+  return "Daemon runtime request failed";
 }

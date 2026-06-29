@@ -36,7 +36,12 @@ pnpm -C packages test
 pnpm -C packages lint
 pnpm -C packages --filter @hellobug/server dev
 pnpm -C packages --filter @hellobug/daemon dev
+pnpm -C packages test:server:relay
+pnpm -C packages test:daemon:v1
+pnpm -C packages test:v1:backend
 ```
+
+Backend local debug, LAN relay, bootstrap token, and daemon env startup examples are in [docs/backend-runbook.md](/Users/shuai/yangshuai/projects/HelloBug/docs/backend-runbook.md).
 
 Flutter stays separate:
 

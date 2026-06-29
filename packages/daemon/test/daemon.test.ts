@@ -1,11 +1,12 @@
 import type { AddressInfo } from "node:net";
 import { generateKeyPairSync, type KeyObject } from "node:crypto";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 import { WebSocketServer } from "ws";
+import { TransportControlSessionId } from "@hellobug/protocol";
 
 import { loadDaemonConfig } from "../src/config/load.js";
 import { DeviceKeyStore } from "../src/crypto/keys.js";
@@ -20,6 +21,8 @@ import { formatPairingSasLine } from "../src/pairing/responder.js";
 import { DaemonSessionManager } from "../src/sessions/manager.js";
 import { toBase64Url } from "../src/lib/base64url.js";
 import { PairingSlotManager, getSas } from "../src/pairing/code.js";
+import { DaemonWorkspaceService } from "../src/fs/workspace.js";
+import type { SessionRuntime } from "../src/sessions/runtime.js";
 import { DaemonConnection } from "../src/transport/connection.js";
 import { createDaemonMessageRouter } from "../src/transport/message-router.js";
 import { PairingTransportKeyStore } from "../src/transport/pairing-key-store.js";
@@ -31,6 +34,23 @@ function decodeMaybeEnvelope(raw: unknown) {
     typeof parsed === "object" &&
     typeof parsed.ciphertext === "string"
   ) {
+    if (
+      parsed.cipher_mode === "noise_static_v1" &&
+      typeof parsed.message_type === "string" &&
+      typeof parsed.routing_payload === "string"
+    ) {
+      return {
+        v: 1,
+        ...(typeof parsed.request_id === "string" &&
+        parsed.request_id.length > 0
+            ? { id: parsed.request_id }
+            : {}),
+        type: parsed.message_type,
+        payload: JSON.parse(
+          Buffer.from(parsed.routing_payload, "base64url").toString("utf8"),
+        ) as Record<string, unknown>,
+      };
+    }
     try {
       return JSON.parse(
         Buffer.from(parsed.ciphertext, "base64url").toString("utf8"),
@@ -115,6 +135,72 @@ function nextRawEnvelope(
   });
 }
 
+function encodePlaceholderEnvelope(
+  type: string,
+  payload: Record<string, unknown>,
+  options: {
+    from?: string;
+    sessionId?: string;
+    seq?: number;
+    requestId?: string;
+  } = {},
+): string {
+  return JSON.stringify({
+    from: options.from ?? "hellobug-server",
+    to: "",
+    session_id: options.sessionId ?? "",
+    seq: options.seq ?? 1,
+    ts: Date.now(),
+    sig: "signature",
+    ciphertext: Buffer.from("opaque", "utf8").toString("base64url"),
+    message_type: type,
+    cipher_mode: "noise_static_v1",
+    ...(options.requestId ? { request_id: options.requestId } : {}),
+    routing_payload: Buffer.from(JSON.stringify(payload), "utf8").toString(
+      "base64url",
+    ),
+  });
+}
+
+function encodePlainEnvelopeMessage(
+  message: Record<string, unknown>,
+  options: {
+    from?: string;
+    sessionId?: string;
+    seq?: number;
+    requestId?: string;
+  } = {},
+): string {
+  const payloadSessionId =
+    message.payload &&
+    typeof message.payload === "object" &&
+    !Array.isArray(message.payload) &&
+    typeof (message.payload as { session_id?: unknown }).session_id === "string"
+      ? ((message.payload as { session_id: string }).session_id ?? "")
+      : "";
+  const sessionId =
+    options.sessionId ??
+    (payloadSessionId.length > 0 ? payloadSessionId : TransportControlSessionId);
+  const requestId =
+    options.requestId ??
+    (typeof message.id === "string" ? message.id : undefined);
+
+  return JSON.stringify({
+    from: options.from ?? "app-device-1",
+    to: "",
+    session_id: sessionId,
+    seq: options.seq ?? 1,
+    ts: Date.now(),
+    sig: "signature",
+    ciphertext: Buffer.from(JSON.stringify(message), "utf8").toString(
+      "base64url",
+    ),
+    message_type: typeof message.type === "string" ? message.type : undefined,
+    cipher_mode: "plain",
+    ...(requestId ? { request_id: requestId } : {}),
+  });
+}
+
 function exportOkpPublicKeyBase64Url(publicKey: KeyObject): string {
   const jwk = publicKey.export({ format: "jwk" }) as JsonWebKey;
   if (typeof jwk.x !== "string" || jwk.x.length === 0) {
@@ -156,6 +242,64 @@ describe("daemon skeleton", () => {
       expect(config.bootstrap_token).toBe("bootstrap-token");
     } finally {
       delete process.env.HELLOBUG_DAEMON_CONFIG_PATH;
+    }
+  });
+
+  it("allows daemon config to be provided entirely by env overrides", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "hellobug-config-env-only-"));
+    const file = join(dir, "missing-daemon.json");
+
+    process.env.HELLOBUG_DAEMON_CONFIG_PATH = file;
+    process.env.HELLOBUG_DAEMON_SERVER_URL = "ws://127.0.0.1:3000/v1/relay";
+    process.env.HELLOBUG_DAEMON_BOOTSTRAP_TOKEN = "env-bootstrap-token";
+    process.env.HELLOBUG_DAEMON_ALLOWED_PATHS = "/tmp/work:/tmp/demo";
+    process.env.HELLOBUG_DAEMON_PAIRING_TTL_MS = "45000";
+    try {
+      const config = await loadDaemonConfig();
+      expect(config.server_url).toBe("ws://127.0.0.1:3000/v1/relay");
+      expect(config.bootstrap_token).toBe("env-bootstrap-token");
+      expect(config.allowed_paths).toEqual(["/tmp/work", "/tmp/demo"]);
+      expect(config.pairing_ttl_ms).toBe(45_000);
+    } finally {
+      delete process.env.HELLOBUG_DAEMON_CONFIG_PATH;
+      delete process.env.HELLOBUG_DAEMON_SERVER_URL;
+      delete process.env.HELLOBUG_DAEMON_BOOTSTRAP_TOKEN;
+      delete process.env.HELLOBUG_DAEMON_ALLOWED_PATHS;
+      delete process.env.HELLOBUG_DAEMON_PAIRING_TTL_MS;
+    }
+  });
+
+  it("lets env overrides replace file config values", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "hellobug-config-override-"));
+    const file = join(dir, "daemon.json");
+    await writeFile(
+      file,
+      JSON.stringify({
+        server_url: "ws://localhost:3000/v1/relay",
+        register_url: "http://localhost:3000",
+        allowed_paths: ["/tmp/original"],
+      }),
+    );
+
+    process.env.HELLOBUG_DAEMON_SERVER_URL = "ws://192.168.18.8:3000/v1/relay";
+    process.env.HELLOBUG_DAEMON_ALLOWED_PATHS = JSON.stringify([
+      "/tmp/override-a",
+      "/tmp/override-b",
+    ]);
+    process.env.HELLOBUG_DAEMON_PAIRING_REFRESH_MS = "15000";
+    try {
+      const config = await loadDaemonConfig(file);
+      expect(config.server_url).toBe("ws://192.168.18.8:3000/v1/relay");
+      expect(config.register_url).toBe("http://localhost:3000");
+      expect(config.allowed_paths).toEqual([
+        "/tmp/override-a",
+        "/tmp/override-b",
+      ]);
+      expect(config.pairing_refresh_ms).toBe(15_000);
+    } finally {
+      delete process.env.HELLOBUG_DAEMON_SERVER_URL;
+      delete process.env.HELLOBUG_DAEMON_ALLOWED_PATHS;
+      delete process.env.HELLOBUG_DAEMON_PAIRING_REFRESH_MS;
     }
   });
 
@@ -236,16 +380,32 @@ describe("daemon skeleton", () => {
       },
     });
 
-    await connection.connect();
-    const { socket, messages } = await connectionPromise;
+    const pendingConnection = connectionPromise;
+    const connecting = connection.connect();
+    const { socket, messages } = await pendingConnection;
+    const helloEnvelopePromise = nextRawEnvelope(
+      socket,
+      (message) => message.message_type === "daemon.hello",
+    );
+    await connecting;
+
+    const helloEnvelope = await helloEnvelopePromise;
+    expect(helloEnvelope.cipher_mode).toBe("noise_static_v1");
+    expect(helloEnvelope.session_id).toBe(TransportControlSessionId);
+    expect(typeof helloEnvelope.routing_payload).toBe("string");
 
     const hello = await messages.next("daemon.hello");
     expect(hello.payload.device_id).toBe("daemon-1");
 
+    const pairSasEnvelopePromise = nextRawEnvelope(
+      socket,
+      (message) => message.message_type === "device.pair.sas",
+    );
+
     socket.send(
-      JSON.stringify({
-        type: "device.pair",
-        payload: {
+      encodePlaceholderEnvelope(
+        "device.pair",
+        {
           pairing_code: "428791",
           server_url: serverUrl,
           app_pubkey: exportOkpPublicKeyBase64Url(appNoiseIdentity.publicKey),
@@ -254,10 +414,17 @@ describe("daemon skeleton", () => {
           ),
           app_device_name: "Test iPhone",
         },
-      }),
+        {
+          requestId: "pair-1",
+        },
+      ),
     );
 
     const sas = await messages.next("device.pair.sas");
+    const sasEnvelope = await pairSasEnvelopePromise;
+    expect(sasEnvelope.cipher_mode).toBe("noise_static_v1");
+    expect(sasEnvelope.session_id).toBe("");
+    expect(typeof sasEnvelope.routing_payload).toBe("string");
     expect(sas.payload.sas).toHaveLength(5);
     expect(sas.payload.noise_handshake).toBeTypeOf("string");
     expect(sas.payload.daemon_pubkey).toBe(identity.x25519PublicKeyBase64Url);
@@ -266,6 +433,169 @@ describe("daemon skeleton", () => {
     );
     expect(sas.payload.machine_name).toBeTypeOf("string");
     expect(sas.payload.os).toBeTypeOf("string");
+
+    await connection.close();
+    await new Promise<void>((resolve) => {
+      server.close(() => resolve());
+    });
+  });
+
+  it("decodes relay placeholder errors without requiring sender_pubkey", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "hellobug-keys-"));
+    const file = join(dir, "device.key");
+    const identity = await new DeviceKeyStore(file).loadOrCreate();
+    const received: Array<Record<string, unknown>> = [];
+    const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
+    await new Promise<void>((resolve) => {
+      server.once("listening", () => resolve());
+    });
+    const address = server.address() as AddressInfo;
+    const serverUrl = `ws://127.0.0.1:${address.port}`;
+
+    const connectionPromise = new Promise<{
+      socket: import("ws").WebSocket;
+    }>((resolve) => {
+      server.once("connection", (socket) => {
+        resolve({ socket });
+      });
+    });
+
+    const connection = new DaemonConnection({
+      serverUrl,
+      identity,
+      certificates: {
+        deviceId: "daemon-1",
+        certPem: "cert",
+        caCertPem: "ca",
+      },
+      handlers: {
+        onMessage: async (message) => {
+          received.push(message as unknown as Record<string, unknown>);
+        },
+      },
+    });
+
+    const pendingConnection = connectionPromise;
+    const connecting = connection.connect();
+    const { socket } = await pendingConnection;
+    const helloEnvelope = await nextRawEnvelope(
+      socket,
+      (message) => message.message_type === "daemon.hello",
+    );
+    await connecting;
+
+    socket.send(
+      JSON.stringify({
+        from: "hellobug-server",
+        to: "",
+        session_id: TransportControlSessionId,
+        seq: Number(helloEnvelope.seq) + 1,
+        ts: Date.now(),
+        sig: "signature",
+        ciphertext: Buffer.from("opaque", "utf8").toString("base64url"),
+        message_type: "error",
+        cipher_mode: "noise_static_v1",
+        request_id: "daemon.hello",
+        routing_payload: Buffer.from(
+          JSON.stringify({
+            request_id: "daemon.hello",
+            session_id: null,
+            code: "AUTH_INVALID",
+            message: "Unknown daemon device",
+          }),
+          "utf8",
+        ).toString("base64url"),
+      }),
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(received).toContainEqual({
+      v: 1,
+      id: "daemon.hello",
+      type: "error",
+      payload: {
+        request_id: "daemon.hello",
+        session_id: null,
+        code: "AUTH_INVALID",
+        message: "Unknown daemon device",
+      },
+    });
+
+    await connection.close();
+    await new Promise<void>((resolve) => {
+      server.close(() => resolve());
+    });
+  });
+
+  it("rejects legacy raw workspace.list relay messages with a protocol error", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "hellobug-keys-"));
+    const file = join(dir, "device.key");
+    const identity = await new DeviceKeyStore(file).loadOrCreate();
+    const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
+    await new Promise<void>((resolve) => {
+      server.once("listening", () => resolve());
+    });
+    const address = server.address() as AddressInfo;
+    const serverUrl = `ws://127.0.0.1:${address.port}`;
+
+    const connectionPromise = new Promise<{
+      socket: import("ws").WebSocket;
+      messages: ReturnType<typeof createMessageReader>;
+    }>((resolve) => {
+      server.once("connection", (socket) => {
+        resolve({
+          socket,
+          messages: createMessageReader(socket),
+        });
+      });
+    });
+
+    const connection = new DaemonConnection({
+      serverUrl,
+      identity,
+      certificates: {
+        deviceId: "daemon-1",
+        certPem: "cert",
+        caCertPem: "ca",
+      },
+      handlers: {
+        onMessage: createDaemonMessageRouter({
+          identity,
+        }),
+      },
+    });
+
+    await connection.connect();
+    const { socket, messages } = await connectionPromise;
+    await messages.next("daemon.hello");
+
+    const errorEnvelopePromise = nextRawEnvelope(
+      socket,
+      (message) =>
+        message.message_type === "error" &&
+        message.request_id === "workspace-list-legacy-raw-1",
+    );
+
+    socket.send(
+      JSON.stringify({
+        v: 1,
+        id: "workspace-list-legacy-raw-1",
+        type: "workspace.list",
+        payload: {},
+      }),
+    );
+
+    const errorEnvelope = await errorEnvelopePromise;
+    expect(errorEnvelope.cipher_mode).toBe("plain");
+    expect(errorEnvelope.message_type).toBe("error");
+
+    const errorMessage = await messages.next("error");
+    expect(errorMessage.payload.request_id).toBe("workspace-list-legacy-raw-1");
+    expect(errorMessage.payload.session_id).toBeNull();
+    expect(errorMessage.payload.code).toBe("PROTOCOL_VERSION");
+    expect(errorMessage.payload.message).toContain(
+      "Legacy raw relay messages are no longer allowed for workspace.list",
+    );
 
     await connection.close();
     await new Promise<void>((resolve) => {
@@ -327,9 +657,9 @@ describe("daemon skeleton", () => {
     await messages.next("daemon.hello");
 
     socket.send(
-      JSON.stringify({
-        type: "device.pair",
-        payload: {
+      encodePlaceholderEnvelope(
+        "device.pair",
+        {
           pairing_code: "428791",
           server_url: serverUrl,
           app_pubkey: exportOkpPublicKeyBase64Url(appNoiseIdentity.publicKey),
@@ -338,7 +668,10 @@ describe("daemon skeleton", () => {
           ),
           app_device_name: "Confirm iPhone",
         },
-      }),
+        {
+          requestId: "pair-2",
+        },
+      ),
     );
 
     const sas = await messages.next("device.pair.sas");
@@ -357,13 +690,16 @@ describe("daemon skeleton", () => {
     });
 
     socket.send(
-      JSON.stringify({
-        type: "device.pair.confirm",
-        payload: {
+      encodePlaceholderEnvelope(
+        "device.pair.confirm",
+        {
           confirmed: true,
           noise_handshake: responded.message.toString("base64url"),
         },
-      }),
+        {
+          requestId: "pair-confirm-2",
+        },
+      ),
     );
 
     await confirmed;
@@ -450,16 +786,19 @@ describe("daemon skeleton", () => {
     }
 
     socket.send(
-      JSON.stringify({
-        type: "device.pair",
-        payload: {
+      encodePlaceholderEnvelope(
+        "device.pair",
+        {
           pairing_code: "428791",
           server_url: serverUrl,
           app_pubkey: appPublicJwk.x,
           app_ed25519_pubkey: appSigningJwk.x,
           app_device_name: "Bootstrap iPhone",
         },
-      }),
+        {
+          requestId: "pair-3",
+        },
+      ),
     );
 
     const sas = await messages.next("device.pair.sas");
@@ -475,13 +814,16 @@ describe("daemon skeleton", () => {
     });
 
     socket.send(
-      JSON.stringify({
-        type: "device.pair.confirm",
-        payload: {
+      encodePlaceholderEnvelope(
+        "device.pair.confirm",
+        {
           confirmed: true,
           noise_handshake: responded.message.toString("base64url"),
         },
-      }),
+        {
+          requestId: "pair-confirm-3",
+        },
+      ),
     );
 
     await confirmed;
@@ -540,6 +882,16 @@ describe("daemon skeleton", () => {
         message.cipher_mode === "noise_static_v1" &&
         message.message_type === "session.start.result",
     );
+    expect(
+      JSON.parse(
+        Buffer.from(
+          String(startResultEnvelope.routing_payload),
+          "base64url",
+        ).toString("utf8"),
+      ),
+    ).toEqual({
+      status: "started",
+    });
     const startResultPlaintext = appCipher.decrypt(
       Buffer.from(String(startResultEnvelope.ciphertext), "base64url"),
       createSessionNonce(sessionId, Number(startResultEnvelope.seq)),
@@ -608,6 +960,79 @@ describe("daemon skeleton", () => {
     expect(inner.payload.event.event_type).toBe("assistant.delta");
     expect(inner.payload.event.text).toBe("echo: hello pairing bootstrap");
 
+    const pushTriggerPromise = nextRawEnvelope(
+      socket,
+      (message) =>
+        message.cipher_mode === "noise_static_v1" &&
+        message.message_type === "push.trigger" &&
+        message.session_id === sessionId,
+    );
+    const doneEnvelopePromise = nextRawEnvelope(
+      socket,
+      (message) =>
+        message.cipher_mode === "noise_static_v1" &&
+        message.message_type === "session.event" &&
+        message.session_id === sessionId &&
+        typeof message.routing_payload === "string" &&
+        JSON.parse(
+          Buffer.from(String(message.routing_payload), "base64url").toString(
+            "utf8",
+          ),
+        ).event?.event_type === "session.done",
+    );
+
+    socket.send(
+      JSON.stringify({
+        from: "app-device-1",
+        to: "",
+        session_id: sessionId,
+        seq: 43,
+        ts: Date.now(),
+        sig: "signature",
+        ciphertext: encrypt(
+          {
+            id: "cancel-pairing-1",
+            type: "session.cancel",
+            payload: {
+              session_id: sessionId,
+            },
+          },
+          43,
+        ),
+        message_type: "session.cancel",
+        cipher_mode: "noise_static_v1",
+        sender_pubkey: appPublicJwk.x,
+      }),
+    );
+
+    const pushTriggerEnvelope = await pushTriggerPromise;
+    expect(
+      JSON.parse(
+        Buffer.from(
+          String(pushTriggerEnvelope.routing_payload),
+          "base64url",
+        ).toString("utf8"),
+      ),
+    ).toEqual({
+      session_id: sessionId,
+      event_type: "task_done",
+    });
+
+    const doneEnvelope = await doneEnvelopePromise;
+    expect(
+      JSON.parse(
+        Buffer.from(
+          String(doneEnvelope.routing_payload),
+          "base64url",
+        ).toString("utf8"),
+      ),
+    ).toMatchObject({
+      session_id: sessionId,
+      event: {
+        event_type: "session.done",
+      },
+    });
+
     await connection.close();
     await new Promise<void>((resolve) => {
       server.close(() => resolve());
@@ -628,6 +1053,159 @@ describe("daemon skeleton", () => {
         },
       }),
     ).toBe("🐢 🪐 🍵 🎷 🌙");
+  });
+
+  it("decrypts transport-control requests and replies without ratcheting", async () => {
+    const root = await mkdtemp(join(tmpdir(), "hellobug-workspace-control-"));
+    const readyWorkspace = join(root, "ready");
+    await mkdir(readyWorkspace, { recursive: true });
+    await writeFile(join(readyWorkspace, "README.md"), "ready\n");
+    const dir = await mkdtemp(join(tmpdir(), "hellobug-keys-"));
+    const file = join(dir, "device.key");
+    const identity = await new DeviceKeyStore(file).loadOrCreate();
+    const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
+    await new Promise<void>((resolve) => {
+      server.once("listening", () => resolve());
+    });
+    const address = server.address() as AddressInfo;
+    const serverUrl = `ws://127.0.0.1:${address.port}`;
+
+    const connectionPromise = new Promise<{
+      socket: import("ws").WebSocket;
+      messages: ReturnType<typeof createMessageReader>;
+    }>((resolve) => {
+      server.once("connection", (socket) => {
+        resolve({
+          socket,
+          messages: createMessageReader(socket),
+        });
+      });
+    });
+
+    const workspace = new DaemonWorkspaceService({
+      allowedPaths: [readyWorkspace],
+    });
+    const connection = new DaemonConnection({
+      serverUrl,
+      identity,
+      certificates: {
+        deviceId: "daemon-1",
+        certPem: "cert",
+        caCertPem: "ca",
+      },
+      ratchetMessageLimit: 0,
+      handlers: {
+        onMessage: createDaemonMessageRouter({
+          identity,
+          workspace,
+        }),
+      },
+    });
+
+    await connection.connect();
+    const { socket } = await connectionPromise;
+    await nextRawEnvelope(
+      socket,
+      (message) => message.message_type === "daemon.hello",
+    );
+
+    const appKeyPair = generateKeyPairSync("x25519");
+    const appPublicJwk = appKeyPair.publicKey.export({
+      format: "jwk",
+    }) as JsonWebKey;
+    if (typeof appPublicJwk.x !== "string") {
+      throw new Error("app public key missing x coordinate");
+    }
+
+    const appCipher = new SessionCipher(
+      deriveSessionKeys({
+        role: "initiator",
+        localPrivateKey: appKeyPair.privateKey,
+        localPublicKeyBase64Url: appPublicJwk.x,
+        remotePublicKeyBase64Url: identity.x25519PublicKeyBase64Url,
+      }),
+    );
+    const requestId = "workspace-list-control-1";
+    const encrypt = (message: Record<string, unknown>, seq: number) =>
+      appCipher
+        .encrypt(
+          Buffer.from(JSON.stringify(message), "utf8"),
+          createSessionNonce(TransportControlSessionId, seq),
+        )
+        .toString("base64url");
+
+    socket.send(
+      JSON.stringify({
+        from: "app-device-1",
+        to: "",
+        session_id: TransportControlSessionId,
+        seq: 51,
+        ts: Date.now(),
+        sig: "signature",
+        ciphertext: encrypt(
+          {
+            id: requestId,
+            type: "workspace.list",
+            payload: {},
+          },
+          51,
+        ),
+        message_type: "workspace.list",
+        cipher_mode: "noise_static_v1",
+        sender_pubkey: appPublicJwk.x,
+        request_id: requestId,
+      }),
+    );
+
+    const responseEnvelope = await nextRawEnvelope(
+      socket,
+      (message) =>
+        message.cipher_mode === "noise_static_v1" &&
+        message.message_type === "workspace.list" &&
+        message.request_id === requestId,
+    );
+    expect(responseEnvelope.session_id).toBe(TransportControlSessionId);
+    expect(responseEnvelope.request_id).toBe(requestId);
+    expect(responseEnvelope.sender_pubkey).toBe(
+      identity.x25519PublicKeyBase64Url,
+    );
+
+    const responsePlaintext = appCipher.decrypt(
+      Buffer.from(String(responseEnvelope.ciphertext), "base64url"),
+      createSessionNonce(
+        TransportControlSessionId,
+        Number(responseEnvelope.seq),
+      ),
+    );
+    const response = JSON.parse(responsePlaintext.toString("utf8")) as {
+      id: string;
+      type: string;
+      payload: {
+        default_path: string | null;
+        items: Array<{
+          path: string;
+        }>;
+      };
+    };
+    expect(response.id).toBe(requestId);
+    expect(response.type).toBe("workspace.list");
+    expect(response.payload.default_path).toBe(readyWorkspace);
+    expect(response.payload.items[0]?.path).toBe(readyWorkspace);
+
+    await expect(
+      Promise.race([
+        nextRawEnvelope(
+          socket,
+          (message) => message.message_type === "key.ratchet",
+        ),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 150)),
+      ]),
+    ).resolves.toBeNull();
+
+    await connection.close();
+    await new Promise<void>((resolve) => {
+      server.close(() => resolve());
+    });
   });
 
   it("starts a session, echoes input, and emits session.done on cancel", async () => {
@@ -682,7 +1260,7 @@ describe("daemon skeleton", () => {
     await messages.next("daemon.hello");
 
     socket.send(
-      JSON.stringify({
+      encodePlainEnvelopeMessage({
         id: "start-1",
         type: "session.start",
         payload: {
@@ -699,7 +1277,7 @@ describe("daemon skeleton", () => {
     expect(startResult.payload.workspace_path).toBe("/tmp/workspace");
 
     socket.send(
-      JSON.stringify({
+      encodePlainEnvelopeMessage({
         id: "input-1",
         type: "session.input",
         payload: {
@@ -716,7 +1294,7 @@ describe("daemon skeleton", () => {
     expect(sessionEvent.payload.event.text).toBe("echo: hello daemon");
 
     socket.send(
-      JSON.stringify({
+      encodePlainEnvelopeMessage({
         id: "cancel-1",
         type: "session.cancel",
         payload: {
@@ -787,7 +1365,7 @@ describe("daemon skeleton", () => {
     await messages.next("daemon.hello");
 
     socket.send(
-      JSON.stringify({
+      encodePlainEnvelopeMessage({
         id: "start-voice-1",
         type: "session.start",
         payload: {
@@ -803,7 +1381,7 @@ describe("daemon skeleton", () => {
     expect(startResult.payload.status).toBe("started");
 
     socket.send(
-      JSON.stringify({
+      encodePlainEnvelopeMessage({
         id: "voice-1",
         type: "session.input.voice_text",
         payload: {
@@ -820,7 +1398,7 @@ describe("daemon skeleton", () => {
     expect(voiceEvent.payload.event.text).toBe("voice: show changed files");
 
     socket.send(
-      JSON.stringify({
+      encodePlainEnvelopeMessage({
         id: "slash-1",
         type: "session.command.slash",
         payload: {
@@ -947,6 +1525,9 @@ describe("daemon skeleton", () => {
         message.cipher_mode === "noise_static_v1" &&
         message.message_type === "session.start.result",
     );
+    expect(startResultEnvelope.sender_pubkey).toBe(
+      identity.x25519PublicKeyBase64Url,
+    );
     const startResultPlaintext = appCipher.decrypt(
       Buffer.from(String(startResultEnvelope.ciphertext), "base64url"),
       createSessionNonce(sessionId, Number(startResultEnvelope.seq)),
@@ -995,6 +1576,9 @@ describe("daemon skeleton", () => {
     const encryptedEnvelope = await encryptedResponsePromise;
     expect(encryptedEnvelope.message_type).toBe("session.event");
     expect(encryptedEnvelope.cipher_mode).toBe("noise_static_v1");
+    expect(encryptedEnvelope.sender_pubkey).toBe(
+      identity.x25519PublicKeyBase64Url,
+    );
 
     const plaintext = appCipher.decrypt(
       Buffer.from(String(encryptedEnvelope.ciphertext), "base64url"),
@@ -1267,19 +1851,25 @@ describe("daemon skeleton", () => {
       }),
     );
 
-    const ratchetMessage = (await messages.next("key.ratchet")) as {
+    const ratchetEnvelope = await nextRawEnvelope(
+      socket,
+      (message) =>
+        message.cipher_mode === "noise_static_v1" &&
+        message.message_type === "key.ratchet",
+    );
+    const ratchetPlaintext = activeAppCipher.decrypt(
+      Buffer.from(String(ratchetEnvelope.ciphertext), "base64url"),
+      createSessionNonce(sessionId, Number(ratchetEnvelope.seq)),
+    );
+    const ratchetMessage = JSON.parse(ratchetPlaintext.toString("utf8")) as {
       type: string;
-      session_id?: string;
-      next_pubkey?: string;
-      payload?: {
-        session_id?: string;
-        next_pubkey?: string;
+      payload: {
+        session_id: string;
+        next_pubkey: string;
       };
     };
-    const ratchetSessionId =
-      ratchetMessage.payload?.session_id ?? ratchetMessage.session_id;
-    const ratchetNextPubkey =
-      ratchetMessage.payload?.next_pubkey ?? ratchetMessage.next_pubkey;
+    const ratchetSessionId = ratchetMessage.payload.session_id;
+    const ratchetNextPubkey = ratchetMessage.payload.next_pubkey;
     expect(ratchetMessage.type).toBe("key.ratchet");
     expect(ratchetSessionId).toBe(sessionId);
     expect(ratchetNextPubkey).toBeTypeOf("string");
@@ -1295,11 +1885,30 @@ describe("daemon skeleton", () => {
 
     socket.send(
       JSON.stringify({
-        id: "ratchet-ack-1",
-        type: "key.ratchet_ack",
-        payload: {
-          session_id: sessionId,
-        },
+        from: "app-device-1",
+        to: "",
+        session_id: sessionId,
+        seq: 35,
+        ts: Date.now(),
+        sig: "signature",
+        ciphertext: activeAppCipher
+          .encrypt(
+            Buffer.from(
+              JSON.stringify({
+                id: "ratchet-ack-1",
+                type: "key.ratchet_ack",
+                payload: {
+                  session_id: sessionId,
+                },
+              }),
+              "utf8",
+            ),
+            createSessionNonce(sessionId, 35),
+          )
+          .toString("base64url"),
+        message_type: "key.ratchet_ack",
+        cipher_mode: "noise_static_v1",
+        sender_pubkey: appPublicJwk.x,
       }),
     );
 
@@ -1331,7 +1940,7 @@ describe("daemon skeleton", () => {
         from: "app-device-1",
         to: "",
         session_id: sessionId,
-        seq: 35,
+        seq: 36,
         ts: Date.now(),
         sig: "signature",
         ciphertext: encrypt(
@@ -1343,7 +1952,7 @@ describe("daemon skeleton", () => {
               text: "after ratchet",
             },
           },
-          35,
+          36,
         ),
         message_type: "session.input",
         cipher_mode: "noise_static_v1",
@@ -1549,20 +2158,7 @@ describe("daemon skeleton", () => {
         message.message_type === "session.event",
     );
 
-    socket.send(
-      JSON.stringify({
-        id: "app-ratchet-1",
-        type: "key.ratchet",
-        payload: {
-          session_id: sessionId,
-          next_pubkey: nextAppPublicJwk.x,
-        },
-      }),
-    );
-
-    const ratchetAck = await messages.next("key.ratchet_ack");
-    expect(ratchetAck.payload.session_id).toBe(sessionId);
-
+    const previousAppCipher = activeAppCipher;
     activeAppCipher = new SessionCipher(
       deriveSessionKeys({
         role: "initiator",
@@ -1576,6 +2172,43 @@ describe("daemon skeleton", () => {
       JSON.stringify(
         encrypt(
           {
+            id: "app-ratchet-1",
+            type: "key.ratchet",
+            payload: {
+              session_id: sessionId,
+              next_pubkey: nextAppPublicJwk.x,
+            },
+          },
+          53,
+          previousAppCipher,
+          nextAppPublicJwk.x,
+        ),
+      ),
+    );
+
+    const ratchetAckEnvelope = await nextRawEnvelope(
+      socket,
+      (message) =>
+        message.cipher_mode === "noise_static_v1" &&
+        message.message_type === "key.ratchet_ack",
+    );
+    const ratchetAckPlaintext = activeAppCipher.decrypt(
+      Buffer.from(String(ratchetAckEnvelope.ciphertext), "base64url"),
+      createSessionNonce(sessionId, Number(ratchetAckEnvelope.seq)),
+    );
+    const ratchetAck = JSON.parse(ratchetAckPlaintext.toString("utf8")) as {
+      type: string;
+      payload: {
+        session_id: string;
+      };
+    };
+    expect(ratchetAck.type).toBe("key.ratchet_ack");
+    expect(ratchetAck.payload.session_id).toBe(sessionId);
+
+    socket.send(
+      JSON.stringify(
+        encrypt(
+          {
             id: "input-app-ratchet-2",
             type: "session.input",
             payload: {
@@ -1583,7 +2216,7 @@ describe("daemon skeleton", () => {
               text: "after app ratchet",
             },
           },
-          53,
+          54,
           activeAppCipher,
           nextAppPublicJwk.x,
         ),
@@ -1662,7 +2295,7 @@ describe("daemon skeleton", () => {
     await messages.next("daemon.hello");
 
     socket.send(
-      JSON.stringify({
+      encodePlainEnvelopeMessage({
         id: "start-image-1",
         type: "session.start",
         payload: {
@@ -1678,7 +2311,7 @@ describe("daemon skeleton", () => {
     expect(startResult.payload.status).toBe("started");
 
     socket.send(
-      JSON.stringify({
+      encodePlainEnvelopeMessage({
         id: "image-1-0",
         type: "session.input.image",
         payload: {
@@ -1690,21 +2323,25 @@ describe("daemon skeleton", () => {
           data: toBase64Url(Buffer.from("hello ")),
         },
       }),
+      { seq: 2 },
     );
 
     socket.send(
-      JSON.stringify({
-        id: "image-1-1",
-        type: "session.input.image",
-        payload: {
-          session_id: "session-image-1",
-          image_id: "img-1",
-          chunk_index: 1,
-          total_chunks: 2,
-          mime_type: "image/jpeg",
-          data: toBase64Url(Buffer.from("world")),
+      encodePlainEnvelopeMessage(
+        {
+          id: "image-1-1",
+          type: "session.input.image",
+          payload: {
+            session_id: "session-image-1",
+            image_id: "img-1",
+            chunk_index: 1,
+            total_chunks: 2,
+            mime_type: "image/jpeg",
+            data: toBase64Url(Buffer.from("world")),
+          },
         },
-      }),
+        { seq: 3 },
+      ),
     );
 
     const imageEvent = await messages.next("session.event");
@@ -1713,6 +2350,203 @@ describe("daemon skeleton", () => {
     expect(imageEvent.payload.event.text).toContain("image:");
     expect(imageEvent.payload.event.text).toContain("img-1.jpg");
     expect(imageEvent.payload.event.text).toContain("(image/jpeg)");
+
+    await connection.close();
+    await new Promise<void>((resolve) => {
+      server.close(() => resolve());
+    });
+  });
+
+  it("returns structured error when runtime does not support image input", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "hellobug-keys-"));
+    const file = join(dir, "device.key");
+    const identity = await new DeviceKeyStore(file).loadOrCreate();
+    const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
+    await new Promise<void>((resolve) => {
+      server.once("listening", () => resolve());
+    });
+    const address = server.address() as AddressInfo;
+    const serverUrl = `ws://127.0.0.1:${address.port}`;
+
+    const connectionPromise = new Promise<{
+      socket: import("ws").WebSocket;
+      messages: ReturnType<typeof createMessageReader>;
+    }>((resolve) => {
+      server.once("connection", (socket) => {
+        resolve({
+          socket,
+          messages: createMessageReader(socket),
+        });
+      });
+    });
+
+    const connection = new DaemonConnection({
+      serverUrl,
+      identity,
+      certificates: {
+        deviceId: "daemon-1",
+        certPem: "cert",
+        caCertPem: "ca",
+      },
+      handlers: {
+        onMessage: createDaemonMessageRouter({
+          identity,
+          sessions: new DaemonSessionManager({
+            sendMessage: (message) => {
+              connection.sendMessage(message);
+            },
+            allowedPaths: ["/tmp/workspace"],
+            runtimeFactory: ({ events }): SessionRuntime => ({
+              async start() {},
+              async input() {},
+              async inputImage() {
+                throw new Error("Shell runtime does not support image input");
+              },
+              async inputVoiceText() {},
+              async inputSlashCommand() {},
+              async inputPty() {},
+              async resizePty() {},
+              async cancel() {
+                await events.onSessionEvent?.({
+                  event_type: "session.done",
+                  exit_code: 130,
+                  duration_ms: 0,
+                });
+              },
+            }),
+          }),
+        }),
+      },
+    });
+
+    await connection.connect();
+    const { socket, messages } = await connectionPromise;
+
+    await messages.next("daemon.hello");
+
+    const appNoiseIdentity = generateKeyPairSync("x25519");
+    const appPublicKey = exportOkpPublicKeyBase64Url(appNoiseIdentity.publicKey);
+    const sessionId = "session-image-unsupported-1";
+    const appCipher = new SessionCipher(
+      deriveSessionKeys({
+        role: "initiator",
+        localPrivateKey: appNoiseIdentity.privateKey,
+        localPublicKeyBase64Url: appPublicKey,
+        remotePublicKeyBase64Url: identity.x25519PublicKeyBase64Url,
+      }),
+    );
+    const encrypt = (message: Record<string, unknown>, seq: number) =>
+      appCipher
+        .encrypt(
+          Buffer.from(JSON.stringify(message), "utf8"),
+          createSessionNonce(sessionId, seq),
+        )
+        .toString("base64url");
+
+    socket.send(
+      JSON.stringify({
+        from: "app-device-1",
+        to: "",
+        session_id: sessionId,
+        seq: 1,
+        ts: Date.now(),
+        sig: "signature",
+        ciphertext: encrypt(
+          {
+            id: "start-image-unsupported-1",
+            type: "session.start",
+            payload: {
+              session_id: sessionId,
+              agent_type: "shell",
+              workspace_path: "/tmp/workspace",
+              resume_session_id: null,
+            },
+          },
+          1,
+        ),
+        message_type: "session.start",
+        cipher_mode: "noise_static_v1",
+        sender_pubkey: appPublicKey,
+      }),
+    );
+
+    const startResultEnvelope = await nextRawEnvelope(
+      socket,
+      (message) =>
+        message.message_type === "session.start.result" &&
+        message.session_id === sessionId,
+    );
+    expect(startResultEnvelope.cipher_mode).toBe("noise_static_v1");
+
+    const startResult = await messages.next("session.start.result");
+    expect(startResult.payload.status).toBe("started");
+
+    socket.send(
+      JSON.stringify({
+        from: "app-device-1",
+        to: "",
+        session_id: sessionId,
+        seq: 2,
+        ts: Date.now(),
+        sig: "signature",
+        ciphertext: encrypt(
+          {
+            id: "image-unsupported-1",
+            type: "session.input.image",
+            payload: {
+              session_id: sessionId,
+              image_id: "img-unsupported-1",
+              chunk_index: 0,
+              total_chunks: 1,
+              mime_type: "image/jpeg",
+              data: toBase64Url(Buffer.from("hello-image")),
+            },
+          },
+          2,
+        ),
+        message_type: "session.input.image",
+        cipher_mode: "noise_static_v1",
+        sender_pubkey: appPublicKey,
+      }),
+    );
+
+    const pushTriggerPromise = nextRawEnvelope(
+      socket,
+      (message) =>
+        message.message_type === "push.trigger" &&
+        message.session_id === sessionId &&
+        typeof message.routing_payload === "string",
+    );
+
+    const errorEnvelope = await nextRawEnvelope(
+      socket,
+      (message) =>
+        message.message_type === "error" && message.session_id === sessionId,
+    );
+    expect(errorEnvelope.cipher_mode).toBe("noise_static_v1");
+    expect(typeof errorEnvelope.routing_payload).toBe("string");
+
+    const errorMessage = await messages.next("error");
+    expect(errorMessage.payload.request_id).toBe("image-unsupported-1");
+    expect(errorMessage.payload.session_id).toBe(sessionId);
+    expect(errorMessage.payload.code).toBe("PROTOCOL_VERSION");
+    expect(errorMessage.payload.message).toContain(
+      "Shell runtime does not support image input",
+    );
+
+    const pushTriggerEnvelope = await pushTriggerPromise;
+    expect(pushTriggerEnvelope.cipher_mode).toBe("noise_static_v1");
+    expect(
+      JSON.parse(
+        Buffer.from(
+          String(pushTriggerEnvelope.routing_payload),
+          "base64url",
+        ).toString("utf8"),
+      ),
+    ).toEqual({
+      session_id: sessionId,
+      event_type: "session_error",
+    });
 
     await connection.close();
     await new Promise<void>((resolve) => {
@@ -1769,20 +2603,173 @@ describe("daemon skeleton", () => {
 
     await messages.next("daemon.hello");
 
-    socket.send(
-      JSON.stringify({
-        id: "input-missing-1",
-        type: "session.input",
-        payload: {
-          session_id: "missing-session",
-          text: "hello daemon",
-        },
+    const appNoiseIdentity = generateKeyPairSync("x25519");
+    const appPublicJwk = appNoiseIdentity.publicKey.export({
+      format: "jwk",
+    }) as JsonWebKey;
+    const appPublicKey = String(appPublicJwk.x);
+    const sessionId = "missing-session";
+    const appCipher = new SessionCipher(
+      deriveSessionKeys({
+        role: "initiator",
+        localPrivateKey: appNoiseIdentity.privateKey,
+        localPublicKeyBase64Url: appPublicKey,
+        remotePublicKeyBase64Url: identity.x25519PublicKeyBase64Url,
       }),
     );
 
+    socket.send(
+      JSON.stringify({
+        from: "app-device-1",
+        to: "",
+        session_id: sessionId,
+        seq: 2,
+        ts: Date.now(),
+        sig: "signature",
+        ciphertext: appCipher
+          .encrypt(
+            Buffer.from(
+              JSON.stringify({
+                id: "input-missing-1",
+                type: "session.input",
+                payload: {
+                  session_id: sessionId,
+                  text: "hello daemon",
+                },
+              }),
+              "utf8",
+            ),
+            createSessionNonce(sessionId, 2),
+          )
+          .toString("base64url"),
+        message_type: "session.input",
+        cipher_mode: "noise_static_v1",
+        sender_pubkey: appPublicKey,
+      }),
+    );
+
+    const errorEnvelope = await nextRawEnvelope(
+      socket,
+      (message) => message.message_type === "error",
+    );
+    expect(errorEnvelope.cipher_mode).toBe("noise_static_v1");
+    expect(errorEnvelope.session_id).toBe(sessionId);
+    expect(typeof errorEnvelope.routing_payload).toBe("string");
+
     const errorMessage = await messages.next("error");
     expect(errorMessage.payload.request_id).toBe("input-missing-1");
+    expect(errorMessage.payload.session_id).toBe(sessionId);
     expect(errorMessage.payload.code).toBe("SESSION_NOT_FOUND");
+
+    await connection.close();
+    await new Promise<void>((resolve) => {
+      server.close(() => resolve());
+    });
+  });
+
+  it("returns structured error when an encrypted inbound payload is schema-invalid", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "hellobug-keys-"));
+    const file = join(dir, "device.key");
+    const identity = await new DeviceKeyStore(file).loadOrCreate();
+    const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
+    await new Promise<void>((resolve) => {
+      server.once("listening", () => resolve());
+    });
+    const address = server.address() as AddressInfo;
+    const serverUrl = `ws://127.0.0.1:${address.port}`;
+
+    const connectionPromise = new Promise<{
+      socket: import("ws").WebSocket;
+      messages: ReturnType<typeof createMessageReader>;
+    }>((resolve) => {
+      server.once("connection", (socket) => {
+        resolve({
+          socket,
+          messages: createMessageReader(socket),
+        });
+      });
+    });
+
+    const connection = new DaemonConnection({
+      serverUrl,
+      identity,
+      certificates: {
+        deviceId: "daemon-1",
+        certPem: "cert",
+        caCertPem: "ca",
+      },
+      handlers: {
+        onMessage: createDaemonMessageRouter({
+          identity,
+          sessions: new DaemonSessionManager({
+            sendMessage: (message) => {
+              connection.sendMessage(message);
+            },
+            allowedPaths: ["/tmp/workspace"],
+          }),
+        }),
+      },
+    });
+
+    await connection.connect();
+    const { socket, messages } = await connectionPromise;
+    await messages.next("daemon.hello");
+
+    const appNoiseIdentity = generateKeyPairSync("x25519");
+    const appPublicKey = exportOkpPublicKeyBase64Url(appNoiseIdentity.publicKey);
+    const sessionId = TransportControlSessionId;
+    const appCipher = new SessionCipher(
+      deriveSessionKeys({
+        role: "initiator",
+        localPrivateKey: appNoiseIdentity.privateKey,
+        localPublicKeyBase64Url: appPublicKey,
+        remotePublicKeyBase64Url: identity.x25519PublicKeyBase64Url,
+      }),
+    );
+
+    socket.send(
+      JSON.stringify({
+        from: "app-device-1",
+        to: "",
+        session_id: sessionId,
+        seq: 7,
+        ts: Date.now(),
+        sig: "signature",
+        ciphertext: appCipher
+          .encrypt(
+            Buffer.from(
+              JSON.stringify({
+                id: "invalid-workspace-list-1",
+                type: "workspace.resolve",
+                payload: {},
+              }),
+              "utf8",
+            ),
+            createSessionNonce(sessionId, 7),
+          )
+          .toString("base64url"),
+        message_type: "workspace.resolve",
+        cipher_mode: "noise_static_v1",
+        sender_pubkey: appPublicKey,
+        request_id: "invalid-workspace-list-1",
+      }),
+    );
+
+    const errorEnvelope = await nextRawEnvelope(
+      socket,
+      (message) =>
+        message.message_type === "error" &&
+        message.request_id === "invalid-workspace-list-1",
+    );
+    expect(errorEnvelope.cipher_mode).toBe("noise_static_v1");
+    expect(errorEnvelope.session_id).toBe(TransportControlSessionId);
+    expect(typeof errorEnvelope.routing_payload).toBe("string");
+
+    const errorMessage = await messages.next("error");
+    expect(errorMessage.payload.request_id).toBe("invalid-workspace-list-1");
+    expect(errorMessage.payload.session_id).toBeNull();
+    expect(errorMessage.payload.code).toBe("PROTOCOL_VERSION");
+    expect(errorMessage.payload.message).toContain("workspace_path");
 
     await connection.close();
     await new Promise<void>((resolve) => {
@@ -1840,7 +2827,7 @@ describe("daemon skeleton", () => {
     await messages.next("daemon.hello");
 
     socket.send(
-      JSON.stringify({
+      encodePlainEnvelopeMessage({
         id: "start-forbidden-1",
         type: "session.start",
         payload: {
