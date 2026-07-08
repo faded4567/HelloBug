@@ -1,0 +1,19 @@
+{
+  "name": "@hellobug/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@fastify/websocket": "^11.2.0",
+    "@hellobug/protocol": "file:../protocol",
+    "fastify": "^5.4.0",
+    "jose": "^6.0.12",
+    "node-forge": "^1.3.1",
+    "ws": "^8.18.3",
+    "zod": "^3.25.76"
+  }
+}

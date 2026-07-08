@@ -1,0 +1,11 @@
+{
+  "name": "hellobug-deploy",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node packages/server/dist/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
