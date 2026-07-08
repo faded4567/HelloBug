@@ -18,6 +18,7 @@ import { CertificateStore, registerDaemon } from "./transport/register.js";
 export async function bootstrapDaemon(): Promise<{
   connection: DaemonConnection;
   pairingSlotManager: PairingSlotManager;
+  sessionManager: DaemonSessionManager;
   announcePairingSlot: () => void;
 }> {
   const config = await loadDaemonConfig();
@@ -88,14 +89,20 @@ export async function bootstrapDaemon(): Promise<{
         history: transcriptService,
         catalog: catalogService,
         pairingTransportKeys,
-        onPairingConfirmed: announcePairingSlot,
+        onPairingConfirmed: markPaired,
       }),
     },
   });
+  let paired = false;
+  function markPaired(): void {
+    paired = true;
+    console.log("[pairing] device paired, stopping code refresh");
+  }
   function announcePairingSlot(): void {
+    if (paired) return;
     pairingSlotManager.pruneExpired();
     const slot = pairingSlotManager.issuePairingSlot(
-      config.pairing_ttl_ms ?? 30_000,
+      config.pairing_ttl_ms ?? 300_000,
     );
     connection.announcePairingSlot(slot);
     logPairingSlot(config.server_url, slot);
@@ -104,13 +111,30 @@ export async function bootstrapDaemon(): Promise<{
     connection.sendMessage(message);
   };
 
-  return { connection, pairingSlotManager, announcePairingSlot };
+  return { connection, pairingSlotManager, sessionManager, announcePairingSlot };
 }
 
 async function main(): Promise<void> {
-  const { connection, announcePairingSlot } = await bootstrapDaemon();
+  const { connection, sessionManager, announcePairingSlot } = await bootstrapDaemon();
+
+  // Clean up on daemon exit
+  const cleanup = async () => {
+    console.log("[daemon] shutting down, cancelling all sessions...");
+    await sessionManager.shutdown();
+    console.log("[daemon] shutdown complete");
+  };
+  process.once("SIGINT", () => { cleanup().then(() => process.exit(0)); });
+  process.once("SIGTERM", () => { cleanup().then(() => process.exit(0)); });
+
   await connection.connect();
   announcePairingSlot();
+
+  // When relay disconnects, clean up and exit
+  connection.onDisconnect = async () => {
+    console.log("[daemon] relay disconnected, shutting down sessions...");
+    await sessionManager.shutdown();
+    process.exit(0);
+  };
   const timer = setInterval(
     announcePairingSlot,
     configRefreshInterval(await loadDaemonConfig()),
@@ -119,7 +143,7 @@ async function main(): Promise<void> {
 }
 
 function configRefreshInterval(config: Awaited<ReturnType<typeof loadDaemonConfig>>): number {
-  return config.pairing_refresh_ms ?? 25_000;
+  return config.pairing_refresh_ms ?? 1_800_000;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

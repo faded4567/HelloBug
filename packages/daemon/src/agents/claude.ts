@@ -32,6 +32,8 @@ export class ClaudeSessionRuntime implements SessionRuntime {
   private startedAt = 0;
   private doneSent = false;
   private lineQueue = Promise.resolve();
+  private inputQueue = Promise.resolve();
+  private replyResolve: (() => void) | null = null;
   private readonly toolNamesById = new Map<string, string>();
 
   constructor(
@@ -109,7 +111,14 @@ export class ClaudeSessionRuntime implements SessionRuntime {
   }
 
   async input(text: string): Promise<void> {
+    // Wait for previous input to get a reply before sending the next one
+    await this.inputQueue;
+    let resolveInput: () => void;
+    this.inputQueue = new Promise<void>((r) => { resolveInput = r; });
     await this.writeUserMessage(text);
+    // Store the resolve so handleOutputLine can unblock the next input
+    // when the first assistant event arrives
+    this.replyResolve = resolveInput!;
   }
 
   async inputImage(filePath: string, mimeType: string): Promise<void> {
@@ -143,6 +152,8 @@ export class ClaudeSessionRuntime implements SessionRuntime {
     }
 
     this.child.kill("SIGINT");
+    this.replyResolve?.();
+    this.replyResolve = null;
   }
 
   private async writeUserMessage(text: string): Promise<void> {
@@ -174,8 +185,6 @@ export class ClaudeSessionRuntime implements SessionRuntime {
   private buildArgs(options: SessionRuntimeStartOptions): string[] {
     const args = [
       ...(this.options.extraArgs ?? []),
-      "-p",
-      "",
       "--verbose",
       "--input-format",
       "stream-json",
@@ -231,6 +240,28 @@ export class ClaudeSessionRuntime implements SessionRuntime {
   }
 
   private async emitEvent(event: SessionEventBody): Promise<void> {
+    // Log content to console
+    if (event.event_type === "assistant.delta") {
+      process.stdout.write((event as { text: string }).text);
+    } else if (event.event_type === "tool.use") {
+      const e = event as { tool_name: string };
+      console.log(`\n[agent] 🔧 tool.use: ${e.tool_name}`);
+    } else if (event.event_type === "tool.result") {
+      const e = event as { tool_name: string; content: string };
+      const preview = (e.content ?? "").slice(0, 120);
+      console.log(`[agent] 📋 tool.result: ${e.tool_name} → ${preview}${preview.length >= 120 ? "..." : ""}`);
+    } else if (event.event_type === "session.usage") {
+      const e = event as { input_tokens: number; output_tokens: number };
+      console.log(`\n[agent] 📊 tokens: ${e.input_tokens}→${e.output_tokens}`);
+    }
+
+    // Unblock next input only after claude finishes processing the current turn
+    if (this.replyResolve) {
+      if (event.event_type === "session.usage" || event.event_type === "session.done") {
+        this.replyResolve();
+        this.replyResolve = null;
+      }
+    }
     await this.events.onSessionEvent?.(event);
   }
 

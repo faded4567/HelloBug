@@ -24,7 +24,7 @@ export interface PairingSlot {
 export class PairingSlotManager {
   private readonly slots = new Map<string, PairingSlot>();
 
-  issuePairingSlot(ttlMs = 30_000): PairingSlot {
+  issuePairingSlot(ttlMs = 300_000): PairingSlot {
     const slot: PairingSlot = {
       pairing_id: randomBytes(32).toString("hex"),
       pairing_code: randomInt(0, 1_000_000).toString().padStart(6, "0"),

@@ -124,6 +124,8 @@ export interface DaemonConnectionOptions {
 }
 
 export class DaemonConnection {
+  onDisconnect?: () => void | Promise<void>;
+
   private socket: WebSocket | null = null;
   private sequence = Math.floor(Math.random() * 1_000_000_000);
   private readonly sessionCrypto = new Map<string, SessionCryptoState>();
@@ -179,6 +181,7 @@ export class DaemonConnection {
         console.log(
           `[daemon] relay closed code=${code} reason=${reason.toString()}`,
         );
+        void this.onDisconnect?.();
       });
 
       socket.once("error", (error: Error) => {

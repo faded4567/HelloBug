@@ -1,4 +1,7 @@
 import { createHash } from "node:crypto";
+import { readdir, stat } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import type {
   AgentType,
   ErrorCode,
@@ -84,6 +87,7 @@ export class DaemonSessionManager {
   private readonly imageUploadStore: SessionImageUploadStore;
   private readonly auditLogger?: AuditLogger;
   private readonly dangerInterceptor?: DangerApprovalInterceptor;
+  private readonly claudeSessionIds = new Map<string, string>();
 
   constructor(private readonly options: DaemonSessionManagerOptions) {
     this.eventEmitter = new SessionEventEmitter({
@@ -166,10 +170,15 @@ export class DaemonSessionManager {
     this.sessions.set(sessionId, handle);
 
     try {
+      // Resolve resume: if resume_session_id is a HelloBug session ID,
+      // look up the claude session ID for it
+      const resumeClaudeId = message.payload.resume_session_id
+        ? (this.claudeSessionIds.get(message.payload.resume_session_id) ?? message.payload.resume_session_id)
+        : null;
       await runtime.start({
         sessionId,
         workspacePath,
-        resumeSessionId: message.payload.resume_session_id,
+        resumeSessionId: resumeClaudeId,
         agentType: message.payload.agent_type,
       });
     } catch (error) {
@@ -204,8 +213,11 @@ export class DaemonSessionManager {
 
   async handleInput(message: SessionInputMessage): Promise<void> {
     const handle = this.getRequiredSession(message.payload.session_id);
+    const textPreview = message.payload.text.length > 80
+        ? `${message.payload.text.slice(0, 80)}...`
+        : message.payload.text;
     console.log(
-      `[daemon-session] input session=${handle.sessionId} length=${message.payload.text.length}`,
+      `\n[daemon-session] ✉️  input session=${handle.sessionId} text="${textPreview}"`,
     );
     await this.auditLogger?.appendAuditEntry({
       session_id: handle.sessionId,
@@ -442,6 +454,11 @@ export class DaemonSessionManager {
 
     await this.auditRuntimeEvent(handle, event);
 
+    if (event.event_type === "session.usage" && !this.claudeSessionIds.has(handle.sessionId)) {
+      // First response complete — try to discover claude session ID from transcript dir
+      this.discoverClaudeSessionId(handle);
+    }
+
     if (event.event_type === "session.done") {
       await this.dangerInterceptor?.clearSession(handle.sessionId);
       await this.imageUploadStore.cleanupSession(handle.sessionId);
@@ -532,6 +549,43 @@ export class DaemonSessionManager {
   private nextSeq(handle: InternalSessionHandle): number {
     handle.seq += 1;
     return handle.seq;
+  }
+
+  async shutdown(): Promise<void> {
+    const handles = [...this.sessions.values()];
+    this.sessions.clear();
+    await Promise.allSettled(
+      handles.map(async (h) => {
+        try { await h.runtime.cancel(); } catch {}
+      }),
+    );
+  }
+
+  getClaudeSessionId(helloBugSessionId: string): string | undefined {
+    return this.claudeSessionIds.get(helloBugSessionId);
+  }
+
+  private async discoverClaudeSessionId(handle: InternalSessionHandle): Promise<void> {
+    try {
+      const slug = handle.workspacePath.replace(/[\\/]/g, "-");
+      const dir = join(homedir(), ".claude", "projects", slug);
+      const entries = await readdir(dir, { withFileTypes: true });
+      let newest: { name: string; mtime: number } | null = null;
+      for (const entry of entries) {
+        if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue;
+        const fileStat = await stat(join(dir, entry.name));
+        if (!newest || fileStat.mtimeMs > newest.mtime) {
+          newest = { name: entry.name, mtime: fileStat.mtimeMs };
+        }
+      }
+      if (newest) {
+        const claudeId = newest.name.slice(0, -6); // remove ".jsonl"
+        this.claudeSessionIds.set(handle.sessionId, claudeId);
+        console.log(`[daemon-session] claude session mapped: ${handle.sessionId} → ${claudeId}`);
+      }
+    } catch {
+      // Best effort
+    }
   }
 
   private emitDangerResult(
