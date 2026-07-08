@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/inner_message.dart';
 import '../models/session_summary.dart';
+import '../crypto/secure_store.dart';
 import '../transport/ws_client.dart';
 import '../transport/ws_provider.dart';
 import 'workspace_history_provider.dart';
@@ -13,6 +15,8 @@ final sessionsProvider =
     );
 
 class SessionsNotifier extends Notifier<List<SessionSummary>> {
+  static const _storeKey = 'hellobug_sessions';
+
   StreamSubscription<InnerMessage>? _subscription;
   WsClient? _client;
   List<SessionSummary> _sessions = const [];
@@ -31,6 +35,7 @@ class SessionsNotifier extends Notifier<List<SessionSummary>> {
       _subscription = _client!.messages.listen(_handle);
     }
     ref.onDispose(() => _subscription?.cancel());
+    unawaited(_restore());
     return _sessions;
   }
 
@@ -57,7 +62,9 @@ class SessionsNotifier extends Notifier<List<SessionSummary>> {
     for (final session in _sessions) {
       _client?.untrackSession(session.sessionId);
     }
-    _setSessions(const []);
+    _sessions = const [];
+    state = const [];
+    SecureStore.delete(_storeKey);
   }
 
   void markDeviceOffline(String deviceId) {
@@ -160,6 +167,36 @@ class SessionsNotifier extends Notifier<List<SessionSummary>> {
   void _setSessions(List<SessionSummary> next) {
     _sessions = next;
     state = next;
+    unawaited(_persist());
+  }
+
+  Future<void> _restore() async {
+    if (_sessions.isNotEmpty) return;
+    try {
+      final raw = await SecureStore.read(_storeKey);
+      if (raw == null) return;
+      final list = (jsonDecode(raw) as List)
+          .map((e) => SessionSummary.fromJson(e as Map<String, dynamic>))
+          .map((s) =>
+              s.status == SessionStatus.running ||
+                      s.status == SessionStatus.replaying
+                  ? s.copyWith(status: SessionStatus.done)
+                  : s)
+          .toList();
+      _sessions = list;
+      state = list;
+    } catch (_) {
+      // Ignore corrupt persisted data
+    }
+  }
+
+  Future<void> _persist() async {
+    try {
+      final json = jsonEncode(_sessions.map((s) => s.toJson()).toList());
+      await SecureStore.write(_storeKey, json);
+    } catch (_) {
+      // Best-effort persistence
+    }
   }
 
   String? _previewForEvent(

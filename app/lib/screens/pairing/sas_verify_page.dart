@@ -47,7 +47,7 @@ class SasVerifyPage extends ConsumerWidget {
         return;
       }
 
-      context.go('/devices');
+      context.go('/sessions');
       unawaited(ref.read(pairingControllerProvider.notifier).reset());
     }
 

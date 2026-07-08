@@ -1,16 +1,31 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import '../../theme/index.dart';
 
 class MessageBubble extends StatelessWidget {
-  const MessageBubble({super.key, required this.text, required this.isUser, this.isStreaming = false});
+  const MessageBubble({super.key, required this.text, required this.isUser, this.isStreaming = false, this.createdAt});
   final String text;
   final bool isUser;
   final bool isStreaming;
+  final DateTime? createdAt;
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return Align(
+    return GestureDetector(
+      onLongPress: () {
+        Clipboard.setData(ClipboardData(text: text));
+        showCupertinoModalPopup<void>(
+          context: context,
+          builder: (_) => CupertinoActionSheet(
+            message: Text(text.length > 80 ? '${text.substring(0, 80)}...' : text, style: TextStyle(fontSize: 12, color: CupertinoColors.secondaryLabel.resolveFrom(context))),
+            actions: [
+              CupertinoActionSheetAction(onPressed: () => Navigator.pop(context), child: const Text('已复制到剪贴板')),
+            ],
+          ),
+        );
+      },
+      child: Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         margin: EdgeInsets.only(
@@ -28,23 +43,25 @@ class MessageBubble extends StatelessWidget {
             bottomRight: isUser ? AppRadius.sm : AppRadius.lg,
           ),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Flexible(child: Text(
+            Text(
               text.isEmpty ? ' ' : text,
               style: TextStyle(fontSize: 15, color: isUser ? const Color(0xFFFFFFFF) : c.fg, height: 1.45),
-            )),
-            if (isStreaming) ...[
-              const SizedBox(width: 4),
-              Container(
-                width: 6, height: 14,
-                color: c.tint,
+            ),
+            if (createdAt != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                '${createdAt!.hour.toString().padLeft(2, '0')}:${createdAt!.minute.toString().padLeft(2, '0')}',
+                style: TextStyle(fontSize: 10, color: isUser ? const Color(0x88FFFFFF) : c.fg3),
               ),
             ],
+            if (isStreaming) Container(width: 6, height: 14, color: c.tint, margin: const EdgeInsets.only(top: 4)),
           ],
         ),
+      ),
       ),
     );
   }

@@ -101,9 +101,24 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         child:
             ctrl == null
                 ? Center(
-                  child: Text(
-                    '终端未连接',
-                    style: TextStyle(fontSize: 15, color: c.fg2),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('🖥', style: TextStyle(fontSize: 48, color: c.fg3.withValues(alpha: .25))),
+                      const SizedBox(height: 12),
+                      Text('终端未连接', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: c.fg)),
+                      const SizedBox(height: 6),
+                      Text(
+                        _connState == WsConnectionState.offline
+                            ? '中继连接已断开，正在重连…'
+                            : '无法建立终端会话',
+                        style: TextStyle(fontSize: 13, color: c.fg3),
+                      ),
+                      if (_connState == WsConnectionState.offline) ...[
+                        const SizedBox(height: 16),
+                        const CupertinoActivityIndicator(),
+                      ],
+                    ],
                   ),
                 )
                 : Column(

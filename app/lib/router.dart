@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -10,7 +12,13 @@ import 'screens/pairing/sas_verify_page.dart';
 import 'screens/unlock/unlock_page.dart';
 import 'screens/root_tab_scaffold.dart';
 import 'screens/devices/devices_page.dart';
-import 'screens/sessions/sessions_page.dart';
+import 'screens/workspace_home_page.dart';
+import 'screens/workspace_permission_page.dart';
+import 'screens/workspace_path_invalid_page.dart';
+import 'screens/workspace_empty_page.dart';
+import 'screens/workspace_new_page.dart';
+import 'screens/workspace_settings_page.dart';
+import 'screens/push_landing_page.dart';
 import 'screens/settings/settings_home_page.dart';
 import 'screens/diff_spike/diff_spike_page.dart';
 import 'screens/diff/diff_page.dart';
@@ -27,6 +35,11 @@ import 'screens/settings/relay_settings_page.dart';
 import 'screens/devices/device_detail_page.dart';
 import 'models/device_summary.dart';
 import 'screens/history/history_page.dart';
+import 'screens/auth_invalid_page.dart';
+import 'screens/startup_loading_page.dart';
+import 'screens/device_revoked_page.dart';
+import 'screens/pairing/pairing_expired_page.dart';
+import 'screens/pairing/pairing_failed_page.dart';
 import 'screens/terminal/terminal_page.dart';
 import 'transport/ws_provider.dart';
 
@@ -53,9 +66,81 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: 'manual', builder: (_, __) => const ManualPairPage()),
           GoRoute(path: 'qr', builder: (_, __) => const QrScanPage()),
           GoRoute(path: 'sas', builder: (_, __) => const SasVerifyPage()),
+          GoRoute(
+            path: 'expired',
+            builder: (_, state) {
+              final extra = state.extra;
+              if (extra is Map<String, String>) {
+                return PairingExpiredPage(
+                  expiredCode: extra['expiredCode'],
+                  renewCommand: extra['renewCommand'] ?? 'hellobug pair --renew',
+                );
+              }
+              return const PairingExpiredPage();
+            },
+          ),
+          GoRoute(
+            path: 'failed',
+            builder: (_, state) {
+              final extra = state.extra;
+              if (extra is Map<String, String>) {
+                return PairingFailedPage(
+                  errorMessage: extra['errorMessage'] ?? '配对失败',
+                  errorCode: extra['errorCode'],
+                  serverUrl: extra['serverUrl'],
+                );
+              }
+              return const PairingFailedPage(errorMessage: '配对失败');
+            },
+          ),
         ],
       ),
       GoRoute(path: '/unlock', builder: (_, __) => const UnlockPage()),
+      GoRoute(
+        path: '/startup-loading',
+        builder: (_, state) {
+          final extra = state.extra;
+          if (extra is Map<String, dynamic>) {
+            return StartupLoadingPage(
+              relayUrl: extra['relayUrl'] as String?,
+              pairedDeviceName: extra['pairedDeviceName'] as String?,
+              lastActiveText: extra['lastActiveText'] as String?,
+              error: extra['error'] as String?,
+              onRetry: extra['onRetry'] as VoidCallback?,
+              onEnterOffline: extra['onEnterOffline'] as VoidCallback?,
+              onGoToOnboarding: extra['onGoToOnboarding'] as VoidCallback?,
+            );
+          }
+          return const StartupLoadingPage();
+        },
+      ),
+      GoRoute(
+        path: '/device-revoked',
+        builder: (_, state) {
+          final extra = state.extra;
+          if (extra is Map<String, String>) {
+            return DeviceRevokedPage(
+              deviceName: extra['deviceName'],
+              revokedAt: extra['revokedAt'],
+              revokedBy: extra['revokedBy'],
+            );
+          }
+          return const DeviceRevokedPage();
+        },
+      ),
+      GoRoute(
+        path: '/auth-invalid',
+        builder: (_, state) {
+          final extra = state.extra;
+          if (extra is Map<String, String>) {
+            return AuthInvalidPage(
+              deviceName: extra['deviceName'],
+              lastActiveText: extra['lastActiveText'],
+            );
+          }
+          return const AuthInvalidPage();
+        },
+      ),
       GoRoute(
         path: '/new-session',
         builder:
@@ -83,7 +168,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/sessions',
-                builder: (_, __) => const SessionsPage(),
+                builder: (_, __) => const WorkspaceHomePage(),
               ),
             ],
           ),
@@ -148,6 +233,71 @@ final routerProvider = Provider<GoRouter>((ref) {
             ),
       ),
       GoRoute(path: '/history', builder: (_, __) => const HistoryListPage()),
+      GoRoute(
+        path: '/push-landing',
+        builder: (_, state) {
+          final extra = state.extra;
+          if (extra is Map<String, dynamic>) {
+            return PushLandingPage(
+              message: extra['message'] as String?,
+              sessionId: extra['sessionId'] as String?,
+            );
+          }
+          return const PushLandingPage();
+        },
+      ),
+      GoRoute(
+        path: '/workspace/settings',
+        builder: (_, state) {
+          final extra = state.extra;
+          if (extra is Map<String, dynamic>) {
+            return WorkspaceSettingsPage(
+              workspacePath: extra['workspacePath'] as String? ?? '',
+              workspaceName: extra['workspaceName'] as String?,
+              deviceName: extra['deviceName'] as String?,
+            );
+          }
+          return const WorkspaceSettingsPage(workspacePath: '');
+        },
+      ),
+      GoRoute(
+        path: '/workspace/empty',
+        builder: (_, __) => const WorkspaceEmptyPage(),
+      ),
+      GoRoute(
+        path: '/workspace/new',
+        builder: (_, __) => const WorkspaceNewPage(),
+      ),
+      GoRoute(
+        path: '/workspace/path-invalid',
+        builder: (_, state) {
+          final extra = state.extra;
+          if (extra is Map<String, dynamic>) {
+            return WorkspacePathInvalidPage(
+              workspacePath: extra['workspacePath'] as String? ?? '',
+              repairHint: extra['repairHint'] as String?,
+            );
+          }
+          return const WorkspacePathInvalidPage(workspacePath: '');
+        },
+      ),
+      GoRoute(
+        path: '/workspace/permission',
+        builder: (_, state) {
+          final extra = state.extra;
+          if (extra is Map<String, dynamic>) {
+            return WorkspacePermissionPage(
+              workspacePath: extra['workspacePath'] as String? ?? '',
+              currentPermission: extra['currentPermission'] as String?,
+              requiredPermission: extra['requiredPermission'] as String?,
+              fixCommand: extra['fixCommand'] as String?,
+              isFullyDenied: (extra['isFullyDenied'] as bool?) ?? false,
+              repairHints: (extra['repairHints'] as List?)?.cast<String>(),
+            );
+          }
+          return const WorkspacePermissionPage(workspacePath: '');
+        },
+      ),
       GoRoute(
         path: '/terminal/:sessionId',
         builder:

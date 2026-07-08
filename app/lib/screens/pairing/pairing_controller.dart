@@ -25,6 +25,7 @@ class PairingState {
     this.step = PairingStep.idle,
     this.sasEmojis = const [],
     this.errorMessage,
+    this.errorCode,
     this.machineName,
     this.os,
   });
@@ -32,6 +33,7 @@ class PairingState {
   final PairingStep step;
   final List<String> sasEmojis;
   final String? errorMessage;
+  final String? errorCode;
   final String? machineName;
   final String? os;
 
@@ -42,6 +44,7 @@ class PairingState {
     PairingStep? step,
     List<String>? sasEmojis,
     Object? errorMessage = _pairingUnset,
+    Object? errorCode = _pairingUnset,
     Object? machineName = _pairingUnset,
     Object? os = _pairingUnset,
   }) {
@@ -52,6 +55,10 @@ class PairingState {
           identical(errorMessage, _pairingUnset)
               ? this.errorMessage
               : errorMessage as String?,
+      errorCode:
+          identical(errorCode, _pairingUnset)
+              ? this.errorCode
+              : errorCode as String?,
       machineName:
           identical(machineName, _pairingUnset)
               ? this.machineName
@@ -388,7 +395,8 @@ class PairingController extends StateNotifier<PairingState> {
 
     if (message.type == 'error') {
       final text = message.payload['message'] as String? ?? '配对失败';
-      unawaited(_fail(text));
+      final code = message.payload['code'] as String?;
+      unawaited(_fail(text, code: code));
     }
   }
 
@@ -405,11 +413,15 @@ class PairingController extends StateNotifier<PairingState> {
     }
   }
 
-  Future<void> _fail(String message) async {
+  Future<void> _fail(String message, {String? code}) async {
     debugPrint('[Pairing] error -> $message');
     _completePendingWithError(message);
     await _clearPending(disposeClient: true);
-    state = PairingState(step: PairingStep.error, errorMessage: message);
+    state = PairingState(
+      step: PairingStep.error,
+      errorMessage: message,
+      errorCode: code,
+    );
   }
 
   void _completePendingWithError(String message) {

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../models/workspace_summary.dart';
 import '../../state/workspace_history_provider.dart';
@@ -282,22 +283,7 @@ class _WorkspaceSwitchSheetState extends ConsumerState<WorkspaceSwitchSheet> {
         return;
       }
       if (!resolvedSummary.isReady) {
-        unawaited(
-          showCupertinoDialog<void>(
-            context: context,
-            builder:
-                (dialogContext) => CupertinoAlertDialog(
-                  title: const Text('无法切换到该工作区'),
-                  content: Text(_workspaceStatusText(resolvedSummary.status)),
-                  actions: [
-                    CupertinoDialogAction(
-                      onPressed: () => Navigator.of(dialogContext).pop(),
-                      child: const Text('知道了'),
-                    ),
-                  ],
-                ),
-          ),
-        );
+        _showResolveError(resolvedSummary);
         return;
       }
       _select(resolvedSummary.path);
@@ -321,6 +307,26 @@ class _WorkspaceSwitchSheetState extends ConsumerState<WorkspaceSwitchSheet> {
               ),
         ),
       );
+    }
+  }
+
+  void _showResolveError(WorkspaceSummary summary) {
+    Navigator.of(context).pop(); // dismiss switch sheet first
+    final extras = <String, dynamic>{
+      'workspacePath': summary.path.isNotEmpty ? summary.path : (summary.requestedPath ?? ''),
+      'repairHint': summary.repairHint,
+    };
+    switch (summary.status) {
+      case WorkspaceStatus.missing:
+        context.push('/workspace/path-invalid', extra: extras);
+      case WorkspaceStatus.forbidden:
+        extras['currentPermission'] = summary.accessMode;
+        extras['isFullyDenied'] = true;
+        context.push('/workspace/permission', extra: extras);
+      case WorkspaceStatus.notDir:
+        context.push('/workspace/path-invalid', extra: extras);
+      case WorkspaceStatus.ready:
+        break;
     }
   }
 

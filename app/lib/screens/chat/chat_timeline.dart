@@ -73,7 +73,7 @@ class _ChatTimelineState extends ConsumerState<ChatTimeline> {
       );
     }
 
-    final showTyping = items.last.kind == ChatItemKind.user;
+    final showTyping = items.isNotEmpty && items.last.kind == ChatItemKind.user;
     final count = items.length + (showTyping ? 1 : 0);
 
     return ListView.builder(
@@ -90,6 +90,7 @@ class _ChatTimelineState extends ConsumerState<ChatTimeline> {
         return _ChatItemWidget(
           item: items[i],
           isLast: i == items.length - 1,
+          showTyping: showTyping,
           sessionId: widget.sessionId,
           workspacePath: widget.workspacePath,
         );
@@ -102,11 +103,13 @@ class _ChatItemWidget extends StatelessWidget {
   const _ChatItemWidget({
     required this.item,
     required this.isLast,
+    required this.showTyping,
     required this.sessionId,
     required this.workspacePath,
   });
   final ChatItem item;
   final bool isLast;
+  final bool showTyping;
   final String sessionId;
   final String workspacePath;
 
@@ -114,11 +117,12 @@ class _ChatItemWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return switch (item.kind) {
-      ChatItemKind.user => MessageBubble(text: item.text ?? '', isUser: true),
+      ChatItemKind.user => MessageBubble(text: item.text ?? '', isUser: true, createdAt: item.createdAt),
       ChatItemKind.assistantDelta => MessageBubble(
         text: item.text ?? '',
         isUser: false,
-        isStreaming: isLast,
+        isStreaming: isLast && showTyping,
+        createdAt: item.createdAt,
       ),
       ChatItemKind.toolUse => Padding(
         padding: const EdgeInsets.only(left: 4),
@@ -147,6 +151,28 @@ class _ChatItemWidget extends StatelessWidget {
           child: Text('— 会话结束 —', style: TextStyle(fontSize: 13, color: c.fg3)),
         ),
       ),
+      ChatItemKind.usage => Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: c.bg3,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              '📊 ${_fmtTokens(item.inputTokens)} → ${_fmtTokens(item.outputTokens)} tokens',
+              style: TextStyle(fontSize: 11, color: c.fg3),
+            ),
+          ),
+        ),
+      ),
     };
   }
+}
+
+String _fmtTokens(int? n) {
+  if (n == null) return '?';
+  if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}k';
+  return n.toString();
 }

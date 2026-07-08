@@ -48,6 +48,35 @@ class _PairingEntryPageState extends ConsumerState<PairingEntryPage> {
     }
   }
 
+  void _checkExpired(PairingState state) {
+    if (state.errorMessage == null || state.step != PairingStep.error) return;
+    // Already showing an error sub-page
+    final routeName = ModalRoute.of(context)?.settings.name ?? '';
+    if (routeName.contains('/pairing/expired') || routeName.contains('/pairing/failed')) return;
+
+    final message = state.errorMessage!;
+    if (message.contains('过期') || message.contains('expired') || message.contains('超时')) {
+      final code = _digits.where((d) => d.isNotEmpty).join();
+      final displayCode = code.length == 6
+          ? '${code.substring(0, 3)}-${code.substring(3, 6)}'
+          : code;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        context.push('/pairing/expired', extra: {'expiredCode': displayCode});
+      });
+      return;
+    }
+    // All other errors → failed page
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.push('/pairing/failed', extra: {
+        'errorMessage': message,
+        'errorCode': state.errorCode ?? '',
+        'serverUrl': _serverController.text.trim(),
+      });
+    });
+  }
+
   bool _canConnect(PairingState pairing) =>
       _digits.every((d) => d.isNotEmpty) && !pairing.isBusy;
 
@@ -97,6 +126,7 @@ class _PairingEntryPageState extends ConsumerState<PairingEntryPage> {
   @override
   Widget build(BuildContext context) {
     final pairing = ref.watch(pairingControllerProvider);
+    ref.listen(pairingControllerProvider, (_, next) => _checkExpired(next));
     return CupertinoPageScaffold(
       backgroundColor: context.colors.bg,
       navigationBar: CupertinoNavigationBar(

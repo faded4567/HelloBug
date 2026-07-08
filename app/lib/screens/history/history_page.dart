@@ -61,11 +61,28 @@ class _HistoryListPageState extends ConsumerState<HistoryListPage> {
   String? _workspacePath;
   AccessFailure? _error;
   String? _pendingRequestId;
+  final _searchCtrl = TextEditingController();
+  String _query = '';
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  List<HistorySummary> get _filtered {
+    if (_query.isEmpty) return _items;
+    final q = _query.toLowerCase();
+    return _items.where((i) =>
+      i.sessionId.toLowerCase().contains(q) ||
+      i.workspacePath.toLowerCase().contains(q)
+    ).toList();
   }
 
   Future<void> _load() async {
@@ -164,31 +181,51 @@ class _HistoryListPageState extends ConsumerState<HistoryListPage> {
         middle: Text('历史记录', style: TextStyle(color: c.fg)),
       ),
       child: SafeArea(
-        child:
-            _loading
-                ? const Center(child: CupertinoActivityIndicator())
-                : _error != null
-                ? Center(
-                  child: _FailureView(
-                    failure: _error!,
-                    onPressed:
-                        _error!.retryable
-                            ? _load
-                            : () => _closeHistorySurface(context),
-                  ),
-                )
-                : _items.isEmpty
-                ? Center(
-                  child: Text(
-                    _workspacePath == null ? '暂无可用工作区' : '暂无历史记录',
-                    style: TextStyle(color: c.fg2),
-                  ),
-                )
-                : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _items.length,
-                  itemBuilder: (ctx, i) => _HistoryTile(item: _items[i]),
+        child: Column(
+          children: [
+            if (_items.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: CupertinoSearchTextField(
+                  controller: _searchCtrl,
+                  placeholder: '搜索会话 ID 或路径',
+                  onChanged: (v) => setState(() => _query = v),
+                  style: TextStyle(color: c.fg),
                 ),
+              ),
+            Expanded(
+              child:
+                  _loading
+                      ? const Center(child: CupertinoActivityIndicator())
+                      : _error != null
+                      ? Center(
+                        child: _FailureView(
+                          failure: _error!,
+                          onPressed:
+                              _error!.retryable
+                                  ? _load
+                                  : () => _closeHistorySurface(context),
+                        ),
+                      )
+                      : _items.isEmpty
+                      ? Center(
+                        child: Text(
+                          _workspacePath == null ? '暂无可用工作区' : '暂无历史记录',
+                          style: TextStyle(color: c.fg2),
+                        ),
+                      )
+                      : _filtered.isEmpty
+                      ? Center(
+                        child: Text('未找到匹配记录', style: TextStyle(color: c.fg2)),
+                      )
+                      : ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _filtered.length,
+                        itemBuilder: (ctx, i) => _HistoryTile(item: _filtered[i]),
+                      ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -630,6 +667,7 @@ class _HistoryItem extends StatelessWidget {
           ),
         ),
       ),
+      ChatItemKind.usage => const SizedBox.shrink(),
     };
   }
 }

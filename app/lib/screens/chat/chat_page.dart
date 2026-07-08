@@ -4,12 +4,13 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/session_summary.dart';
+import '../../state/chat_provider.dart';
 import '../../state/sessions_provider.dart';
+import '../new_session/new_session_flow.dart';
 import '../../theme/index.dart';
 import '../../transport/connection_state.dart';
 import '../../transport/ws_provider.dart';
 import '../../widgets/workspace_switch/workspace_switch_sheet.dart';
-import '../new_session/new_session_flow.dart';
 import 'chat_header.dart';
 import 'chat_input_bar.dart';
 import 'chat_status_banner.dart';
@@ -35,6 +36,17 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     _statesSub = client?.states.listen((s) {
       if (mounted) setState(() => _connState = s);
     });
+    // Load history for completed sessions
+    if (widget.initialSession != null &&
+        widget.initialSession!.status != SessionStatus.running) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.read(chatProvider.notifier).loadHistory(
+              widget.sessionId,
+              widget.initialSession!.workspacePath,
+            );
+      });
+    }
   }
 
   @override
@@ -44,7 +56,25 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   void _handleCancel() {
-    // navigate back without ending session — session stays in list
+    final sessions = ref.read(sessionsProvider);
+    final found = sessions.cast<SessionSummary?>().firstWhere(
+      (s) => s!.sessionId == widget.sessionId,
+      orElse: () => null,
+    );
+    if (found != null && found.status == SessionStatus.running) {
+      showCupertinoDialog<void>(
+        context: context,
+        builder: (_) => CupertinoAlertDialog(
+          title: const Text('会话仍在运行'),
+          content: const Text('确定要离开吗？会话将在后台继续运行。'),
+          actions: [
+            CupertinoDialogAction(child: const Text('留在会话'), onPressed: () => Navigator.pop(context)),
+            CupertinoDialogAction(isDestructiveAction: true, child: const Text('离开'), onPressed: () => Navigator.of(context).pop()),
+          ],
+        ),
+      );
+      return;
+    }
     Navigator.of(context).pop();
   }
 
@@ -110,6 +140,16 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         session.status == SessionStatus.running &&
         _connState == WsConnectionState.online;
 
+    final isDone = session.status == SessionStatus.done;
+
+    // Compute total tokens
+    final items = ref.watch(chatProvider.select((m) => m[widget.sessionId] ?? []));
+    int totalIn = 0, totalOut = 0;
+    for (final item in items) {
+      totalIn += item.inputTokens ?? 0;
+      totalOut += item.outputTokens ?? 0;
+    } 
+
     return CupertinoPageScaffold(
       backgroundColor: c.bg,
       child: Column(
@@ -118,6 +158,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             session: session,
             onCancel: _handleCancel,
             onWorkspaceSwitch: () => _showWorkspaceSwitch(session),
+            totalInputTokens: totalIn > 0 ? totalIn : null,
+            totalOutputTokens: totalOut > 0 ? totalOut : null,
           ),
           ChatStatusBanner(state: _connState, sessionStatus: session.status),
           Expanded(
@@ -126,6 +168,26 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               workspacePath: session.workspacePath,
             ),
           ),
+          if (isDone)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: SizedBox(
+                width: double.infinity,
+                child: CupertinoButton.filled(
+                  onPressed: () {
+                    context.push(
+                      '/new-session',
+                      extra: NewSessionFlowArgs(
+                        workspacePath: session.workspacePath,
+                        agentType: session.agentType,
+                        resumeSessionId: widget.sessionId,
+                      ),
+                    );
+                  },
+                  child: const Text('继续对话'),
+                ),
+              ),
+            ),
           ChatInputBar(
             sessionId: widget.sessionId,
             enabled: inputEnabled,

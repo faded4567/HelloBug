@@ -211,11 +211,9 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
 
   @override
   Widget build(BuildContext context) {
-    final wsClient = ref.watch(wsClientProvider);
     _bindSlashController();
     final c = context.colors;
     final templates = ref.watch(templatesProvider);
-    final canSend = widget.enabled && _hasText && wsClient != null;
     final voiceHoldEnabled = widget.enabled && !_hasFocus && !_hasText;
     final inputPlaceholder =
         widget.enabled
@@ -274,58 +272,31 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
                   ),
                 ),
                 const SizedBox(width: 6),
-                if (_hasFocus) ...[
+                if (_hasFocus && !_hasText) ...[
                   CupertinoButton(
                     padding: const EdgeInsets.all(4),
-                    onPressed:
-                        widget.enabled
-                            ? () =>
-                                VoiceInputSheet.show(context, _sendVoiceText)
-                            : null,
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: c.bg3,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(CupertinoIcons.mic, size: 18, color: c.fg2),
-                    ),
+                    onPressed: widget.enabled ? () => VoiceInputSheet.show(context, _sendVoiceText) : null,
+                    child: Container(width: 36, height: 36, decoration: BoxDecoration(color: c.bg3, shape: BoxShape.circle), child: Icon(CupertinoIcons.mic, size: 18, color: c.fg2)),
                   ),
                   const SizedBox(width: 4),
                 ],
                 CupertinoButton(
                   padding: const EdgeInsets.all(4),
                   onPressed: widget.enabled ? _showMediaSheet : null,
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: c.bg3,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(CupertinoIcons.plus, size: 18, color: c.fg2),
-                  ),
+                  child: Container(width: 36, height: 36, decoration: BoxDecoration(color: c.bg3, shape: BoxShape.circle), child: Icon(CupertinoIcons.plus, size: 18, color: c.fg2)),
                 ),
-                if (_hasText) const SizedBox(width: 4),
-                if (_hasText)
+                if (_hasText) ...[
+                  const SizedBox(width: 4),
                   CupertinoButton(
                     padding: const EdgeInsets.all(4),
-                    onPressed: canSend ? _send : null,
+                    onPressed: _send,
                     child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: canSend ? c.tint : c.bg3,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        CupertinoIcons.arrow_up,
-                        size: 18,
-                        color: canSend ? const Color(0xFFFFFFFF) : c.fg3,
-                      ),
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(color: c.tint, shape: BoxShape.circle),
+                      child: const Icon(CupertinoIcons.arrow_up, size: 18, color: CupertinoColors.white),
                     ),
                   ),
+                ],
               ],
             ),
           ),

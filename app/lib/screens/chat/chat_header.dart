@@ -9,10 +9,14 @@ class ChatHeader extends StatelessWidget {
     required this.session,
     required this.onCancel,
     required this.onWorkspaceSwitch,
+    this.totalInputTokens,
+    this.totalOutputTokens,
   });
   final SessionSummary session;
   final VoidCallback onCancel;
   final VoidCallback onWorkspaceSwitch;
+  final int? totalInputTokens;
+  final int? totalOutputTokens;
 
   @override
   Widget build(BuildContext context) {
@@ -30,8 +34,8 @@ class ChatHeader extends StatelessWidget {
     };
 
     return Container(
-      color: c.bg,
       decoration: BoxDecoration(
+        color: c.bg,
         border: Border(bottom: BorderSide(color: c.separator)),
       ),
       child: SafeArea(
@@ -131,6 +135,11 @@ class ChatHeader extends StatelessWidget {
                       style: TextStyle(fontSize: 11, color: c.fg3),
                     ),
                   ),
+                  if (totalInputTokens != null || totalOutputTokens != null)
+                    Text(
+                      '📊 ${totalInputTokens ?? '?'}→${totalOutputTokens ?? '?'}',
+                      style: TextStyle(fontSize: 11, color: c.fg3),
+                    ),
                 ],
               ),
             ),

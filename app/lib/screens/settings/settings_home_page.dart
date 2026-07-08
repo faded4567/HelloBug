@@ -2,10 +2,15 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../state/chat_provider.dart';
 import '../../state/devices_provider.dart';
+import '../../state/drafts_provider.dart';
+import '../../state/sessions_provider.dart';
 import '../../state/settings_provider.dart';
 import '../../state/templates_provider.dart';
+import '../../state/workspaces_provider.dart';
 import '../../theme/index.dart';
+import '../../transport/app_runtime_store.dart';
 import '../../transport/ws_provider.dart';
 
 class SettingsHomePage extends ConsumerWidget {
@@ -203,13 +208,7 @@ class SettingsHomePage extends ConsumerWidget {
                     '清除本地缓存',
                     style: TextStyle(color: AppColors.red),
                   ),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap:
-                      () => _showMessage(
-                        context,
-                        title: '清除本地缓存',
-                        message: '缓存清理入口还没有正式接线，这里先保留与 HTML 设计一致的操作位。',
-                      ),
+                  onTap: () => _clearCache(context, ref, c),
                 ),
               ],
             ),
@@ -229,23 +228,19 @@ class SettingsHomePage extends ConsumerWidget {
               ],
             ),
             CupertinoListSection.insetGrouped(
+              header: Text('危险操作', style: TextStyle(color: c.fg2)),
               children: [
                 CupertinoListTile(
                   title: const Center(
                     child: Text(
-                      '退出登录',
+                      '重置 App',
                       style: TextStyle(
                         color: AppColors.red,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
-                  onTap:
-                      () => _showMessage(
-                        context,
-                        title: '退出登录',
-                        message: '账号体系还没有正式接线，先保留这个危险操作入口。',
-                      ),
+                  onTap: () => _confirmReset(context, ref),
                 ),
               ],
             ),
@@ -366,6 +361,73 @@ class _ConnectionStatus extends StatelessWidget {
       style: TextStyle(color: connected ? color : c.fg2),
     );
   }
+}
+
+void _confirmReset(BuildContext context, WidgetRef ref) {
+  showCupertinoDialog<void>(
+    context: context,
+    builder:
+        (dialogContext) => CupertinoAlertDialog(
+          title: const Text('重置 App'),
+          content: const Text('将清除所有配对数据、会话记录和本地缓存，并返回初始流程。'),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('取消'),
+            ),
+            CupertinoDialogAction(
+              isDestructiveAction: true,
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+                final client = ref.read(wsClientProvider);
+                ref.read(wsClientProvider.notifier).state = null;
+                client?.dispose();
+                ref.read(devicesProvider.notifier).clear();
+                ref.read(sessionsProvider.notifier).clear();
+                ref.invalidate(chatProvider);
+                ref.invalidate(draftsProvider);
+                ref.invalidate(workspacesProvider);
+                await AppRuntimeStore.clear();
+                if (context.mounted) {
+                  context.go('/onboarding');
+                }
+              },
+              child: const Text('重置'),
+            ),
+          ],
+        ),
+  );
+}
+
+void _clearCache(BuildContext context, WidgetRef ref, ThemeColors c) {
+  showCupertinoDialog<void>(
+    context: context,
+    builder:
+        (dialogContext) => CupertinoAlertDialog(
+          title: const Text('清除本地缓存'),
+          content: const Text('将清除会话列表缓存和已加载的消息记录，不影响服务器端数据。'),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('取消'),
+            ),
+            CupertinoDialogAction(
+              isDestructiveAction: true,
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                ref.invalidate(chatProvider);
+                ref.read(sessionsProvider.notifier).clear();
+                _showMessage(
+                  context,
+                  title: '已清除',
+                  message: '本地缓存已清理',
+                );
+              },
+              child: const Text('清除'),
+            ),
+          ],
+        ),
+  );
 }
 
 void _showMessage(

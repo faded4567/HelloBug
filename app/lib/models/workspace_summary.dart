@@ -8,6 +8,12 @@ class WorkspaceSummary {
     required this.isDefault,
     this.entryCount,
     this.requestedPath,
+    this.statusReason,
+    this.accessMode,
+    this.repairHint,
+    this.isEmptyDir = false,
+    this.repoRoot,
+    this.gitBranch,
   });
 
   final String path;
@@ -16,6 +22,12 @@ class WorkspaceSummary {
   final bool isDefault;
   final int? entryCount;
   final String? requestedPath;
+  final String? statusReason;
+  final String? accessMode;
+  final String? repairHint;
+  final bool isEmptyDir;
+  final String? repoRoot;
+  final String? gitBranch;
 
   bool get isReady => status == WorkspaceStatus.ready;
 
@@ -36,6 +48,12 @@ class WorkspaceSummary {
         isDefault: payload['is_default'] as bool? ?? false,
         entryCount: (payload['entry_count'] as num?)?.toInt(),
         requestedPath: payload['workspace_path'] as String?,
+        statusReason: payload['status_reason'] as String?,
+        accessMode: payload['access_mode'] as String?,
+        repairHint: payload['repair_hint'] as String?,
+        isEmptyDir: payload['is_empty'] as bool? ?? false,
+        repoRoot: payload['repo_root'] as String?,
+        gitBranch: payload['git_branch'] as String?,
       );
 
   static List<WorkspaceSummary> listFromPayload(dynamic raw) {

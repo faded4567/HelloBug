@@ -104,9 +104,35 @@ class _DiffPageState extends ConsumerState<DiffPage> {
     final fileName = widget.args.filePath.split('/').last;
     final activeSession = _resolvePreviewSession(ref.watch(sessionsProvider));
 
+    if (_hunks.isEmpty) {
+      return CupertinoPageScaffold(
+        backgroundColor: c.bg,
+        navigationBar: CupertinoNavigationBar(
+          backgroundColor: c.bg, border: null,
+          middle: Text(fileName, style: TextStyle(fontSize: 14, fontFamily: 'Menlo', color: c.fg)),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('📄', style: TextStyle(fontSize: 48, color: c.fg3.withValues(alpha: .25))),
+              const SizedBox(height: 12),
+              Text('没有检测到变更', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: c.fg)),
+              const SizedBox(height: 6),
+              Text('文件可能未被修改或变更太小无法识别', style: TextStyle(fontSize: 13, color: c.fg3)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final diffLen = widget.args.diff.length;
+    final isLarge = diffLen > 50_000;
+    final displayHunks = isLarge ? _hunks.take(200).toList() : _hunks;
+
     var added = 0;
     var removed = 0;
-    for (final hunk in _hunks) {
+    for (final hunk in displayHunks) {
       for (final line in hunk.lines) {
         if (line.type == DiffLineType.added) {
           added++;
@@ -210,11 +236,22 @@ class _DiffPageState extends ConsumerState<DiffPage> {
               ],
             ),
           ),
+          if (isLarge)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              color: AppColors.orange.withValues(alpha: .1),
+              child: Text(
+                'Diff 结果较大（${diffLen ~/ 1024}KB），仅显示前 200 处变更',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: AppColors.orange),
+              ),
+            ),
           Expanded(
             child:
                 _splitMode
-                    ? SplitDiffView(hunks: _hunks, scrollController: _scroll)
-                    : UnifiedDiffView(hunks: _hunks, scrollController: _scroll),
+                    ? SplitDiffView(hunks: displayHunks, scrollController: _scroll)
+                    : UnifiedDiffView(hunks: displayHunks, scrollController: _scroll),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -231,7 +268,7 @@ class _DiffPageState extends ConsumerState<DiffPage> {
                 Expanded(
                   child: Center(
                     child: Text(
-                      '${_hunkIdx + 1} / ${_hunks.length} 处变更',
+                      '${_hunkIdx + 1} / ${displayHunks.length} 处变更${isLarge ? "（截断前 ${_hunks.length} 处）" : ""}',
                       style: TextStyle(fontSize: 13, color: c.fg2),
                     ),
                   ),

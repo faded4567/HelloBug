@@ -4,13 +4,91 @@ import 'package:go_router/go_router.dart';
 
 import '../../models/device_summary.dart';
 import '../../state/devices_provider.dart';
+import '../../state/sessions_provider.dart';
 import '../../theme/index.dart';
+import '../../transport/app_runtime_store.dart';
+import '../../transport/ws_provider.dart';
 
-class DevicesPage extends ConsumerWidget {
+class DevicesPage extends ConsumerStatefulWidget {
   const DevicesPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DevicesPage> createState() => _DevicesPageState();
+}
+
+class _DevicesPageState extends ConsumerState<DevicesPage> {
+  bool _initialLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    // Mark initial loading done after first build with data
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() => _initialLoading = false);
+    });
+  }
+
+  Future<void> _refresh() async {
+    setState(() => _error = null);
+    final client = ref.read(wsClientProvider);
+    if (client == null) {
+      setState(() => _error = '未连接到服务器');
+      return;
+    }
+    try {
+      await ref.read(devicesProvider.notifier).load(force: true);
+      setState(() => _error = null);
+    } catch (e) {
+      setState(() => _error = '刷新失败，请稍后再试');
+    }
+  }
+
+  Future<bool> _confirmUnlink(DeviceSummary device) async {
+    final result = await showCupertinoDialog<bool>(
+      context: context,
+      builder:
+          (dialogContext) => CupertinoAlertDialog(
+            title: Text('解绑 ${device.machineName}'),
+            content: const Text('解绑后 App 将断开连接并返回配对流程。'),
+            actions: [
+              CupertinoDialogAction(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('取消'),
+              ),
+              CupertinoDialogAction(
+                isDestructiveAction: true,
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('解绑'),
+              ),
+            ],
+          ),
+    );
+    return result ?? false;
+  }
+
+  Future<void> _unlinkDevice(DeviceSummary device) async {
+    try {
+      await ref
+          .read(devicesProvider.notifier)
+          .revokeDevice(device.deviceId, mode: 'unlink');
+    } catch (_) {
+      // Still clean up local state even if remote call fails
+    }
+    final client = ref.read(wsClientProvider);
+    ref.read(wsClientProvider.notifier).state = null;
+    client?.dispose();
+    ref.read(devicesProvider.notifier).clear();
+    ref.read(sessionsProvider.notifier).clear();
+    await AppRuntimeStore.clear();
+    if (mounted) {
+      context.go('/onboarding');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final devices =
         ref.watch(devicesProvider).values.toList()..sort((left, right) {
           if (left.isRevoked != right.isRevoked) {
@@ -23,56 +101,179 @@ class DevicesPage extends ConsumerWidget {
             right.machineName.toLowerCase(),
           );
         });
+    final c = context.colors;
+
     return CupertinoPageScaffold(
-      backgroundColor: context.colors.bg,
+      backgroundColor: c.bg,
       navigationBar: CupertinoNavigationBar(
-        backgroundColor: context.colors.bg,
+        backgroundColor: c.bg,
         border: null,
-        middle: Text('我的设备', style: TextStyle(color: context.colors.fg)),
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: () {},
-          child: Icon(CupertinoIcons.settings, color: context.colors.fg),
+        middle: Text('我的设备', style: TextStyle(color: c.fg)),
+        trailing: GestureDetector(
+          onTap: () => context.push('/settings'),
+          child: Icon(CupertinoIcons.settings, color: c.tint),
         ),
       ),
       child: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          children: [
-            _SectionHeader(label: '已配对'),
-            ...devices.map((d) => _DeviceCard(device: d)),
-            _SectionHeader(label: '添加'),
-            _AddDeviceRow(onTap: () => context.push('/pairing')),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                color: context.colors.bg2,
-                borderRadius: BorderRadius.circular(12),
+        child: _buildContent(devices, c),
+      ),
+    );
+  }
+
+  Widget _buildContent(List<DeviceSummary> devices, ThemeColors c) {
+    // Initial loading state
+    if (_initialLoading && devices.isEmpty) {
+      return const Center(child: CupertinoActivityIndicator());
+    }
+
+    // Error state
+    if (_error != null && devices.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('📡', style: TextStyle(fontSize: 52)),
+              const SizedBox(height: 12),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 15, color: c.fg2),
               ),
-              child: Text.rich(
-                TextSpan(
-                  children: [
-                    const TextSpan(text: '💡 '),
-                    TextSpan(
-                      text: '向左滑动',
+              const SizedBox(height: 16),
+              CupertinoButton.filled(
+                onPressed: _refresh,
+                child: const Text('重试'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Empty state (no paired devices)
+    if (devices.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('🖥', style: TextStyle(fontSize: 52, color: c.fg3.withValues(alpha: .25))),
+              const SizedBox(height: 12),
+              Text(
+                '还没有配对设备',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: c.fg),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '首次使用需要先在电脑上运行 daemon\n然后扫码或输入配对码绑定',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: c.fg2, height: 1.6),
+              ),
+              const SizedBox(height: 16),
+              CupertinoButton.filled(
+                onPressed: () => context.push('/pairing'),
+                child: const Text('绑定新设备'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Device list
+    return Column(
+      children: [
+        // Error banner (non-blocking)
+        if (_error != null)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: AppColors.red.withValues(alpha: .12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _error!,
+                    style: TextStyle(fontSize: 13, color: AppColors.red),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: _refresh,
+                  child: Text('重试', style: TextStyle(fontSize: 13, color: c.tint)),
+                ),
+              ],
+            ),
+          ),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            children: [
+              _SectionHeader(label: '已配对'),
+              ...devices.map(
+                (d) => Dismissible(
+                  key: Key('device-${d.deviceId}'),
+                  direction: DismissDirection.endToStart,
+                  background: Container(
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 20),
+                    margin: const EdgeInsets.only(bottom: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.red,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      '解绑',
                       style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: context.colors.fg,
+                        color: CupertinoColors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    TextSpan(
-                      text: '卡片可解绑设备并吊销其访问权限',
-                      style: TextStyle(color: context.colors.fg2),
-                    ),
-                  ],
+                  ),
+                  confirmDismiss: (_) => _confirmUnlink(d),
+                  onDismissed: (_) => _unlinkDevice(d),
+                  child: _DeviceCard(device: d),
                 ),
-                style: const TextStyle(fontSize: 13, height: 1.6),
               ),
-            ),
-          ],
+              _SectionHeader(label: '添加'),
+              _AddDeviceRow(onTap: () => context.push('/pairing')),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: c.bg2,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      const TextSpan(text: '💡 '),
+                      TextSpan(
+                        text: '向左滑动',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: c.fg,
+                        ),
+                      ),
+                      TextSpan(
+                        text: '卡片可解绑设备并吊销其访问权限',
+                        style: TextStyle(color: c.fg2),
+                      ),
+                    ],
+                  ),
+                  style: const TextStyle(fontSize: 13, height: 1.6),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -112,7 +313,7 @@ class _DeviceCard extends StatelessWidget {
         device.isRevoked
             ? AppColors.red
             : device.online
-            ? const Color(0xFF34C759)
+            ? AppColors.green
             : context.colors.fg3;
     final statusText =
         device.isRevoked

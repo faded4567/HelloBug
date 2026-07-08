@@ -405,10 +405,10 @@ class AppRuntimeStore {
       return 'HelloBug Web';
     }
     if (defaultTargetPlatform == TargetPlatform.iOS) {
-      return 'HelloBug iPhone';
+      return 'iPhone (iOS)';
     }
     if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'HelloBug Android';
+      return 'Android Phone';
     }
     return 'HelloBug App';
   }

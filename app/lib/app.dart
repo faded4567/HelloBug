@@ -22,6 +22,8 @@ import 'transport/transport_lifecycle_observer.dart';
 import 'transport/ws_client.dart';
 import 'transport/ws_provider.dart';
 import 'widgets/danger_confirm/danger_confirm_sheet.dart';
+import 'widgets/danger_confirm/danger_result_sheet.dart';
+import 'widgets/reconnect_overlay.dart';
 
 class HelloBugApp extends ConsumerStatefulWidget {
   const HelloBugApp({super.key});
@@ -70,9 +72,22 @@ class _HelloBugAppState extends ConsumerState<HelloBugApp> {
         DefaultWidgetsLocalizations.delegate,
       ],
       builder:
-          (context, child) => UnlockGate(
-            child: _DangerListener(child: child ?? const SizedBox.shrink()),
-          ),
+          (context, child) {
+            final client = ref.watch(wsClientProvider);
+            final wrapped = UnlockGate(
+              child: _DangerListener(child: child ?? const SizedBox.shrink()),
+            );
+            if (client != null) {
+              final host =
+                  Uri.tryParse(client.serverUri.toString())?.host ?? '';
+              return ReconnectOverlay(
+                client: client,
+                relayHost: host,
+                child: wrapped,
+              );
+            }
+            return wrapped;
+          },
     );
   }
 }
@@ -137,18 +152,12 @@ class _DangerListenerState extends ConsumerState<_DangerListener> {
         }
 
         _announcedDangerResultIds.add(result.dangerId);
-        showCupertinoDialog<void>(
+        showCupertinoModalPopup<void>(
           context: context,
           builder:
-              (_) => CupertinoAlertDialog(
-                title: Text(_dangerResultTitle(result.status)),
-                content: Text(result.message),
-                actions: [
-                  CupertinoDialogAction(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('知道了'),
-                  ),
-                ],
+              (_) => DangerResultSheet(
+                status: result.status,
+                message: result.message,
               ),
         );
       });
@@ -244,92 +253,65 @@ class _DangerListenerState extends ConsumerState<_DangerListener> {
   Future<void> _handleTransportError(InnerMessage message) async {
     final code = message.payload['code'] as String? ?? '';
     final requestId = message.payload['request_id'] as String? ?? '';
-    final errorMessage = message.payload['message'] as String? ?? '连接已失效';
 
     if (code == 'DEVICE_REVOKED') {
-      await _resetRuntimeAndReturnToOnboarding(
-        title: '设备已吊销',
-        message: errorMessage,
-      );
+      if (_resettingRuntime) return;
+      _resettingRuntime = true;
+      try {
+        final client = _observedClient;
+        _transportSub?.cancel();
+        _transportSub = null;
+        _observedClient = null;
+        _lastUploadedPushTokenKey = null;
+
+        ref.read(wsClientProvider.notifier).state = null;
+        client?.dispose();
+        // Keep runtime store so we can show device info on revoked page
+        final runtime = await AppRuntimeStore.load();
+        final deviceName = runtime?.machineName ?? '未知设备';
+        ref.read(devicesProvider.notifier).clear();
+        ref.read(sessionsProvider.notifier).clear();
+        ref.invalidate(chatProvider);
+        ref.invalidate(draftsProvider);
+        ref.invalidate(workspacesProvider);
+
+        if (!mounted) return;
+        context.go('/device-revoked', extra: {'deviceName': deviceName});
+      } finally {
+        _resettingRuntime = false;
+      }
       return;
     }
 
     if (code == 'AUTH_INVALID' &&
         (requestId == 'auth.attach' || requestId == 'auth.refresh')) {
-      await _resetRuntimeAndReturnToOnboarding(
-        title: '登录已失效',
-        message: errorMessage,
-      );
-    }
-  }
+      if (_resettingRuntime) return;
+      _resettingRuntime = true;
+      try {
+        final client = _observedClient;
+        _transportSub?.cancel();
+        _transportSub = null;
+        _observedClient = null;
+        _lastUploadedPushTokenKey = null;
 
-  Future<void> _resetRuntimeAndReturnToOnboarding({
-    required String title,
-    required String message,
-  }) async {
-    if (_resettingRuntime) {
+        ref.read(wsClientProvider.notifier).state = null;
+        client?.dispose();
+        final runtime = await AppRuntimeStore.load();
+        final deviceName = runtime?.machineName ?? '未知设备';
+        await AppRuntimeStore.clear();
+        ref.read(devicesProvider.notifier).clear();
+        ref.read(sessionsProvider.notifier).clear();
+        ref.invalidate(chatProvider);
+        ref.invalidate(draftsProvider);
+        ref.invalidate(workspacesProvider);
+
+        if (!mounted) return;
+        context.go('/auth-invalid', extra: {'deviceName': deviceName});
+      } finally {
+        _resettingRuntime = false;
+      }
       return;
-    }
-    _resettingRuntime = true;
-
-    try {
-      final client = _observedClient;
-      _transportSub?.cancel();
-      _transportSub = null;
-      _observedClient = null;
-      _lastUploadedPushTokenKey = null;
-
-      ref.read(wsClientProvider.notifier).state = null;
-      client?.dispose();
-      await AppRuntimeStore.clear();
-      ref.read(devicesProvider.notifier).clear();
-      ref.read(sessionsProvider.notifier).clear();
-      ref.invalidate(chatProvider);
-      ref.invalidate(draftsProvider);
-      ref.invalidate(workspacesProvider);
-
-      if (!mounted) {
-        return;
-      }
-
-      await showCupertinoDialog<void>(
-        context: context,
-        builder:
-            (dialogContext) => CupertinoAlertDialog(
-              title: Text(title),
-              content: Text(message),
-              actions: [
-                CupertinoDialogAction(
-                  onPressed:
-                      () =>
-                          Navigator.of(
-                            dialogContext,
-                            rootNavigator: true,
-                          ).pop(),
-                  child: const Text('重新配对'),
-                ),
-              ],
-            ),
-      );
-      if (!mounted) {
-        return;
-      }
-      context.go('/onboarding');
-    } finally {
-      _resettingRuntime = false;
-    }
-  }
-
-  String _dangerResultTitle(String status) {
-    switch (status) {
-      case 'timed_out':
-        return '危险操作已超时';
-      case 'not_found':
-        return '危险操作已失效';
-      case 'biometric_required':
-        return '需要生物验证';
-      default:
-        return '危险操作未完成';
     }
   }
 }
+
