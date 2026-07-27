@@ -1,6 +1,6 @@
 {
   "name": "@hellobug/protocol",
-  "version": "0.1.0",
+  "version": "0.1.0-debug.1",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
@@ -20,4 +20,3 @@
     "zod": "^3.25.76"
   }
 }
-

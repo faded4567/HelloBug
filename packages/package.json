@@ -2,6 +2,11 @@
   "name": "hellobug",
   "private": true,
   "packageManager": "pnpm@10.12.1",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "node-pty"
+    ]
+  },
   "scripts": {
     "build": "npm --prefix ./protocol run build && npm --prefix ./server run build && npm --prefix ./daemon run build",
     "test": "npm --prefix ./protocol run test && npm --prefix ./server run test && npm --prefix ./daemon run test",

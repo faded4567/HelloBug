@@ -7,7 +7,7 @@
 后端 workspace 根目录是 `packages/`：
 
 ```bash
-cd /Users/shuai/yangshuai/projects/HelloBug/packages
+cd /path/to/HelloBug/packages
 ```
 
 ## 2. Server 本地启动
@@ -58,7 +58,7 @@ HELLOBUG_DAEMON_ALLOWED_PATHS='["/abs/workspace-a","/abs/workspace-b"]'
 ```bash
 HELLOBUG_DAEMON_SERVER_URL=ws://192.168.18.8:3000/v1/relay \
 HELLOBUG_DAEMON_BOOTSTRAP_TOKEN=<bootstrap_token> \
-HELLOBUG_DAEMON_ALLOWED_PATHS="/Users/shuai/yangshuai/projects/HelloBug" \
+HELLOBUG_DAEMON_ALLOWED_PATHS="/absolute/path/to/your/workspace" \
 pnpm dev:daemon
 ```
 

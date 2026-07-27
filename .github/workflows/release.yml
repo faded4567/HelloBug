@@ -1,0 +1,83 @@
+name: Publish Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: stable
+          cache: true
+
+      - name: Install backend dependencies
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.12.1 --activate
+          pnpm -C packages install --frozen-lockfile
+
+      - name: Build daemon release archive
+        run: bash scripts/package-daemon-release.sh "${GITHUB_REF_NAME#v}"
+
+      - name: Configure Android release signing
+        id: android_signing
+        working-directory: app
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          if [[ -n "$ANDROID_KEYSTORE_BASE64" && -n "$ANDROID_KEYSTORE_PASSWORD" && -n "$ANDROID_KEY_PASSWORD" && -n "$ANDROID_KEY_ALIAS" ]]; then
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/hellobug-release.jks
+            printf '%s\n' \
+              'storeFile=hellobug-release.jks' \
+              "storePassword=$ANDROID_KEYSTORE_PASSWORD" \
+              "keyAlias=$ANDROID_KEY_ALIAS" \
+              "keyPassword=$ANDROID_KEY_PASSWORD" \
+              > android/key.properties
+            echo "apk_name=hellobug-${GITHUB_REF_NAME#v}-android-release.apk" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Android signing secrets are absent; publishing a debug-signed test APK."
+            echo "apk_name=hellobug-${GITHUB_REF_NAME#v}-android-release-debug-signed.apk" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build Android APK
+        working-directory: app
+        run: |
+          flutter pub get
+          flutter build apk --release
+          cp build/app/outputs/flutter-apk/app-release.apk ../dist/release/${{ steps.android_signing.outputs.apk_name }}
+          cd ../dist/release
+          sha256sum ${{ steps.android_signing.outputs.apk_name }} > ${{ steps.android_signing.outputs.apk_name }}.sha256
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release_args=(--title "HelloBug $GITHUB_REF_NAME")
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            release_args+=(--prerelease)
+          fi
+
+          notes_file="docs/release-notes/${GITHUB_REF_NAME}.md"
+          if [ -f "$notes_file" ]; then
+            release_args+=(--notes-file "$notes_file")
+          else
+            release_args+=(--generate-notes)
+          fi
+
+          gh release create "$GITHUB_REF_NAME" dist/release/* "${release_args[@]}"

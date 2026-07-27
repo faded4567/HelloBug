@@ -1,7 +1,7 @@
 name: hellobug
 description: "Remote control for local Claude Code / Codex agents."
 publish_to: 'none'
-version: 0.1.0+1
+version: 0.1.0-debug.1+1
 
 environment:
   sdk: ^3.7.0

@@ -1,17 +1,19 @@
-# hellobug
+# HelloBug Flutter App
 
-A new Flutter project.
+This directory contains the HelloBug mobile client. The app pairs with a daemon running on a computer, then uses the configured relay to view and control coding-agent sessions.
 
-## Getting Started
+## Run Locally
 
-This project is a starting point for a Flutter application.
+From this directory:
 
-A few resources to get you started if this is your first Flutter project:
+```bash
+flutter pub get
+flutter test
+flutter run
+```
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+The relay server and daemon must already be running. Follow the repository [quick start](../README.md#本地快速开始) for the complete setup and pairing flow.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+For local server addresses, use `ws://10.0.2.2:3000/v1/relay` from an Android emulator, `ws://127.0.0.1:3000/v1/relay` from an iOS Simulator, or the development host's LAN address from a physical device.
+
+The Android push integration requires a local `android/app/google-services.json` when testing real FCM delivery. Do not commit that file unless it is explicitly intended to be public.
