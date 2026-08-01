@@ -1,6 +1,7 @@
 {
   "name": "@hellobug/daemon",
   "version": "0.1.0-debug.1",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",

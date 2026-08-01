@@ -1,5 +1,6 @@
 {
   "name": "hellobug-deploy",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "scripts": {
